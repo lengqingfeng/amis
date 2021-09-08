@@ -5,7 +5,6 @@
  */
 
 import React from 'react';
-import cx from 'classnames';
 import {findDOMNode} from 'react-dom';
 import {SketchPicker, GithubPicker, ColorState} from 'react-color';
 import {Icon} from './icons';
@@ -22,6 +21,7 @@ export interface ColorProps extends LocaleProps, ThemeProps {
   // closeOnSelect:boolean;
   clearable: boolean;
   className?: string;
+  popoverClassName?: string;
   disabled?: boolean;
   popOverContainer?: any;
   placement?: string;
@@ -75,12 +75,12 @@ export class ColorControl extends React.PureComponent<
     this.input = React.createRef();
   }
 
-  componentWillReceiveProps(nextProps: ColorProps) {
+  componentDidUpdate(prevProps: ColorProps) {
     const props = this.props;
 
-    if (props.value !== nextProps.value) {
+    if (prevProps.value !== props.value) {
       this.setState({
-        inputValue: nextProps.value || ''
+        inputValue: props.value || ''
       });
     }
   }
@@ -206,6 +206,7 @@ export class ColorControl extends React.PureComponent<
     const {
       classPrefix: ns,
       className,
+      popoverClassName,
       value,
       placeholder,
       disabled,
@@ -273,7 +274,7 @@ export class ColorControl extends React.PureComponent<
           >
             <PopOver
               classPrefix={ns}
-              className={cx('ColorPicker-popover')}
+              className={cx('ColorPicker-popover', popoverClassName)}
               onHide={this.close}
               overlay
             >

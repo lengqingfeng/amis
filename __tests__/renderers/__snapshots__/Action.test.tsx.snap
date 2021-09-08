@@ -2,7 +2,7 @@
 
 exports[`Renderers:Action [actionType = "link"] show active class 1`] = `
 <button
-  className="a-Button a-Button--default a"
+  className="cxd-Button cxd-Button--default a"
   onClick={[Function]}
   type="button"
 >
@@ -14,7 +14,7 @@ exports[`Renderers:Action [actionType = "link"] show active class 1`] = `
 
 exports[`Renderers:Action [actionType = "link"] show active class 2`] = `
 <button
-  className="a-Button a-Button--default a is-active"
+  className="cxd-Button cxd-Button--default a is-active"
   onClick={[Function]}
   type="button"
 >
@@ -29,7 +29,9 @@ exports[`Renderers:Action MenuItem changes class when actived & disabled 1`] = `
   className="a"
   onClick={[Function]}
 >
-  123
+  <span>
+    123
+  </span>
 </a>
 `;
 
@@ -38,16 +40,21 @@ exports[`Renderers:Action MenuItem changes class when actived & disabled 2`] = `
   className="a is-active"
   onClick={[Function]}
 >
-  233
+  <span>
+    233
+  </span>
 </a>
 `;
 
 exports[`Renderers:Action MenuItem changes class when actived & disabled 3`] = `
 <a
-  className="a is-active is-disabled"
+  className="a is-active"
+  disabled={true}
   onClick={[Function]}
 >
-  233
+  <span>
+    233
+  </span>
 </a>
 `;
 
@@ -56,7 +63,9 @@ exports[`Renderers:Action MenuItem display icon 1`] = `
   className="a"
   onClick={[Function]}
 >
-  123
+  <span>
+    123
+  </span>
 </a>
 `;
 
@@ -65,16 +74,18 @@ exports[`Renderers:Action MenuItem display icon 2`] = `
   className="a"
   onClick={[Function]}
 >
-  123
   <i
-    className="a-Button-icon fa fa-cloud"
+    className="cxd-Button-icon fa fa-cloud"
   />
+  <span>
+    123
+  </span>
 </a>
 `;
 
 exports[`Renderers:Action custom activeClass 1`] = `
 <button
-  className="a-Button a-Button--default a"
+  className="cxd-Button cxd-Button--default a"
   onClick={[Function]}
   type="button"
 >
@@ -86,7 +97,7 @@ exports[`Renderers:Action custom activeClass 1`] = `
 
 exports[`Renderers:Action custom activeClass 2`] = `
 <button
-  className="a-Button a-Button--default a custom-active"
+  className="cxd-Button cxd-Button--default a custom-active"
   onClick={[Function]}
   type="button"
 >

@@ -17,7 +17,7 @@ export interface DiffControlSchema extends FormBaseControl {
   /**
    * 指定为 Diff 编辑器
    */
-  type: 'diff';
+  type: 'diff-editor';
 
   /**
    * 左侧面板的值， 支持取变量。
@@ -124,7 +124,6 @@ export class DiffEditor extends React.Component<DiffEditorProps, any> {
 
     if (
       this.originalEditor &&
-      diffValue &&
       (diffValue !== prevProps.diffValue || data !== prevProps.data)
     ) {
       this.originalEditor.getModel().setValue(
@@ -144,7 +143,6 @@ export class DiffEditor extends React.Component<DiffEditorProps, any> {
 
     if (
       this.modifiedEditor &&
-      value &&
       value !== prevProps.value &&
       !this.state.focused
     ) {
@@ -263,6 +261,7 @@ export class DiffEditor extends React.Component<DiffEditorProps, any> {
             ...options,
             readOnly: disabled
           }}
+          isDiffEditor
         />
       </div>
     );
@@ -279,13 +278,13 @@ export class DiffEditorControlRenderer extends DiffEditor {
   };
 }
 
-@Renderer({
-  test: /(^|\/)diff-editor$/,
-  name: 'diff-editor'
-})
-export class DiffEditorRenderer extends DiffEditor {
-  static defaultProps = {
-    ...DiffEditor.defaultProps,
-    disabled: true
-  };
-}
+// @Renderer({
+//   test: /(^|\/)diff-editor$/,
+//   name: 'diff-editor'
+// })
+// export class DiffEditorRenderer extends DiffEditor {
+//   static defaultProps = {
+//     ...DiffEditor.defaultProps,
+//     disabled: true
+//   };
+// }

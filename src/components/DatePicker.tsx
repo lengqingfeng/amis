@@ -5,7 +5,6 @@
  */
 
 import React from 'react';
-import cx from 'classnames';
 import moment from 'moment';
 import 'moment/locale/zh-cn';
 import {Icon} from './icons';
@@ -16,6 +15,7 @@ import {PlainObject} from '../types';
 import Calendar from './calendar/Calendar';
 import 'react-datetime/css/react-datetime.css';
 import {localeable, LocaleProps, TranslateFn} from '../locale';
+import {ucFirst} from '../utils/helper';
 
 const availableShortcuts: {[propName: string]: any} = {
   now: {
@@ -91,6 +91,13 @@ const availableShortcuts: {[propName: string]: any} = {
     label: 'Date.endOfMonth',
     date: (now: moment.Moment) => {
       return now.endOf('month');
+    }
+  },
+
+  endoflastmonth: {
+    label: 'Date.endOfLastMonth',
+    date: (now: moment.Moment) => {
+      return now.add(-1, 'month').endOf('month');
     }
   }
 };
@@ -230,6 +237,7 @@ export type ShortCuts =
 export interface DateProps extends LocaleProps, ThemeProps {
   viewMode: 'years' | 'months' | 'days' | 'time' | 'quarters';
   className?: string;
+  popoverClassName?: string;
   placeholder?: string;
   inputFormat?: string;
   timeFormat?: string;
@@ -245,8 +253,8 @@ export interface DateProps extends LocaleProps, ThemeProps {
   value?: any;
   shortcuts: string | Array<ShortCuts>;
   overlayPlacement: string;
-  minTime?: moment.Moment;
-  maxTime?: moment.Moment;
+  // minTime?: moment.Moment;
+  // maxTime?: moment.Moment;
   dateFormat?: string;
   timeConstraints?: {
     hours?: {
@@ -267,6 +275,7 @@ export interface DateProps extends LocaleProps, ThemeProps {
   };
   popOverContainer?: any;
 
+  borderMode?: 'full' | 'half' | 'none';
   // 是否为内嵌模式，如果开启就不是 picker 了，直接页面点选。
   embed?: boolean;
 
@@ -321,10 +330,12 @@ export class DatePicker extends React.Component<DateProps, DatePickerState> {
 
   dom: HTMLDivElement;
 
-  componentWillReceiveProps(nextProps: DateProps) {
-    if (this.props.value !== nextProps.value) {
+  componentDidUpdate(prevProps: DateProps) {
+    const props = this.props;
+
+    if (prevProps.value !== props.value) {
       this.setState({
-        value: normalizeValue(nextProps.value, nextProps.format)
+        value: normalizeValue(props.value, props.format)
       });
     }
   }
@@ -392,8 +403,8 @@ export class DatePicker extends React.Component<DateProps, DatePickerState> {
     const {
       onChange,
       format,
-      minTime,
-      maxTime,
+      minDate,
+      maxDate,
       dateFormat,
       timeFormat,
       closeOnSelect,
@@ -405,10 +416,10 @@ export class DatePicker extends React.Component<DateProps, DatePickerState> {
       return;
     }
 
-    if (minTime && value && value.isBefore(minTime, 'second')) {
-      value = minTime;
-    } else if (maxTime && value && value.isAfter(maxTime, 'second')) {
-      value = maxTime;
+    if (minDate && value && value.isBefore(minDate, 'second')) {
+      value = minDate;
+    } else if (maxDate && value && value.isAfter(maxDate, 'second')) {
+      value = maxDate;
     }
 
     onChange(utc ? moment.utc(value).format(format) : value.format(format));
@@ -473,7 +484,7 @@ export class DatePicker extends React.Component<DateProps, DatePickerState> {
     if (!shortcuts) {
       return null;
     }
-    const {classPrefix: ns} = this.props;
+    const {classPrefix: ns, classnames: cx} = this.props;
     let shortcutArr: Array<string | ShortCuts>;
     if (typeof shortcuts === 'string') {
       shortcutArr = shortcuts.split(',');
@@ -483,7 +494,7 @@ export class DatePicker extends React.Component<DateProps, DatePickerState> {
 
     const __ = this.props.translate;
     return (
-      <ul className={`${ns}DatePicker-shortcuts`}>
+      <ul className={cx(`DatePicker-shortcuts`)}>
         {shortcutArr.map(item => {
           if (!item) {
             return null;
@@ -500,7 +511,7 @@ export class DatePicker extends React.Component<DateProps, DatePickerState> {
           }
           return (
             <li
-              className={`${ns}DatePicker-shortcut`}
+              className={cx(`DatePicker-shortcut`)}
               onClick={() => this.selectRannge(shortcut)}
               key={shortcut.key || shortcut.label}
             >
@@ -515,7 +526,9 @@ export class DatePicker extends React.Component<DateProps, DatePickerState> {
   render() {
     const {
       classPrefix: ns,
+      classnames: cx,
       className,
+      popoverClassName,
       value,
       placeholder,
       disabled,
@@ -531,7 +544,9 @@ export class DatePicker extends React.Component<DateProps, DatePickerState> {
       overlayPlacement,
       locale,
       format,
-      embed
+      borderMode,
+      embed,
+      minDate
     } = this.props;
 
     const __ = this.props.translate;
@@ -542,7 +557,7 @@ export class DatePicker extends React.Component<DateProps, DatePickerState> {
       return (
         <div
           className={cx(
-            `${ns}DateCalendar`,
+            `DateCalendar`,
             {
               'is-disabled': disabled
             },
@@ -561,6 +576,7 @@ export class DatePicker extends React.Component<DateProps, DatePickerState> {
             input={false}
             onClose={this.close}
             locale={locale}
+            minDate={minDate}
             // utc={utc}
           />
         </div>
@@ -574,10 +590,11 @@ export class DatePicker extends React.Component<DateProps, DatePickerState> {
         onFocus={this.handleFocus}
         onBlur={this.handleBlur}
         className={cx(
-          `${ns}DatePicker`,
+          `DatePicker`,
           {
             'is-disabled': disabled,
-            'is-focused': this.state.isFocused
+            'is-focused': this.state.isFocused,
+            [`DatePicker--border${ucFirst(borderMode)}`]: borderMode
           },
           className
         )}
@@ -585,22 +602,22 @@ export class DatePicker extends React.Component<DateProps, DatePickerState> {
         onClick={this.handleClick}
       >
         {date ? (
-          <span className={`${ns}DatePicker-value`}>
+          <span className={cx(`DatePicker-value`)}>
             {date.format(inputFormat)}
           </span>
         ) : (
-          <span className={`${ns}DatePicker-placeholder`}>
+          <span className={cx(`DatePicker-placeholder`)}>
             {__(placeholder)}
           </span>
         )}
 
         {clearable && !disabled && normalizeValue(value, format) ? (
-          <a className={`${ns}DatePicker-clear`} onClick={this.clearValue}>
+          <a className={cx(`DatePicker-clear`)} onClick={this.clearValue}>
             <Icon icon="close" className="icon" />
           </a>
         ) : null}
 
-        <a className={`${ns}DatePicker-toggler`}>
+        <a className={cx(`DatePicker-toggler`)}>
           <Icon icon="calendar" className="icon" />
         </a>
 
@@ -614,7 +631,7 @@ export class DatePicker extends React.Component<DateProps, DatePickerState> {
           >
             <PopOver
               classPrefix={ns}
-              className={`${ns}DatePicker-popover`}
+              className={cx(`DatePicker-popover`, popoverClassName)}
               onHide={this.close}
               overlay
               onClick={this.handlePopOverClick}
@@ -634,6 +651,7 @@ export class DatePicker extends React.Component<DateProps, DatePickerState> {
                 input={false}
                 onClose={this.close}
                 locale={locale}
+                minDate={minDate}
                 // utc={utc}
               />
             </PopOver>

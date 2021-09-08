@@ -2,9 +2,10 @@ import React from 'react';
 import {Renderer, RendererProps} from '../factory';
 import {filter} from '../utils/tpl';
 import cx from 'classnames';
-import {anyChanged} from '../utils/helper';
+import {anyChanged, getPropValue} from '../utils/helper';
 import {escapeHtml} from '../utils/tpl-builtin';
 import {BaseSchema, SchemaTpl} from '../Schema';
+import {BadgeSchema, withBadge} from '../components/Badge';
 
 /**
  * tpl 渲染器
@@ -33,6 +34,11 @@ export interface TplSchema extends BaseSchema {
   style?: {
     [propName: string]: any;
   };
+
+  /**
+   * 角标
+   */
+  badge?: BadgeSchema;
 }
 
 export interface TplProps extends RendererProps, TplSchema {
@@ -45,8 +51,7 @@ export interface TplProps extends RendererProps, TplSchema {
 export class Tpl extends React.Component<TplProps, object> {
   static defaultProps: Partial<TplProps> = {
     inline: true,
-    placeholder: '',
-    value: ''
+    placeholder: ''
   };
 
   dom: any;
@@ -74,7 +79,8 @@ export class Tpl extends React.Component<TplProps, object> {
   }
 
   getContent() {
-    const {tpl, html, text, raw, value, data, placeholder} = this.props;
+    const {tpl, html, text, raw, data, placeholder} = this.props;
+    const value = getPropValue(this.props);
 
     if (raw) {
       return raw;
@@ -127,4 +133,6 @@ export class Tpl extends React.Component<TplProps, object> {
   test: /(^|\/)(?:tpl|html)$/,
   name: 'tpl'
 })
+// @ts-ignore 类型没搞定
+@withBadge
 export class TplRenderer extends Tpl {}

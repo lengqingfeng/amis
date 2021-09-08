@@ -13,8 +13,8 @@ order: 60
 ```schema: scope="body"
 {
   "type": "form",
-  "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/mock2/form/saveForm",
-  "controls": [
+  "api": "/api/mock2/form/saveForm",
+  "body": [
     {
       "type": "tree-select",
       "name": "tree",
@@ -67,4 +67,4 @@ order: 60
 }
 ```
 
-更多用法，见 [Tree](./tree)
+更多用法，见 [InputTree](./input-tree)

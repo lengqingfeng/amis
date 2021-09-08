@@ -148,7 +148,7 @@ export interface ChartProps
   extends RendererProps,
     Omit<ChartSchema, 'type' | 'className'> {
   chartRef?: (echart: any) => void;
-  onDataFilter?: (config: any, echarts: any) => any;
+  onDataFilter?: (config: any, echarts: any, data?: any) => any;
   onChartWillMount?: (echarts: any) => void | Promise<void>;
   onChartMount?: (chart: any, echarts: any) => void;
   onChartUnMount?: (chart: any, echarts: any) => void;
@@ -177,12 +177,13 @@ export class Chart extends React.Component<ChartProps> {
     this.refFn = this.refFn.bind(this);
     this.reload = this.reload.bind(this);
     this.handleClick = this.handleClick.bind(this);
+    this.mounted = true;
+
+    props.config && this.renderChart(props.config);
   }
 
-  componentWillMount() {
-    const {config, api, data, initFetch, source} = this.props;
-
-    this.mounted = true;
+  componentDidMount() {
+    const {api, data, initFetch, source} = this.props;
 
     if (source && isPureVariable(source)) {
       const ret = resolveVariableAndFilter(source, data, '| raw');
@@ -190,8 +191,6 @@ export class Chart extends React.Component<ChartProps> {
     } else if (api && initFetch !== false) {
       this.reload();
     }
-
-    config && this.renderChart(config);
   }
 
   componentDidUpdate(prevProps: ChartProps) {
@@ -235,13 +234,8 @@ export class Chart extends React.Component<ChartProps> {
 
   refFn(ref: any) {
     const chartRef = this.props.chartRef;
-    const {
-      chartTheme,
-      onChartWillMount,
-      onChartMount,
-      onChartUnMount,
-      env
-    } = this.props;
+    const {chartTheme, onChartWillMount, onChartUnMount, env} = this.props;
+    let onChartMount = this.props.onChartMount;
 
     if (ref) {
       Promise.all([
@@ -276,6 +270,11 @@ export class Chart extends React.Component<ChartProps> {
         }
 
         this.echarts = echarts.init(ref, theme);
+
+        if (typeof onChartMount === 'string') {
+          onChartMount = new Function('chart', 'echarts') as any;
+        }
+
         onChartMount?.(this.echarts, echarts);
         this.echarts.on('click', this.handleClick);
         this.unSensor = resizeSensor(ref, () => {
@@ -305,7 +304,7 @@ export class Chart extends React.Component<ChartProps> {
   }
 
   reload(subpath?: string, query?: any) {
-    const {api, env, store, interval} = this.props;
+    const {api, env, store, interval, translate: __} = this.props;
 
     if (query) {
       return this.receive(query);
@@ -332,7 +331,7 @@ export class Chart extends React.Component<ChartProps> {
         if (!result.ok) {
           return env.notify(
             'error',
-            result.msg || '加载失败，请重试！',
+            result.msg || __('fetchFailed'),
             result.msgTimeout !== undefined
               ? {
                   closeButton: true,
@@ -389,7 +388,12 @@ export class Chart extends React.Component<ChartProps> {
     const dataFilter = this.props.dataFilter;
 
     if (!onDataFilter && typeof dataFilter === 'string') {
-      onDataFilter = new Function('config', 'echarts', dataFilter) as any;
+      onDataFilter = new Function(
+        'config',
+        'echarts',
+        'data',
+        dataFilter
+      ) as any;
     }
 
     config = config || this.pending;
@@ -400,7 +404,8 @@ export class Chart extends React.Component<ChartProps> {
     }
     try {
       onDataFilter &&
-        (config = onDataFilter(config, (window as any).echarts) || config);
+        (config =
+          onDataFilter(config, (window as any).echarts, data) || config);
     } catch (e) {
       console.warn(e);
     }
@@ -446,10 +451,10 @@ export class Chart extends React.Component<ChartProps> {
     height && (style.height = height);
 
     return (
-      <LazyComponent
-        unMountOnHidden={unMountOnHidden}
-        placeholder={
-          <div className={cx(`${ns}Chart`, className)} style={style}>
+      <div className={cx(`${ns}Chart`, className)} style={style}>
+        <LazyComponent
+          unMountOnHidden={unMountOnHidden}
+          placeholder={
             <div className={`${ns}Chart-placeholder`}>
               <Spinner
                 show
@@ -457,31 +462,27 @@ export class Chart extends React.Component<ChartProps> {
                 spinnerClassName={cx('Chart-spinner')}
               />
             </div>
-          </div>
-        }
-        component={() => (
-          <div
-            className={cx(`${ns}Chart`, className)}
-            style={style}
-            ref={this.refFn}
-          />
-        )}
-      />
+          }
+          component={() => (
+            <div className={`${ns}Chart-content`} ref={this.refFn}></div>
+          )}
+        />
+      </div>
     );
   }
 }
 
 @Renderer({
-  test: /(^|\/)chart$/,
-  storeType: ServiceStore.name,
-  name: 'chart'
+  type: 'chart',
+  storeType: ServiceStore.name
 })
 export class ChartRenderer extends Chart {
   static contextType = ScopedContext;
 
-  componentWillMount() {
-    super.componentWillMount();
-    const scoped = this.context as IScopedContext;
+  constructor(props: ChartProps, context: IScopedContext) {
+    super(props);
+
+    const scoped = context;
     scoped.registerComponent(this);
   }
 

@@ -1,11 +1,10 @@
 import React from 'react';
 import {toast} from '../../src/components/Toast';
-import {render} from '../../src/index';
+import {render, makeTranslator} from '../../src/index';
 import {normalizeLink} from '../../src/utils/normalizeLink';
 import {alert, confirm} from '../../src/components/Alert';
 import axios from 'axios';
-import Frame from 'react-frame-component';
-import stripJsonComments from 'strip-json-comments';
+import JSON5 from 'json5';
 import CodeEditor from '../../src/components/Editor';
 import copy from 'copy-to-clipboard';
 
@@ -40,6 +39,20 @@ const scopes = {
         }
     }`,
 
+  'form2': `{
+      "type": "page",
+      "body": {
+          "title": "",
+          "type": "form",
+          "autoFocus": false,
+          "api": "/api/mock/saveForm?waitSeconds=1",
+          "mode": "horizontal",
+          "body": SCHEMA_PLACEHOLDER,
+          "submitText": null,
+          "actions": []
+      }
+  }`,
+
   'form-item': `{
         "type": "page",
         "body": {
@@ -53,7 +66,22 @@ const scopes = {
             "submitText": null,
             "actions": []
         }
-    }`
+    }`,
+
+  'form-item2': `{
+      "type": "page",
+      "body": {
+          "title": "",
+          "type": "form",
+          "mode": "horizontal",
+          "autoFocus": false,
+          "body": [
+              SCHEMA_PLACEHOLDER
+          ],
+          "submitText": null,
+          "actions": []
+      }
+  }`
 };
 
 export default class PlayGround extends React.Component {
@@ -85,6 +113,9 @@ export default class PlayGround extends React.Component {
     this.removeWindowEvents = this.removeWindowEvents.bind(this);
     this.handleChange = this.handleChange.bind(this);
     this.schemaProps = {};
+
+    const __ = makeTranslator(props.locale);
+
     this.env = {
       session: 'doc',
       updateLocation: (location, replace) => {
@@ -102,13 +133,18 @@ export default class PlayGround extends React.Component {
           return;
         }
 
+        if (action && to && action.target) {
+          window.open(to, action.target);
+          return;
+        }
+
         if (/^https?:\/\//.test(to)) {
           window.location.replace(to);
         } else {
           router.push(to);
         }
       },
-      fetcher: config => {
+      fetcher: async config => {
         config = {
           dataType: 'json',
           ...config
@@ -120,18 +156,48 @@ export default class PlayGround extends React.Component {
           config.headers['Content-Type'] = 'application/json';
         }
 
-        return axios[config.method](config.url, config.data, config);
+        // 支持返回各种报错信息
+        config.validateStatus = function (status) {
+          return true;
+        };
+
+        const response = await axios[config.method](
+          config.url,
+          config.data,
+          config
+        );
+
+        if (response.status >= 400) {
+          if (response.data) {
+            if (response.data.msg) {
+              throw new Error(response.data.msg);
+            } else {
+              throw new Error(
+                __('System.requestError') +
+                  JSON.stringify(response.data, null, 2)
+              );
+            }
+          } else {
+            throw new Error(
+              `${__('System.requestErrorStatus')} ${response.status}`
+            );
+          }
+        }
+        return response;
       },
       isCancel: value => axios.isCancel(value),
       notify: (type, msg) =>
         toast[type]
-          ? toast[type](msg, type === 'error' ? '系统错误' : '系统消息')
+          ? toast[type](
+              msg,
+              type === 'error' ? __('System.error') : __('System.notify')
+            )
           : console.warn('[Notify]', type, msg),
       alert,
       confirm,
       copy: content => {
         copy(content);
-        toast.success('内容已复制到粘贴板');
+        toast.success(__('System.copy'));
       }
     };
 
@@ -195,14 +261,9 @@ export default class PlayGround extends React.Component {
         );
       }
 
-      schemaContent = stripJsonComments(schemaContent).replace(
-        /('|")raw:/g,
-        '$1'
-      ); // 去掉注释
+      schemaContent = schemaContent.replace(/('|")raw:/g, '$1'); // 去掉 raw
 
-      const json = {
-        ...JSON.parse(schemaContent)
-      };
+      const json = JSON5.parse(schemaContent);
 
       return json;
     } catch (e) {
@@ -258,7 +319,7 @@ export default class PlayGround extends React.Component {
       schemaCode: value
     });
     try {
-      const schema = JSON.parse(value);
+      const schema = JSON5.parse(value);
       this.setState(
         {
           schema

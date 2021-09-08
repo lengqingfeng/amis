@@ -10,7 +10,7 @@ import Checkbox from '../../components/Checkbox';
 import chunk from 'lodash/chunk';
 import {Icon} from '../../components/icons';
 import {Api} from '../../types';
-import {autobind} from '../../utils/helper';
+import {autobind, hasAbility} from '../../utils/helper';
 
 /**
  * 复选框
@@ -66,23 +66,9 @@ export default class CheckboxesControl extends React.Component<
     multiple: true,
     placeholder: 'placeholder.noOption',
     creatable: false,
+    inline: true,
     createBtnLabel: 'Select.createLabel'
   };
-
-  componentDidMount() {
-    const {defaultCheckAll, onToggleAll} = this.props;
-
-    defaultCheckAll && onToggleAll();
-  }
-
-  componentDidUpdate(prevProps: OptionsControlProps) {
-    let {options: currOptions, onToggleAll, defaultCheckAll} = this.props;
-    let {options: prevOptions} = prevProps;
-
-    if (defaultCheckAll && prevOptions != currOptions) {
-      onToggleAll();
-    }
-  }
 
   reload() {
     const reload = this.props.reloadOptions;
@@ -114,6 +100,10 @@ export default class CheckboxesControl extends React.Component<
   renderGroup(option: Option, index: number) {
     const {classnames: cx, labelField} = this.props;
 
+    if (!option.children?.length) {
+      return null;
+    }
+
     return (
       <div
         key={index}
@@ -125,11 +115,7 @@ export default class CheckboxesControl extends React.Component<
           {option[labelField || 'label']}
         </label>
 
-        {option.children && option.children.length
-          ? option.children.map((option, index) =>
-              this.renderItem(option, index)
-            )
-          : null}
+        {option.children.map((option, index) => this.renderItem(option, index))}
       </div>
     );
   }
@@ -164,7 +150,7 @@ export default class CheckboxesControl extends React.Component<
         description={option.description}
       >
         {String(option[labelField || 'label'])}
-        {removable ? (
+        {removable && hasAbility(option, 'removable') ? (
           <a data-tooltip={__('Select.clear')} data-position="left">
             <Icon
               icon="minus"
@@ -173,7 +159,7 @@ export default class CheckboxesControl extends React.Component<
             />
           </a>
         ) : null}
-        {editable ? (
+        {editable && hasAbility(option, 'editable') ? (
           <a data-tooltip="编辑" data-position="left">
             <Icon
               icon="pencil"
@@ -230,12 +216,12 @@ export default class CheckboxesControl extends React.Component<
           inline={inline}
           labelClassName={labelClassName}
         >
-          全选/不选
+        {__('Checkboxes.selectAll')}
         </Checkbox>
       );
     }
 
-    if (!inline && (columnsCount as number) > 1) {
+    if ((columnsCount as number) > 1) {
       let weight = 12 / (columnsCount as number);
       let cellClassName = `Grid-col--sm${
         weight === Math.round(weight) ? weight : ''

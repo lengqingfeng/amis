@@ -82,7 +82,7 @@ export function setDefaultTheme(theme: string) {
 }
 
 export function classnames(...classes: ClassValue[]) {
-  return getTheme(defaultTheme).classnames(...classes);
+  return getTheme(defaultTheme).classnames.apply(null, classes);
 }
 
 export function getClassPrefix() {
@@ -128,7 +128,7 @@ export interface ThemeOutterProps {
   classnames?: ClassNamesFn;
 }
 
-export let defaultTheme: string = 'default';
+export let defaultTheme: string = 'cxd';
 export const ThemeContext = React.createContext('');
 
 export function themeable<
@@ -148,7 +148,7 @@ export function themeable<
         ComposedComponent.displayName || ComposedComponent.name
       })`;
       static contextType = ThemeContext;
-      static ComposedComponent = ComposedComponent;
+      static ComposedComponent = ComposedComponent as React.ComponentType<T>;
 
       render() {
         const theme: string = this.props.theme || this.context || defaultTheme;

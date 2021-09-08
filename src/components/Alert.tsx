@@ -63,6 +63,8 @@ export class Alert extends React.Component<AlertProps, AlertState> {
     this.modalRef = this.modalRef.bind(this);
     this.handleFormSubmit = this.handleFormSubmit.bind(this);
     this.scopeRef = this.scopeRef.bind(this);
+
+    Alert.instance = this;
   }
 
   static defaultProps = {
@@ -72,10 +74,6 @@ export class Alert extends React.Component<AlertProps, AlertState> {
     alertBtnLevel: 'primary',
     confirmBtnLevel: 'danger'
   };
-
-  componentWillMount() {
-    Alert.instance = this;
-  }
 
   componentDidMount() {
     this._body && (this._body.innerHTML = this.state.content);
@@ -199,9 +197,12 @@ export class Alert extends React.Component<AlertProps, AlertState> {
       title,
       confirmBtnLevel,
       alertBtnLevel,
-      classnames: cx,
-      theme
+      classnames: cx
     } = this.props;
+    let theme = this.props.theme || 'cxd';
+    if (theme === 'default') {
+      theme = 'cxd';
+    }
     const __ = this.props.translate;
     const finalTitle = __(this.state.title ?? title);
     const finalConfirmText = __(this.state.confirmText ?? confirmText);

@@ -15,6 +15,7 @@ import {current, addModal, removeModal} from './ModalManager';
 import {ClassNamesFn, themeable, ThemeProps} from '../theme';
 import {Icon} from './icons';
 import {LocaleProps, localeable} from '../locale';
+import {autobind, getScrollbarWidth} from '../utils/helper';
 
 export interface ModalProps extends ThemeProps, LocaleProps {
   className?: string;
@@ -23,6 +24,7 @@ export interface ModalProps extends ThemeProps, LocaleProps {
   overlay?: boolean;
   onHide: (e: any) => void;
   closeOnEsc?: boolean;
+  closeOnOutside?: boolean;
   container?: any;
   show?: boolean;
   disabled?: boolean;
@@ -43,6 +45,9 @@ export class Modal extends React.Component<ModalProps, ModalState> {
     size: '',
     overlay: true
   };
+
+  isRootClosed = false;
+  modalDom: HTMLElement;
 
   static Header = themeable(
     localeable(
@@ -135,18 +140,32 @@ export class Modal extends React.Component<ModalProps, ModalState> {
       this.handleEnter();
       this.handleEntered();
     }
+
+    document.body.addEventListener('click', this.handleRootClickCapture, true);
+    document.body.addEventListener('click', this.handleRootClick);
   }
 
   componentWillUnmount() {
     if (this.props.show) {
       this.handleExited();
     }
+
+    document.body.removeEventListener('click', this.handleRootClick);
+    document.body.removeEventListener(
+      'click',
+      this.handleRootClickCapture,
+      true
+    );
   }
 
   handleEnter = () => {
     document.body.classList.add(`is-modalOpened`);
-    if (document.body.scrollHeight > window.innerHeight) {
-      document.body.classList.add(`has-scrollbar`);
+    if (
+      window.innerWidth - document.documentElement.clientWidth > 0 ||
+      document.body.scrollHeight > document.body.clientHeight
+    ) {
+      const scrollbarWidth = getScrollbarWidth();
+      document.body.style.width = `calc(100% - ${scrollbarWidth}px)`;
     }
   };
 
@@ -161,20 +180,44 @@ export class Modal extends React.Component<ModalProps, ModalState> {
     setTimeout(() => {
       if (!document.querySelector('.amis-dialog-widget')) {
         document.body.classList.remove(`is-modalOpened`);
-        document.body.classList.remove(`has-scrollbar`);
+        document.body.style.width = '';
       }
     }, 200);
   };
 
   modalRef = (ref: any) => {
+    this.modalDom = ref;
     const {classPrefix: ns} = this.props;
     if (ref) {
       addModal(this);
       (ref as HTMLElement).classList.add(`${ns}Modal--${current()}th`);
     } else {
-      removeModal();
+      removeModal(this);
     }
   };
+
+  @autobind
+  handleRootClickCapture(e: MouseEvent) {
+    const target = e.target as HTMLElement;
+    const {closeOnOutside, classPrefix: ns} = this.props;
+    const isLeftButton =
+      (e.button === 1 && window.event !== null) || e.button === 0;
+
+    this.isRootClosed = !!(
+      isLeftButton &&
+      closeOnOutside &&
+      target &&
+      this.modalDom &&
+      ((!this.modalDom.contains(target) && !target.closest('[role=dialog]')) ||
+        (target.matches(`.${ns}Modal`) && target === this.modalDom))
+    ); // 干脆过滤掉来自弹框里面的点击
+  }
+
+  @autobind
+  handleRootClick(e: MouseEvent) {
+    const {onHide} = this.props;
+    this.isRootClosed && !e.defaultPrevented && onHide(e);
+  }
 
   render() {
     const {

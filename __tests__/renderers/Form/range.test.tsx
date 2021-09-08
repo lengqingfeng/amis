@@ -1,5 +1,5 @@
 import React = require('react');
-import {render, fireEvent} from 'react-testing-library';
+import {render, fireEvent} from '@testing-library/react';
 import '../../../src/themes/default';
 import {render as amisRender} from '../../../src/index';
 import {makeEnv} from '../../helper';
@@ -89,7 +89,7 @@ test('Renderer:range:multiple', async () => {
     }
   });
   fireEvent.blur(inputs[1]);
-  const close = container.querySelector('a.a-InputRange-clear');
+  const close = container.querySelector('a.cxd-InputRange-clear');
   fireEvent.click(close!);
 
   expect(container).toMatchSnapshot();

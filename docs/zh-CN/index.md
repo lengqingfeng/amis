@@ -29,14 +29,14 @@ amis 是一个低代码前端框架，它使用 JSON 配置来生成页面，可
     "type": "crud",
     "draggable": true,
     "syncLocation": false,
-    "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample",
+    "api": "/api/sample",
     "keepItemSelectionOnPageChange": true,
     "filter": {
       "title": "筛选",
       "submitText": "",
-      "controls": [
+      "body": [
         {
-          "type": "text",
+          "type": "input-text",
           "name": "keywords",
           "placeholder": "关键字",
           "addOn": {
@@ -51,7 +51,7 @@ amis 是一个低代码前端框架，它使用 JSON 配置来生成页面，可
         "type": "button",
         "label": "批量删除",
         "actionType": "ajax",
-        "api": "delete:https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample/${ids|raw}",
+        "api": "delete:/api/sample/${ids|raw}",
         "confirmText": "确定要批量删除?"
       },
       {
@@ -63,14 +63,14 @@ amis 是一个低代码前端框架，它使用 JSON 配置来生成页面，可
           "name": "sample-bulk-edit",
           "body": {
             "type": "form",
-            "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample/bulkUpdate2",
-            "controls": [
+            "api": "/api/sample/bulkUpdate2",
+            "body": [
               {
                 "type": "hidden",
                 "name": "ids"
               },
               {
-                "type": "text",
+                "type": "input-text",
                 "name": "engine",
                 "label": "Engine"
               }
@@ -79,8 +79,8 @@ amis 是一个低代码前端框架，它使用 JSON 配置来生成页面，可
         }
       }
     ],
-    "quickSaveApi": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample/bulkUpdate",
-    "quickSaveItemApi": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample/$id",
+    "quickSaveApi": "/api/sample/bulkUpdate",
+    "quickSaveItemApi": "/api/sample/$id",
     "filterTogglable": true,
     "headerToolbar": [
       "filter-toggler",
@@ -90,7 +90,7 @@ amis 是一个低代码前端框架，它使用 JSON 配置来生成页面，可
         "label": "重置测试数据",
         "actionType": "ajax",
         "size": "sm",
-        "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample/reset"
+        "api": "/api/sample/reset"
       },
       "export-excel",
       {
@@ -132,6 +132,7 @@ amis 是一个低代码前端框架，它使用 JSON 配置来生成页面，可
         "name": "platform",
         "label": "平台",
         "popOver": {
+          "trigger": "hover",
           "body": {
             "type": "tpl",
             "tpl": "就是为了演示有个叫 popOver 的功能"
@@ -143,12 +144,8 @@ amis 是一个低代码前端框架，它使用 JSON 配置来生成页面，可
       {
         "name": "grade",
         "label": "CSS 等级",
-        "quickEdit": {
-          "mode": "inline",
-          "type": "select",
-          "options": ["A", "B", "C", "D", "X"]
-        },
-        "type": "text"
+        "type": "select",
+        "options": ["A", "B", "C", "D", "X"]
       },
       {
         "type": "operation",
@@ -157,11 +154,10 @@ amis 是一个低代码前端框架，它使用 JSON 配置来生成页面，可
         "buttons": [
           {
             "type": "button",
-            "icon": "fa fa-times text-danger",
             "actionType": "ajax",
-            "tooltip": "删除",
+            "label": "删除",
             "confirmText": "您确认要删除?",
-            "api": "delete:https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample/$id"
+            "api": "delete:/api/sample/$id"
           }
         ]
       }

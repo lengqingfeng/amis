@@ -12,6 +12,8 @@
   background: var(--DatePicker-bg);
   border-radius: var(--DatePicker-borderRadius);
 
+  @include input-border();
+
   &:not(.is-disabled) {
     cursor: pointer;
 
@@ -184,7 +186,7 @@
     border-top: 0;
 
     td {
-      padding-top: px2rem(5px);
+      padding-top: var(--gap-xs);
       text-align: left;
 
       span {
@@ -199,20 +201,33 @@
       }
     }
   }
+}
 
-  // .rdtCounter {
-  //   .rdtBtn {
-  //     height: 30%;
-  //     line-height: px2rem(20px);
-  //   }
-
-  //   .rdtCount {
-  //     height: 40%;
-  //     display: flex;
-  //     align-items: center;
-  //     justify-content: center;
-  //   }
-  // }
+.#{$ns}CalendarInputWrapper {
+  display: inline-block;
+  position: relative;
+  .#{$ns}CalendarInput-sugs {
+    list-style: none;
+    position: absolute;
+    background: var(--Form-select-menu-bg);
+    color: var(--Form-select-menu-color);
+    border: var(--Form-input-borderWidth) solid
+      var(--Form-input-onFocused-borderColor);
+    left: px2rem(-1px);
+    right: px2rem(-1px);
+    top: 100%;
+    z-index: 10;
+    max-height: px2rem(200px);
+    overflow: auto;
+    &Item {
+      padding-left: 4px;
+      &.is-highlight,
+      &:hover {
+        color: var(--Form-select-menu-onHover-color);
+        background: var(--Form-select-menu-onHover-bg);
+      }
+    }
+  }
 }
 
 .#{$ns}CalendarInput {
@@ -268,7 +283,7 @@
   }
 
   &-sep {
-    width: 15px;
+    width: var(--gap-md);
     text-align: center;
   }
 
@@ -355,10 +370,10 @@
 .rdtPrev,
 .rdtNext {
   cursor: pointer !important;
-  width: px2rem(20px);
+  width: var(--gap-md);
   padding: 0;
   color: #999;
-  font-size: px2rem(20px);
+  font-size: var(--fontSizeXl);
   text-decoration: none;
   font-family: auto;
   font-weight: normal;

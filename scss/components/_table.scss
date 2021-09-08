@@ -1,7 +1,6 @@
 .#{$ns}Table {
   position: relative;
-  background: var(--Table-bg);
-  border: var(--Table-borderWidth) solid var(--Table-borderColor);
+
   border-radius: var(--Table-borderRadius);
   margin-bottom: var(--gap-md);
 
@@ -21,7 +20,7 @@
   &-fixedLeft {
     // 还是改成默认不显示，footable 展示的时候，配置 固定列还没修复
     left: 0;
-    top: -99999px;
+    top: -999999px;
 
     &.in {
       box-shadow: var(--Table-fixedLeft-boxShadow);
@@ -43,7 +42,7 @@
   &-fixedRight {
     // 还是改成默认不显示，footable 展示的时候，配置 固定列还没修复
     right: 0;
-    top: -99999px;
+    top: -999999px;
 
     &.in {
       box-shadow: var(--Table-fixedRight-boxShadow);
@@ -69,6 +68,14 @@
     opacity: 0;
     box-shadow: var(--Table-fixedTop-boxShadow);
 
+    // box-sizing: content-box;
+    // padding: var(--gap-base) var(--gap-base) 0 var(--gap-base);
+    // margin: calc(var(--gap-base) * -1) calc(var(--gap-base) * -1) 0
+    //   calc(var(--gap-base) * -1);
+    // > * {
+    //   box-sizing: border-box;
+    // }
+
     &.in {
       position: fixed;
       opacity: 1;
@@ -80,19 +87,6 @@
       z-index: $zindex-affix + 10;
       // box-shadow: none;
       background: transparent;
-      border-top: var(--Table-borderWidth) solid var(--Table-borderColor);
-
-      > table {
-        margin-bottom: px2rem(5px);
-      }
-    }
-
-    > .#{$ns}Table-heading {
-      border-bottom: none;
-    }
-
-    > .#{$ns}Table-wrapper {
-      border-top: var(--Table-borderWidth) solid var(--Table-borderColor);
     }
 
     &.is-fakeHide {
@@ -107,14 +101,13 @@
 
   &-heading {
     background: var(--Table-heading-bg);
-    border-bottom: var(--Table-borderWidth) solid var(--Table-borderColor);
     padding: calc(
         (
             var(--Table-heading-height) - var(--Table-fontSize) *
               var(--lineHeightBase)
           ) / 2
       )
-      var(--Table-toolbar-paddingX);
+      var(--gap-sm);
   }
 
   &--unsaved &-heading {
@@ -144,7 +137,7 @@
   }
 
   &-header {
-    padding: var(--Table-toolbar-paddingY) var(--Table-toolbar-paddingX);
+    padding: var(--Table-toolbar-marginY) var(--Table-toolbar-marginX);
 
     > * + .#{$ns}Button,
     > * + .#{$ns}ButtonGroup,
@@ -156,7 +149,7 @@
   &-toolbar {
     @include clearfix();
     display: flex;
-    padding: var(--Table-toolbar-paddingY) var(--Table-toolbar-paddingX);
+    margin: 0 var(--Table-toolbar-marginX) var(--Table-toolbar-marginY);
     flex-wrap: wrap;
 
     .#{$ns}DropDown {
@@ -177,15 +170,7 @@
 
   &-contentWrap {
     position: relative;
-  }
-
-  &-header + &-contentWrap,
-  &-toolbar + &-contentWrap {
-    border-top: var(--Table-borderWidth) solid var(--Table-borderColor);
-  }
-
-  &-footToolbar {
-    border-top: var(--Table-borderWidth) solid var(--Table-borderColor);
+    margin-bottom: var(--Table-toolbar-marginY);
   }
 
   &-actions {
@@ -211,6 +196,7 @@
     background: var(--Table-bg);
     border-spacing: 0;
     border-collapse: collapse;
+    border: var(--Table-borderWidth) solid var(--Table-borderColor);
 
     &--withCombine {
       > thead > tr > th,
@@ -318,7 +304,6 @@
       > td,
       > th {
         padding: var(--TableCell-paddingY) var(--TableCell-paddingX);
-        vertical-align: top;
 
         &:first-child {
           padding-left: var(--TableCell--edge-paddingX);
@@ -423,14 +408,14 @@
     @for $i from 2 through 10 {
       tr.#{$ns}Table-tr--#{$i}th.is-expanded {
         .#{$ns}Table-expandCell:before {
-          right: px2rem(7px) + px2rem(-20px) * ($i - 1);
+          right: px2rem(7px) + px2rem(-18px) * ($i - 1);
         }
       }
 
       tr.#{$ns}Table-tr--#{$i}th {
         .#{$ns}Table-expandBtn {
           position: relative;
-          right: -(px2rem(20px)) * ($i - 1);
+          right: -(px2rem(18px)) * ($i - 1);
         }
 
         .#{$ns}Table-expandCell + td {
@@ -442,7 +427,7 @@
             width: px2rem(1px);
             top: 0;
             bottom: 0;
-            left: px2rem(-8px) + px2rem(20px) * ($i - 2);
+            left: px2rem(-8px) + px2rem(18px) * ($i - 2);
             height: auto;
             background: var(--Table-tree-borderColor);
           }
@@ -451,26 +436,26 @@
             content: '';
             position: absolute;
             height: px2rem(1px);
-            top: px2rem(18px);
-            left: px2rem(-8px) + px2rem(20px) * ($i - 2);
+            top: 50%;
+            left: px2rem(-8px) + px2rem(18px) * ($i - 2);
             width: px2rem(10px);
             background: var(--Table-tree-borderColor);
           }
 
-          padding-left: px2rem(20px) * $i - px2rem(20px);
+          padding-left: px2rem(18px) * $i - px2rem(18px);
         }
       }
 
       tr.#{$ns}Table-tr--#{$i}th.is-expandable {
         .#{$ns}Table-expandCell + td {
-          padding-left: px2rem(20px) * ($i - 1);
+          padding-left: px2rem(18px) * ($i - 1);
         }
       }
 
       tr.#{$ns}Table-tr--#{$i}th.is-last:not(.is-expanded) {
         .#{$ns}Table-expandCell + td {
           &::before {
-            height: px2rem(18px);
+            height: 50%;
             bottom: auto;
           }
         }
@@ -482,6 +467,7 @@
       border-right: 0;
       width: px2rem(1px);
       padding-right: var(--TableCell-paddingX);
+      white-space: nowrap;
 
       .#{$ns}Checkbox {
         margin: 0;
@@ -514,7 +500,7 @@
           bottom: 0;
           height: 100%;
           background: var(--Table-tree-borderColor);
-          right: px2rem(7px) + px2rem(-20px) * ($i - 1);
+          right: px2rem(7px) + px2rem(-18px) * ($i - 1);
         }
       }
     }
@@ -526,7 +512,7 @@
         content: '';
         position: absolute;
         width: px2rem(1px);
-        top: px2rem(28px);
+        top: 50%;
         bottom: 0;
         right: px2rem(7px);
         height: auto;
@@ -559,7 +545,7 @@
   &Cell-sortBtn {
     cursor: pointer;
     width: var(--TableCell-sortBtn-width);
-    height: px2rem(20px);
+    height: var(--gap-md);
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -578,7 +564,7 @@
     &--down > svg,
     &--default > svg {
       color: inherit;
-      width: 12x;
+      width: 12px;
       height: 12px;
     }
 
@@ -615,7 +601,7 @@
     cursor: pointer;
     // width: var(--TableCell-searchBtn-width);
     position: absolute;
-    right: px2rem(5px);
+    right: var(--gap-xs);
     top: 50%;
     transform: translateY(-50%);
     color: var(--text--muted-color);
@@ -840,6 +826,17 @@
     visibility: hidden;
     position: absolute;
   }
+}
+
+.#{$ns}InputTable-toolbar {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.#{$ns}InputTable-pager {
+  margin-left: auto;
 }
 
 .#{$ns}OperationField {

@@ -32,6 +32,7 @@ SDK 版本适合对前端或 React 不了解的开发者，它不依赖 npm 及 
     />
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <link rel="stylesheet" href="sdk.css" />
+    <link rel="stylesheet" href="helper.css" />
     <!-- 从 1.1.0 开始 sdk.css 将不支持 IE 11，如果要支持 IE11 请引用这个 css，并把前面那个删了 -->
     <!-- <link rel="stylesheet" href="sdk-ie11.css" /> -->
     <!-- 不过 amis 开发团队几乎没测试过 IE 11 下的效果，所以可能有细节功能用不了，如果发现请报 issue -->
@@ -61,15 +62,15 @@ SDK 版本适合对前端或 React 不了解的开发者，它不依赖 npm 及 
             type: 'form',
             mode: 'horizontal',
             api: '/saveForm',
-            controls: [
+            body: [
               {
                 label: 'Name',
-                type: 'text',
+                type: 'input-text',
                 name: 'name'
               },
               {
                 label: 'Email',
-                type: 'email',
+                type: 'input-email',
                 name: 'email'
               }
             ]
@@ -82,9 +83,21 @@ SDK 版本适合对前端或 React 不了解的开发者，它不依赖 npm 及 
 </html>
 ```
 
+### 更新属性
+
+可以通过 amisScoped 对象的 updateProps 方法来更新下发到 amis 的属性。
+
+```ts
+amisScoped.updateProps(
+  {
+    // 新的属性对象
+  } /*, () => {} 更新回调 */
+);
+```
+
 ### 切换主题
 
-jssdk 版本默认使用 `sdk.css` 即默认主题，如果你想用使用云舍，请改成引用 `cxd.css`。同时 js 渲染地方第四个参数传入 `theme` 属性。如：
+jssdk 版本默认使用 `sdk.css` 即云舍主题，如果你想用使用仿 Antd，请将 css 引用改成 `.antd.css`。同时 js 渲染地方第四个参数传入 `theme` 属性。如：
 
 ```js
 amis.embed(
@@ -96,12 +109,35 @@ amis.embed(
     // 这里是初始 props
   },
   {
-    theme: 'cxd'
+    theme: 'antd'
   }
 );
+
+// 或者
+amisScoped.updateProps({
+  theme: 'antd'
+});
 ```
 
-暗黑主题同理，改成引用 'dark.css' 同时主题设置成 `dark`。
+### 初始值
+
+可以通过 props 里的 data 属性来赋予 amis 顶层数据域的值，类似下面的例子。
+
+```js
+let amis = amisRequire('amis/embed');
+let amisJSON = {
+  type: 'page',
+  body: {
+    type: 'tpl',
+    tpl: '${myData}'
+  }
+};
+let amisScoped = amis.embed('#root', amisJSON, {
+  data: {
+    myData: 'amis'
+  }
+});
+```
 
 ### 控制 amis 的行为
 
@@ -121,7 +157,7 @@ let amisScoped = amis.embed(
 
     // 可以不传，全局 api 适配器。
     // 另外在 amis 配置项中的 api 也可以配置适配器，针对某个特定接口单独处理。
-    responseAdpater(api, response, query, request) {
+    responseAdaptor(api, response, query, request) {
       return response;
     }
 
@@ -163,10 +199,10 @@ let amisScoped = amis.embed(
   "body": {
     "type": "form",
     "name": "form1",
-    "controls": [
+    "body": [
       {
         "label": "Name",
-        "type": "text",
+        "type": "input-text",
         "name": "name1"
       }
     ]
@@ -178,9 +214,29 @@ let amisScoped = amis.embed(
 
 还可以通过 `amisScoped.getComponentByName('page1.form1').setValues({'name1': 'othername'})` 来修改表单中的值。
 
+### 更新属性
+
+可以通过 amisScoped 对象的 updateProps 方法来更新下发到 amis 的属性。
+
+```ts
+amisScoped.updateProps(
+  {
+    // 新的属性对象
+  } /*, () => {} 更新回调 */
+);
+```
+
+### 销毁
+
+如果是单页应用，在离开当前页面的时候通常需要销毁实例，可以通过 unmount 方法来完成。
+
+```ts
+amisScoped.unmount();
+```
+
 ### 切换主题
 
-jssdk 版本默认使用 `sdk.css` 即默认主题，如果你想用使用云舍，请改成引用 `cxd.scss`。同时 js 渲染地方第四个参数传入 `theme` 属性。如：
+jssdk 版本默认使用 `sdk.css` 即云舍主题，如果你想用使用仿 AntD 主题，请改成引用 `antd.css`。同时 js 渲染地方第四个参数传入 `theme` 属性。如：
 
 ```js
 amis.embed(
@@ -192,12 +248,12 @@ amis.embed(
     // 默认数据
   },
   {
-    theme: 'cxd'
+    theme: 'antd'
   }
 );
 ```
 
-暗黑主题同理，改成引用 'dark.css' 同时主题设置成 `dark`。
+> 如果想使用 amis 1.2.2 之前的默认主题，名字是 ang
 
 ### 多页模式
 
@@ -208,6 +264,14 @@ amis.embed(
 默认 JSSDK 不是 hash 路由，如果你想改成 hash 路由模式，请查看此处代码实现。只需要修改 env.isCurrentUrl、env.jumpTo 和 env.updateLocation 这几个方法即可。
 
 参考：https://github.com/baidu/amis/blob/master/examples/components/Example.tsx#L551-L575
+
+### 销毁
+
+如果是单页应用，在离开当前页面的时候通常需要销毁实例，可以通过 unmount 方法来完成。
+
+```ts
+amisScoped.unmount();
+```
 
 ## react
 
@@ -223,24 +287,24 @@ npm i amis
 
 ### 主题样式
 
-目前支持三种主题：`default（默认主题）`、`cxd（云舍）`和`dark（暗黑）`
+目前主要支持两个主题：`cxd（云舍）` 和 `angt（仿 Antd）`
 
 1. 引入样式文件：
 
 html 中引入：
 
 ```html
-<link href="./node_modules/amis/lib/themes/default.css" />
-<!-- 或 <link href="./node_modules/amis/lib/themes/cxd.css" /> -->
-<!-- 或 <link href="./node_modules/amis/lib/themes/dark.css" /> -->
+<link href="./node_modules/amis/lib/themes/cxd.css" />
+<link href="./node_modules/amis/lib/helper.css" />
+<!-- 或 <link href="./node_modules/amis/lib/themes/antd.css" /> -->
 ```
 
 js 中引入：
 
 ```js
-import './node_modules/amis/lib/themes/default.css';
-// 或 import './node_modules/amis/lib/themes/cxd.css';
-// 或 import './node_modules/amis/lib/themes/dark.css';
+import './node_modules/amis/lib/themes/cxd.css';
+import './node_modules/amis/lib/helper.css';
+// 或 import './node_modules/amis/lib/themes/antd.css';
 ```
 
 > 上面只是示例，请根据自己的项目结构调整引用路径
@@ -259,7 +323,7 @@ renderAmis(
   },
   {
     // env...
-    theme: 'default' // cxd 或 dark
+    theme: 'cxd' // cxd 或 antd
   }
 );
 ```
@@ -289,11 +353,13 @@ import {toast} from 'amis/lib/components/Toast';
 
 class MyComponent extends React.Component<any, any> {
   render() {
+    let amisScoped;
+    let theme = 'cxd';
     return (
       <div>
         <p>通过 amis 渲染页面</p>
-        <ToastComponent key="toast" position={'top-right'} />
-        <AlertComponent key="alert" />
+        <ToastComponent theme={theme} key="toast" position={'top-right'} />
+        <AlertComponent theme={theme} key="alert" />
         {renderAmis(
           {
             // 这里是 amis 的 Json 配置。
@@ -304,6 +370,7 @@ class MyComponent extends React.Component<any, any> {
           {
             // props...
             // locale: 'en-US' // 请参考「多语言」的文档
+            // scopeRef: (ref: any) => (amisScoped = ref)  // 功能和前面 SDK 的 amisScoped 一样
           },
           {
             // 下面三个接口必须实现
@@ -353,7 +420,8 @@ class MyComponent extends React.Component<any, any> {
             copy: content => {
               copy(content);
               toast.success('内容已复制到粘贴板');
-            }
+            },
+            theme
 
             // 后面这些接口可以不用实现
 

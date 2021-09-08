@@ -1,7 +1,7 @@
 import React = require('react');
 import PageRenderer from '../../../src/renderers/Form';
 import * as renderer from 'react-test-renderer';
-import {render, fireEvent, cleanup, getByText} from 'react-testing-library';
+import {render, fireEvent, cleanup, getByText} from '@testing-library/react';
 import '../../../src/themes/default';
 import {render as amisRender} from '../../../src/index';
 import {wait, makeEnv} from '../../helper';
@@ -100,11 +100,16 @@ test('Renderer:Form:valdiate', async () => {
   );
 
   fireEvent.click(getByText('Submit'));
+  await wait(100);
+
   expect(container).toMatchSnapshot();
   expect(onSubmit).not.toHaveBeenCalled();
 
   await wait(100);
-  expect(notify).toHaveBeenCalledWith('error', '依赖的部分字段没有通过验证');
+  expect(notify).toHaveBeenCalledWith(
+    'error',
+    '依赖的部分字段没有通过验证\na: 这是必填项'
+  );
 
   const input = container.querySelector('input[name=a]');
   expect(input).toBeTruthy();
@@ -226,7 +231,10 @@ test('Renderer:Form:onValidate', async () => {
   expect(onValidate.mock.calls[0][0]).toMatchSnapshot();
 
   await wait(100);
-  expect(notify).toHaveBeenCalledWith('error', '依赖的部分字段没有通过验证');
+  expect(notify).toHaveBeenCalledWith(
+    'error',
+    '依赖的部分字段没有通过验证\na: a is wrong\nb: b is wrong\nb: b is wrong 2'
+  );
 
   fireEvent.click(getByText('Submit'));
   await wait(100);

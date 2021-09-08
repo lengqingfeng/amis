@@ -24,6 +24,14 @@ export default [
       },
 
       {
+        label: '1.2.0 版本变更',
+        path: '/zh-CN/docs/start/1-2-0',
+        getComponent: () =>
+          // @ts-ignore
+          import('../../docs/zh-CN/start/1-2-0.md').then(makeMarkdownRenderer)
+      },
+
+      {
         label: '常见问题',
         path: '/zh-CN/docs/start/faq',
         getComponent: () =>
@@ -210,6 +218,15 @@ export default [
         getComponent: () =>
           // @ts-ignore
           import('../../docs/zh-CN/extend/i18n.md').then(makeMarkdownRenderer)
+      },
+      {
+        label: '如何贡献代码',
+        path: '/zh-CN/docs/extend/contribute',
+        getComponent: () =>
+          // @ts-ignore
+          import('../../docs/zh-CN/extend/contribute.md').then(
+            makeMarkdownRenderer
+          )
       }
     ]
   }

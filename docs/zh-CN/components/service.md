@@ -19,7 +19,7 @@ amis 中部分组件，作为展示组件，自身没有**使用接口初始化�
 ```schema: scope="body"
 {
     "type": "service",
-    "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/mock2/page/initData",
+    "api": "/api/mock2/page/initData",
     "body": {
         "type": "panel",
         "title": "$title",
@@ -50,7 +50,7 @@ amis 中部分组件，作为展示组件，自身没有**使用接口初始化�
 ```schema: scope="body"
 {
     "type": "service",
-    "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/mock2/crud/table?perPage=5",
+    "api": "/api/mock2/crud/table?perPage=5",
     "body": [
         {
             "type": "table",
@@ -188,7 +188,7 @@ amis 中部分组件，作为展示组件，自身没有**使用接口初始化�
 ```schema: scope="body"
 {
   "type": "service",
-  "schemaApi": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/mock2/service/schema?type=tabs"
+  "schemaApi": "/api/mock2/service/schema?type=tabs"
 }
 ```
 
@@ -216,6 +216,61 @@ amis 中部分组件，作为展示组件，自身没有**使用接口初始化�
 
 它将`data`返回的对象作为 amis 页面配置，进行了解析渲染，实现动态渲染页面的功能。
 
+## 动态渲染表单项
+
+默认 Service 可以通过配置`schemaApi` [动态渲染页面内容](../service#%E5%8A%A8%E6%80%81%E6%B8%B2%E6%9F%93%E9%A1%B5%E9%9D%A2)，但是如果想渲染表单项，请返回下面这种格式：
+
+```json
+{
+  "status": 0,
+  "msg": "",
+  "data": {
+    "type": "container",
+    "body": [
+      {
+        "type": "input-text",
+        "name": "text",
+        "label": "文本输入"
+      }
+    ]
+  }
+}
+```
+
+例如下例：
+
+```schema: scope="form-item2"
+{
+  "type": "service",
+  "schemaApi": "/api/mock2/service/schema?type=controls"
+}
+```
+
+`schemaApi` 除了能返回表单项之外，还能同时返回表单数据，如果你这样返回接口
+
+```json
+{
+  "status": 0,
+  "msg": "",
+  "data": {
+    "data": {
+      "a": "b" // 这样返回的选项会选中第二个选项B
+    },
+    "body": [
+      {
+        "type": "select",
+        "name": "a",
+        "label": "选项",
+        "options": [
+          {"label": "A", "value": "a"},
+          {"label": "B", "value": "b"}
+        ]
+      }
+    ]
+  }
+}
+```
+
 ## 接口联动
 
 `api`和`schemaApi`都支持[接口联动](../../docs/concepts/linkage#%E6%8E%A5%E5%8F%A3%E8%81%94%E5%8A%A8)
@@ -224,9 +279,9 @@ amis 中部分组件，作为展示组件，自身没有**使用接口初始化�
 {
     "title": "",
     "type": "form",
-    "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/mock/saveForm?waitSeconds=1",
+    "api": "/api/mock/saveForm?waitSeconds=1",
     "mode": "horizontal",
-    "controls": [
+    "body": [
         {
         "label": "数据模板",
         "type": "select",
@@ -251,21 +306,21 @@ amis 中部分组件，作为展示组件，自身没有**使用接口初始化�
         },
         {
         "type": "service",
-        "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/mock2/form/initData?tpl=${tpl}",
-        "controls": [
+        "api": "/api/mock2/form/initData?tpl=${tpl}",
+        "body": [
             {
             "label": "名称",
-            "type": "text",
+            "type": "input-text",
             "name": "name"
             },
             {
             "label": "作者",
-            "type": "text",
+            "type": "input-text",
             "name": "author"
             },
             {
             "label": "请求时间",
-            "type": "datetime",
+            "type": "input-datetime",
             "name": "date"
             }
         ]
@@ -290,7 +345,7 @@ Service 支持通过 WebSocket 获取数据，只需要设置 ws（由于无示�
 ```json
 {
   "type": "service",
-  "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/mock2/page/initData",
+  "api": "/api/mock2/page/initData",
   "ws": "ws://localhost:8777",
   "body": {
     "type": "panel",

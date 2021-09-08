@@ -1,6 +1,7 @@
 import React from 'react';
 import {Renderer, RendererProps} from '../factory';
 import {BaseSchema} from '../Schema';
+import {BadgeSchema, withBadge} from '../components/Badge';
 
 /**
  * Icon 图表渲染器
@@ -15,6 +16,11 @@ export interface IconSchema extends BaseSchema {
   icon: string;
 
   vendor?: 'iconfont' | 'fa';
+
+  /**
+   * 角标
+   */
+  badge?: BadgeSchema;
 }
 
 export interface IconProps
@@ -47,7 +53,8 @@ export class Icon extends React.Component<IconProps, object> {
 }
 
 @Renderer({
-  test: /(^|\/)icon$/,
-  name: 'icon'
+  type: 'icon'
 })
+// @ts-ignore 类型没搞定
+@withBadge
 export class TplRenderer extends Icon {}

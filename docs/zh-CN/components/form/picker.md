@@ -17,8 +17,8 @@ order: 35
 ```schema: scope="body"
 {
     "type": "form",
-    "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/mock2/form/saveForm",
-    "controls": [
+    "api": "/api/mock2/form/saveForm",
+    "body": [
         {
             "type": "picker",
             "name": "picker",
@@ -49,9 +49,9 @@ order: 35
 ```schema: scope="body"
 {
   "type": "form",
-  "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/mock2/form/saveForm",
+  "api": "/api/mock2/form/saveForm",
   "debug": true,
-  "controls": [
+  "body": [
     {
       "type": "picker",
       "name": "type4",
@@ -59,15 +59,15 @@ order: 35
       "valueField": "id",
       "labelField": "engine",
       "label": "多选",
-      "source": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample",
+      "source": "/api/sample",
       "size": "lg",
       "value": "4,5",
       "multiple": true,
       "pickerSchema": {
         "mode": "table",
         "name": "thelist",
-        "quickSaveApi": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample/bulkUpdate",
-        "quickSaveItemApi": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample/$id",
+        "quickSaveApi": "/api/sample/bulkUpdate",
+        "quickSaveItemApi": "/api/sample/$id",
         "draggable": true,
         "headerToolbar": {
           "wrapWithPanel": false,
@@ -75,9 +75,9 @@ order: 35
           "className": "text-right",
           "target": "thelist",
           "mode": "inline",
-          "controls": [
+          "body": [
             {
-              "type": "text",
+              "type": "input-text",
               "name": "keywords",
               "addOn": {
                 "type": "submit",
@@ -143,7 +143,7 @@ order: 35
                   "title": "查看",
                   "body": {
                     "type": "form",
-                    "controls": [
+                    "body": [
                       {
                         "type": "static",
                         "name": "engine",
@@ -204,9 +204,9 @@ order: 35
                     "type": "form",
                     "name": "sample-edit-form",
                     "api": "/api/sample/$id",
-                    "controls": [
+                    "body": [
                       {
-                        "type": "text",
+                        "type": "input-text",
                         "name": "engine",
                         "label": "Engine",
                         "required": true
@@ -215,7 +215,7 @@ order: 35
                         "type": "divider"
                       },
                       {
-                        "type": "text",
+                        "type": "input-text",
                         "name": "browser",
                         "label": "Browser",
                         "required": true
@@ -224,7 +224,7 @@ order: 35
                         "type": "divider"
                       },
                       {
-                        "type": "text",
+                        "type": "input-text",
                         "name": "platform",
                         "label": "Platform(s)",
                         "required": true
@@ -233,7 +233,7 @@ order: 35
                         "type": "divider"
                       },
                       {
-                        "type": "text",
+                        "type": "input-text",
                         "name": "version",
                         "label": "Engine version"
                       },
@@ -255,7 +255,7 @@ order: 35
                 "icon": "fa fa-times text-danger",
                 "actionType": "ajax",
                 "confirmText": "您确认要删除?",
-                "api": "delete:https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample/$id"
+                "api": "delete:/api/sample/$id"
               }
             ],
             "toggled": true
@@ -274,8 +274,8 @@ order: 35
 ```schema: scope="body"
 {
   "type": "form",
-  "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/mock2/form/saveForm",
-  "controls": [
+  "api": "/api/mock2/form/saveForm",
+  "body": [
     {
       "type": "picker",
       "name": "type4",
@@ -284,15 +284,15 @@ order: 35
       "labelField": "engine",
       "label": "Picker",
       "embed": true,
-      "source": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample",
+      "source": "/api/sample",
       "size": "lg",
       "value": "4,5",
       "multiple": true,
       "pickerSchema": {
         "mode": "table",
         "name": "thelist",
-        "quickSaveApi": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample/bulkUpdate",
-        "quickSaveItemApi": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample/$id",
+        "quickSaveApi": "/api/sample/bulkUpdate",
+        "quickSaveItemApi": "/api/sample/$id",
         "draggable": true,
         "headerToolbar": {
           "wrapWithPanel": false,
@@ -300,9 +300,9 @@ order: 35
           "className": "text-right",
           "target": "thelist",
           "mode": "inline",
-          "controls": [
+          "body": [
             {
-              "type": "text",
+              "type": "input-text",
               "name": "keywords",
               "addOn": {
                 "type": "submit",
@@ -368,7 +368,7 @@ order: 35
                   "title": "查看",
                   "body": {
                     "type": "form",
-                    "controls": [
+                    "body": [
                       {
                         "type": "static",
                         "name": "engine",
@@ -429,9 +429,9 @@ order: 35
                     "type": "form",
                     "name": "sample-edit-form",
                     "api": "/api/sample/$id",
-                    "controls": [
+                    "body": [
                       {
-                        "type": "text",
+                        "type": "input-text",
                         "name": "engine",
                         "label": "Engine",
                         "required": true
@@ -440,7 +440,7 @@ order: 35
                         "type": "divider"
                       },
                       {
-                        "type": "text",
+                        "type": "input-text",
                         "name": "browser",
                         "label": "Browser",
                         "required": true
@@ -449,7 +449,7 @@ order: 35
                         "type": "divider"
                       },
                       {
-                        "type": "text",
+                        "type": "input-text",
                         "name": "platform",
                         "label": "Platform(s)",
                         "required": true
@@ -458,7 +458,7 @@ order: 35
                         "type": "divider"
                       },
                       {
-                        "type": "text",
+                        "type": "input-text",
                         "name": "version",
                         "label": "Engine version"
                       },
@@ -480,7 +480,7 @@ order: 35
                 "icon": "fa fa-times text-danger",
                 "actionType": "ajax",
                 "confirmText": "您确认要删除?",
-                "api": "delete:https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample/$id"
+                "api": "delete:/api/sample/$id"
               }
             ],
             "toggled": true

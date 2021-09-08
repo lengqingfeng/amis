@@ -9,7 +9,7 @@ import {
   getEnv,
   Instance
 } from 'mobx-state-tree';
-import {IFormStore} from './form';
+import {FormStore, IFormStore} from './form';
 import {str2rules, validate as doValidate} from '../utils/validations';
 import {Api, Payload, fetchOptions} from '../types';
 import {ComboStore, IComboStore, IUniqueGroup} from './combo';
@@ -24,7 +24,8 @@ import {
   findTreeIndex,
   spliceTree,
   isEmpty,
-  getTreeAncestors
+  getTreeAncestors,
+  filterTree
 } from '../utils/helper';
 import {flattenTree} from '../utils/helper';
 import {IRendererStore} from '.';
@@ -48,7 +49,8 @@ interface IOption {
 
 const ErrorDetail = types.model('ErrorDetail', {
   msg: '',
-  tag: ''
+  tag: '',
+  rule: ''
 });
 
 export const FormItemStore = StoreNode.named('FormItemStore')
@@ -59,6 +61,7 @@ export const FormItemStore = StoreNode.named('FormItemStore')
     loading: false,
     required: false,
     tmpValue: types.frozen(),
+    emitedValue: types.frozen(),
     rules: types.optional(types.frozen(), {}),
     messages: types.optional(types.frozen(), {}),
     errorData: types.optional(types.array(ErrorDetail), []),
@@ -74,11 +77,12 @@ export const FormItemStore = StoreNode.named('FormItemStore')
     labelField: 'label',
     joinValues: true,
     extractValue: false,
-    options: types.optional(types.array(types.frozen()), []),
+    options: types.optional(types.frozen<Array<any>>(), []),
     expressionsInOptions: false,
     selectFirst: false,
     autoFill: types.frozen(),
     clearValueOnHidden: false,
+    validateApi: types.optional(types.frozen(), ''),
     selectedOptions: types.optional(types.frozen(), []),
     filteredOptions: types.optional(types.frozen(), []),
     dialogSchema: types.frozen(),
@@ -88,7 +92,8 @@ export const FormItemStore = StoreNode.named('FormItemStore')
   })
   .views(self => {
     function getForm(): any {
-      return self.parentStore;
+      const form = self.parentStore;
+      return form?.storeType === FormStore.name ? form : undefined;
     }
 
     function getValue(): any {
@@ -121,7 +126,7 @@ export const FormItemStore = StoreNode.named('FormItemStore')
       },
 
       get prinstine(): any {
-        return (getForm() as IFormStore).getPristineValueByName(self.name);
+        return (getForm() as IFormStore)?.getPristineValueByName(self.name);
       },
 
       get errors() {
@@ -133,11 +138,19 @@ export const FormItemStore = StoreNode.named('FormItemStore')
         return !!(!errors || !errors.length);
       },
 
+      get errClassNames() {
+        return self.errorData
+          .map(item => item.rule)
+          .filter((item, index, arr) => item && arr.indexOf(item) === index)
+          .map(item => `has-error--${item}`)
+          .join(' ');
+      },
+
       get lastSelectValue(): string {
         return getLastOptionValue();
       },
 
-      getSelectedOptions: (value: any = getValue()) => {
+      getSelectedOptions: (value: any = self.tmpValue) => {
         if (typeof value === 'undefined') {
           return [];
         }
@@ -213,7 +226,10 @@ export const FormItemStore = StoreNode.named('FormItemStore')
       id,
       selectFirst,
       autoFill,
-      clearValueOnHidden
+      clearValueOnHidden,
+      validateApi,
+      maxLength,
+      minLength
     }: {
       required?: boolean;
       unique?: boolean;
@@ -231,6 +247,9 @@ export const FormItemStore = StoreNode.named('FormItemStore')
       selectFirst?: boolean;
       autoFill?: any;
       clearValueOnHidden?: boolean;
+      validateApi?: boolean;
+      minLength?: number;
+      maxLength?: number;
     }) {
       if (typeof rules === 'string') {
         rules = str2rules(rules);
@@ -255,22 +274,25 @@ export const FormItemStore = StoreNode.named('FormItemStore')
         (self.labelField = (labelField as string) || 'label');
       typeof clearValueOnHidden !== 'undefined' &&
         (self.clearValueOnHidden = !!clearValueOnHidden);
+      typeof validateApi !== 'undefined' && (self.validateApi = validateApi);
 
-      rules = rules || {};
       rules = {
         ...rules,
         isRequired: self.required
       };
 
+      // if (typeof minLength === 'number') {
+      //   rules.minLength = minLength;
+      // }
+
+      // if (typeof maxLength === 'number') {
+      //   rules.maxLength = maxLength;
+      // }
+
       if (isObjectShallowModified(rules, self.rules)) {
         self.rules = rules;
-        clearError('bultin');
+        clearError('builtin');
         self.validated = false;
-      }
-
-      if (value !== void 0 && self.value === void 0) {
-        form.setValueByName(self.name, value, true);
-        syncAutoFill(value, true);
       }
     }
 
@@ -282,71 +304,103 @@ export const FormItemStore = StoreNode.named('FormItemStore')
       self.isFocused = false;
     }
 
-    function changeValue(value: any, isPrintine: boolean = false) {
-      if (typeof value === 'undefined' || value === '__undefined') {
-        self.form.deleteValueByName(self.name);
-      } else {
-        self.form.setValueByName(self.name, value, isPrintine);
-      }
+    let validateCancel: Function | null = null;
+    const validate: (data: Object, hook?: any) => Promise<boolean> = flow(
+      function* validate(data: Object, hook?: any) {
+        if (self.validating && !self.validateApi) {
+          return self.valid;
+        }
 
-      syncAutoFill(value, isPrintine);
-    }
+        self.validating = true;
+        clearError();
+        if (hook) {
+          yield hook();
+        }
 
-    const validate: (hook?: any) => Promise<boolean> = flow(function* validate(
-      hook?: any
-    ) {
-      if (self.validating) {
-        return self.valid;
-      }
+        addError(
+          doValidate(self.tmpValue, data, self.rules, self.messages, self.__)
+        );
 
-      self.validating = true;
-      clearError();
-      if (hook) {
-        yield hook();
-      }
+        if (!self.errors.length && self.validateApi) {
+          if (validateCancel) {
+            validateCancel();
+            validateCancel = null;
+          }
 
-      addError(
-        doValidate(
-          self.value,
-          self.form.data,
-          self.rules,
-          self.messages,
-          self.__
-        )
-      );
-      self.validated = true;
+          const json: Payload = yield getEnv(self).fetcher(
+            self.validateApi,
+            data,
+            {
+              cancelExecutor: (executor: Function) =>
+                (validateCancel = executor)
+            }
+          );
+          validateCancel = null;
 
-      if (
-        self.unique &&
-        self.form.parentStore &&
-        self.form.parentStore.storeType === 'ComboStore'
-      ) {
-        const combo = self.form.parentStore as IComboStore;
-        const group = combo.uniques.get(self.name) as IUniqueGroup;
+          if (!json.ok && json.status === 422 && json.errors) {
+            addError(
+              String(
+                json.errors || json.msg || `表单项「${self.name}」校验失败`
+              )
+            );
+          }
+        }
+
+        self.validated = true;
 
         if (
-          group.items.some(
-            item => item !== self && self.value && item.value === self.value
-          )
+          self.unique &&
+          self.form.parentStore &&
+          self.form.parentStore.storeType === 'ComboStore'
         ) {
-          addError(self.__('`当前值不唯一`'));
+          const combo = self.form.parentStore as IComboStore;
+          const group = combo.uniques.get(self.name) as IUniqueGroup;
+
+          if (
+            group.items.some(
+              item =>
+                item !== self &&
+                self.tmpValue !== undefined &&
+                item.value === self.tmpValue
+            )
+          ) {
+            addError(self.__('`当前值不唯一`'));
+          }
         }
+
+        self.validating = false;
+        return self.valid;
       }
+    );
 
-      self.validating = false;
-      return self.valid;
-    });
-
-    function setError(msg: string | Array<string>, tag: string = 'bultin') {
+    function setError(msg: string | Array<string>, tag: string = 'builtin') {
       clearError();
       addError(msg, tag);
     }
 
-    function addError(msg: string | Array<string>, tag: string = 'bultin') {
-      const msgs: Array<string> = Array.isArray(msg) ? msg : [msg];
+    function addError(
+      msg:
+        | string
+        | Array<
+            | string
+            | {
+                msg: string;
+                rule: string;
+              }
+          >,
+      tag: string = 'builtin'
+    ) {
+      const msgs: Array<
+        | string
+        | {
+            msg: string;
+            rule: string;
+          }
+      > = Array.isArray(msg) ? msg : [msg];
       msgs.forEach(item =>
         self.errorData.push({
-          msg: item,
+          msg: typeof item === 'string' ? item : item.msg,
+          rule: typeof item !== 'string' ? item.rule : undefined,
           tag: tag
         })
       );
@@ -380,18 +434,20 @@ export const FormItemStore = StoreNode.named('FormItemStore')
 
     function setOptions(
       options: Array<object>,
-      onChange?: (value: any) => void
+      onChange?: (value: any) => void,
+      data?: Object
     ) {
       if (!Array.isArray(options)) {
         return;
       }
-      options = options.filter(item => item);
+      options = filterTree(options, item => item);
       const originOptions = self.options.concat();
-      options.length ? self.options.replace(options) : self.options.clear();
-      syncOptions(originOptions);
+      self.options = options;
+      syncOptions(originOptions, data);
       let selectedOptions;
 
       if (
+        onChange &&
         self.selectFirst &&
         self.filteredOptions.length &&
         (selectedOptions = self.getSelectedOptions(self.value)) &&
@@ -417,14 +473,8 @@ export const FormItemStore = StoreNode.named('FormItemStore')
             ? list
             : list[0];
 
-        if (form.inited && onChange) {
-          onChange(value);
-        } else {
-          changeValue(value, !form.inited);
-        }
+        onChange(value);
       }
-
-      syncAutoFill(self.value, !form.inited);
     }
 
     let loadCancel: Function | null = null;
@@ -446,7 +496,9 @@ export const FormItemStore = StoreNode.named('FormItemStore')
           self.loading = false;
         }
 
-        self.loading = true;
+        if (!config?.silent) {
+          self.loading = true;
+        }
 
         const json: Payload = yield getEnv(self).fetcher(api, data, {
           autoAppend: false,
@@ -465,7 +517,7 @@ export const FormItemStore = StoreNode.named('FormItemStore')
             );
           getEnv(self).notify(
             'error',
-            self.errors.join(''),
+            self.errors.join('') || `${api}：${json.msg}`,
             json.msgTimeout !== undefined
               ? {
                   closeButton: true,
@@ -532,7 +584,7 @@ export const FormItemStore = StoreNode.named('FormItemStore')
         [];
 
       options = normalizeOptions(options as any);
-      setOptions(options, onChange);
+      setOptions(options, onChange, data);
 
       if (json.data && typeof (json.data as any).value !== 'undefined') {
         onChange && onChange((json.data as any).value, false, true);
@@ -565,17 +617,29 @@ export const FormItemStore = StoreNode.named('FormItemStore')
         spliceTree(self.options, indexes, 1, {
           ...option,
           loading: true
-        })
+        }),
+        undefined,
+        data
       );
 
-      let json = yield fetchOptions(api, data, config, false);
+      let json = yield fetchOptions(
+        api,
+        data,
+        {
+          ...config,
+          silent: true
+        },
+        false
+      );
       if (!json) {
         setOptions(
           spliceTree(self.options, indexes, 1, {
             ...option,
             loading: false,
             error: true
-          })
+          }),
+          undefined,
+          data
         );
         return;
       }
@@ -593,26 +657,23 @@ export const FormItemStore = StoreNode.named('FormItemStore')
           loading: false,
           loaded: true,
           children: options
-        })
+        }),
+        undefined,
+        data
       );
 
       return json;
     });
 
-    function syncOptions(originOptions?: Array<any>) {
+    // @issue 强依赖form，需要改造暂且放过。
+    function syncOptions(originOptions?: Array<any>, data?: Object) {
       if (!self.options.length && typeof self.value === 'undefined') {
         self.selectedOptions = [];
         self.filteredOptions = [];
         return;
       }
 
-      const form = self.form;
-      const value = self.value;
-
-      // 有可能销毁了
-      if (!form) {
-        return;
-      }
+      const value = self.tmpValue;
 
       const selected = Array.isArray(value)
         ? value.map(item =>
@@ -640,18 +701,21 @@ export const FormItemStore = StoreNode.named('FormItemStore')
       let expressionsInOptions = false;
       let filteredOptions = self.options
         .filter((item: any) => {
-          if (!expressionsInOptions && (item.visibleOn || item.hiddenOn)) {
+          if (
+            !expressionsInOptions &&
+            (item.visibleOn || item.hiddenOn || item.disabledOn)
+          ) {
             expressionsInOptions = true;
           }
 
           return item.visibleOn
-            ? evalExpression(item.visibleOn, form.data) !== false
+            ? evalExpression(item.visibleOn, data) !== false
             : item.hiddenOn
-            ? evalExpression(item.hiddenOn, form.data) !== true
+            ? evalExpression(item.hiddenOn, data) !== true
             : item.visible !== false || item.hidden !== true;
         })
         .map((item: any, index) => {
-          const disabled = evalExpression(item.disabledOn, form.data);
+          const disabled = evalExpression(item.disabledOn, data);
           const newItem = item.disabledOn
             ? self.filteredOptions.length > index &&
               self.filteredOptions[index].disabled === disabled
@@ -713,8 +777,10 @@ export const FormItemStore = StoreNode.named('FormItemStore')
         }
       });
 
-      let parentStore = form.parentStore;
-      if (parentStore && parentStore.storeType === ComboStore.name) {
+      const form = self.form;
+
+      let parentStore = form?.parentStore;
+      if (parentStore?.storeType === ComboStore.name) {
         let combo = parentStore as IComboStore;
         let group = combo.uniques.get(self.name) as IUniqueGroup;
         let options: Array<any> = [];
@@ -765,7 +831,7 @@ export const FormItemStore = StoreNode.named('FormItemStore')
 
     function openDialog(
       schema: any,
-      data: any = form.data,
+      data: any,
       callback?: (ret?: any) => void
     ) {
       self.dialogSchema = schema;
@@ -784,48 +850,12 @@ export const FormItemStore = StoreNode.named('FormItemStore')
       }
     }
 
-    function syncAutoFill(
-      value: any = self.value,
-      isPrintine: boolean = false
-    ) {
-      if (
-        !self.multiple &&
-        self.autoFill &&
-        !isEmpty(self.autoFill) &&
-        self.options.length
-      ) {
-        const selectedOptions = self.getSelectedOptions(value);
-        if (selectedOptions.length !== 1) {
-          return;
-        }
-
-        const toSync = dataMapping(
-          self.autoFill,
-          createObject(
-            {
-              ancestors: getTreeAncestors(
-                self.filteredOptions,
-                selectedOptions[0],
-                true
-              )
-            },
-            selectedOptions[0]
-          )
-        );
-        Object.keys(toSync).forEach(key => {
-          const value = toSync[key];
-
-          if (typeof value === 'undefined' || value === '__undefined') {
-            self.form.deleteValueByName(key);
-          } else {
-            self.form.setValueByName(key, value, isPrintine);
-          }
-        });
-      }
-    }
-
     function changeTmpValue(value: any) {
       self.tmpValue = value;
+    }
+
+    function changeEmitedValue(value: any) {
+      self.emitedValue = value;
     }
 
     function addSubFormItem(item: IFormItemStore) {
@@ -843,7 +873,6 @@ export const FormItemStore = StoreNode.named('FormItemStore')
       focus,
       blur,
       config,
-      changeValue,
       validate,
       setError,
       addError,
@@ -858,8 +887,8 @@ export const FormItemStore = StoreNode.named('FormItemStore')
       reset,
       openDialog,
       closeDialog,
-      syncAutoFill,
       changeTmpValue,
+      changeEmitedValue,
       addSubFormItem,
       removeSubFormItem
     };

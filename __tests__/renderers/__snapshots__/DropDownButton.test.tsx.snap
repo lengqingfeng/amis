@@ -3,13 +3,13 @@
 exports[`Renderer:dropdown-button 1`] = `
 <div>
   <div
-    class="a-DropDown  is-opened"
+    class="cxd-DropDown  is-opened show"
   >
     <button
-      class="a-Button show a-Button--primary"
+      class="cxd-Button cxd-Button--primary"
     >
       <span
-        class="a-DropDown-caret"
+        class="cxd-DropDown-caret"
       >
         <icon-mock
           classname="icon icon-caret"
@@ -18,7 +18,7 @@ exports[`Renderer:dropdown-button 1`] = `
       </span>
     </button>
     <ul
-      class="a-DropDown-menu"
+      class="cxd-DropDown-menu"
     >
       <li
         class=""
@@ -26,7 +26,9 @@ exports[`Renderer:dropdown-button 1`] = `
         <a
           class=""
         >
-          按钮
+          <span>
+            按钮
+          </span>
         </a>
       </li>
       <li
@@ -35,7 +37,9 @@ exports[`Renderer:dropdown-button 1`] = `
         <a
           class=""
         >
-          按钮
+          <span>
+            按钮
+          </span>
         </a>
       </li>
     </ul>
@@ -46,13 +50,13 @@ exports[`Renderer:dropdown-button 1`] = `
 exports[`Renderer:dropdown-button 2`] = `
 <div>
   <div
-    class="a-DropDown "
+    class="cxd-DropDown  show"
   >
     <button
-      class="a-Button show a-Button--primary"
+      class="cxd-Button cxd-Button--primary"
     >
       <span
-        class="a-DropDown-caret"
+        class="cxd-DropDown-caret"
       >
         <icon-mock
           classname="icon icon-caret"

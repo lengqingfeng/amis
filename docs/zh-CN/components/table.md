@@ -15,7 +15,7 @@ order: 67
 ```schema: scope="body"
 {
     "type": "service",
-    "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample?perPage=5",
+    "api": "/api/sample?perPage=5",
     "body": [
         {
             "type": "table",
@@ -310,7 +310,7 @@ order: 67
 ```schema: scope="body"
 {
     "type": "crud",
-    "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample?waitSeconds=1",
+    "api": "/api/sample?waitSeconds=1",
     "columns": [
         {
             "name": "id",
@@ -332,7 +332,7 @@ order: 67
 ```schema: scope="body"
 {
     "type": "crud",
-    "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample?waitSeconds=1",
+    "api": "/api/sample?waitSeconds=1",
     "columns": [
         {
             "name": "id",
@@ -354,7 +354,7 @@ order: 67
 ```schema: scope="body"
 {
     "type": "service",
-    "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample?perPage=5",
+    "api": "/api/sample?perPage=5",
     "body": [
         {
             "type": "table",
@@ -404,7 +404,7 @@ order: 67
 ```schema: scope="body"
 {
     "type": "service",
-    "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample?perPage=5",
+    "api": "/api/sample?perPage=5",
     "className": "w-xxl",
     "body": [
         {
@@ -457,7 +457,7 @@ order: 67
 ```schema: scope="body"
 {
     "type": "crud",
-    "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample?waitSeconds=1",
+    "api": "/api/sample?waitSeconds=1",
     "columns": [
         {
             "name": "id",
@@ -477,7 +477,7 @@ order: 67
 ```schema: scope="body"
 {
     "type": "crud",
-    "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample?waitSeconds=1",
+    "api": "/api/sample?waitSeconds=1",
     "columns": [
         {
             "name": "id",
@@ -501,7 +501,7 @@ order: 67
 ```schema: scope="body"
 {
     "type": "crud",
-    "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample?waitSeconds=1",
+    "api": "/api/sample?waitSeconds=1",
     "columns": [
         {
             "name": "id",
@@ -526,7 +526,7 @@ order: 67
 ```schema: scope="body"
 {
     "type": "crud",
-    "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample?waitSeconds=1",
+    "api": "/api/sample?waitSeconds=1",
     "columns": [
         {
             "name": "id",
@@ -558,7 +558,7 @@ order: 67
 ```schema: scope="body"
 {
     "type": "crud",
-    "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample?waitSeconds=1",
+    "api": "/api/sample?waitSeconds=1",
     "columns": [
         {
             "name": "id",
@@ -631,7 +631,7 @@ order: 67
 ```schema: scope="body"
 {
   "type": "crud",
-  "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample?waitSeconds=1",
+  "api": "/api/sample?waitSeconds=1",
   "affixHeader": false,
   "combineNum": 1,
   "columns": [
@@ -665,7 +665,7 @@ order: 67
 ```schema: scope="body"
 {
     "type": "crud",
-    "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample?waitSeconds=1",
+    "api": "/api/sample?waitSeconds=1",
     "columns": [
         {
             "name": "id",
@@ -878,7 +878,7 @@ order: 67
 ```schema: scope="body"
 {
     "type": "service",
-    "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample?perPage=5",
+    "api": "/api/sample?perPage=5",
     "body": [
         {
             "type": "table",
@@ -941,6 +941,8 @@ order: 67
 ## 合并单元格
 
 只需要配置 `combineNum` 属性即可，他表示从左到右多少列内启动自动合并单元格，只要多行的同一个属性值是一样的，就会自动合并。
+
+如果你不想从第一列开始合并单元格，可以配置 `combineFromIndex`，如果配置为 1，则会跳过第一列的合并。如果配置为 2，则会跳过第一列和第二列的合并，从第三行开始向右合并 `combineNum` 列。
 
 ```schema: scope="body"
 {
@@ -1060,7 +1062,7 @@ order: 67
 ```schema: scope="body"
 {
     "type": "service",
-    "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample?perPage=5",
+    "api": "/api/sample?perPage=5",
     "body": [
         {
             "type": "table",
@@ -1118,7 +1120,7 @@ order: 67
 ```schema: scope="body"
 {
     "type": "service",
-    "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample?perPage=10",
+    "api": "/api/sample?perPage=10",
     "body": [
         {
             "type": "table",
@@ -1167,7 +1169,7 @@ order: 67
 ```schema: scope="body"
 {
     "type": "service",
-    "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample?perPage=10",
+    "api": "/api/sample?perPage=10",
     "body": [
         {
             "type": "table",
@@ -1205,7 +1207,7 @@ order: 67
 ```schema: scope="body"
 {
     "type": "service",
-    "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample?perPage=10",
+    "api": "/api/sample?perPage=10",
     "body": [
         {
             "type": "table",
@@ -1251,7 +1253,7 @@ order: 67
 ```schema: scope="body"
 {
     "type": "service",
-    "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample?perPage=10",
+    "api": "/api/sample?perPage=10",
     "body": [
         {
             "type": "table",

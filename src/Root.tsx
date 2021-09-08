@@ -4,7 +4,6 @@ import React from 'react';
 import Alert from './components/Alert2';
 import ImageGallery from './components/ImageGallery';
 import {RendererEnv} from './env';
-import {envOverwrite} from './envOverwrite';
 import {RendererProps} from './factory';
 import {LocaleContext, TranslateFn} from './locale';
 import {RootRenderer} from './RootRenderer';
@@ -58,13 +57,14 @@ export class Root extends React.Component<RootProps> {
     } = this.props;
 
     const theme = env.theme;
-
-    // 根据环境覆盖 schema，这个要在最前面做，不然就无法覆盖 validations
-    envOverwrite(schema, locale);
+    let themeName = this.props.theme || 'cxd';
+    if (themeName === 'default') {
+      themeName = 'cxd';
+    }
 
     return (
       <RootStoreContext.Provider value={rootStore}>
-        <ThemeContext.Provider value={this.props.theme || 'default'}>
+        <ThemeContext.Provider value={themeName}>
           <LocaleContext.Provider value={this.props.locale!}>
             <ImageGallery modalContainer={env.getModalContainer}>
               <RootRenderer
@@ -128,28 +128,15 @@ export function renderChild(
   }
 
   const typeofnode = typeof node;
+
+  if (typeofnode === 'undefined' || node === null) {
+    return null;
+  }
+
   let schema: Schema =
     typeofnode === 'string' || typeofnode === 'number'
       ? {type: 'tpl', tpl: String(node)}
       : (node as Schema);
-  const detectData =
-    schema &&
-    (schema.detectField === '&' ? props : props[schema.detectField || 'data']);
-  const exprProps = detectData
-    ? getExprProperties(schema, detectData, undefined, props)
-    : null;
-
-  if (
-    exprProps &&
-    (exprProps.hidden ||
-      exprProps.visible === false ||
-      schema.hidden ||
-      schema.visible === false ||
-      props.hidden ||
-      props.visible === false)
-  ) {
-    return null;
-  }
 
   const transform = props.propsTransform;
 
@@ -162,7 +149,6 @@ export function renderChild(
   return (
     <SchemaRenderer
       {...props}
-      {...exprProps}
       schema={schema}
       $path={`${prefix ? `${prefix}/` : ''}${(schema && schema.type) || ''}`}
     />

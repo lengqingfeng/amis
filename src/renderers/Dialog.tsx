@@ -5,7 +5,12 @@ import {SchemaNode, Schema, Action} from '../types';
 import {filter} from '../utils/tpl';
 import Modal from '../components/Modal';
 import findLast from 'lodash/findLast';
-import {guid, isVisible, autobind} from '../utils/helper';
+import {
+  guid,
+  isVisible,
+  autobind,
+  isObjectShallowModified
+} from '../utils/helper';
 import {reaction} from 'mobx';
 import {Icon} from '../components/icons';
 import {ModalStore, IModalStore} from '../store/modal';
@@ -48,6 +53,11 @@ export interface DialogSchema extends BaseSchema {
    * 是否支持按 ESC 关闭 Dialog
    */
   closeOnEsc?: boolean;
+
+  /**
+   * 是否支持点其它区域关闭 Dialog
+   */
+  closeOnOutside?: boolean;
 
   name?: SchemaName;
 
@@ -98,18 +108,16 @@ export interface DialogProps
   store: IModalStore;
   show?: boolean;
   lazyRender?: boolean;
+  lazySchema?: (props: DialogProps) => SchemaCollection;
   wrapperComponent: React.ElementType;
 }
 
-export interface DialogState {
-  entered: boolean;
-}
-
-export default class Dialog extends React.Component<DialogProps, DialogState> {
+export default class Dialog extends React.Component<DialogProps> {
   static propsList: Array<string> = [
     'title',
     'size',
     'closeOnEsc',
+    'closeOnOutside',
     'children',
     'bodyClassName',
     'headerClassName',
@@ -132,6 +140,7 @@ export default class Dialog extends React.Component<DialogProps, DialogState> {
     showCloseButton: true,
     wrapperComponent: Modal,
     closeOnEsc: false,
+    closeOnOutside: false,
     showErrorMsg: true
   };
 
@@ -141,9 +150,7 @@ export default class Dialog extends React.Component<DialogProps, DialogState> {
   constructor(props: DialogProps) {
     super(props);
 
-    this.state = {
-      entered: !!this.props.show
-    };
+    props.store.setEntered(!!props.show);
     this.handleSelfClose = this.handleSelfClose.bind(this);
     this.handleAction = this.handleAction.bind(this);
     this.handleDialogConfirm = this.handleDialogConfirm.bind(this);
@@ -156,10 +163,8 @@ export default class Dialog extends React.Component<DialogProps, DialogState> {
     this.handleFormSaved = this.handleFormSaved.bind(this);
     this.handleFormChange = this.handleFormChange.bind(this);
     this.handleChildFinished = this.handleChildFinished.bind(this);
-  }
 
-  componentWillMount() {
-    const store = this.props.store;
+    const store = props.store;
     this.reaction = reaction(
       () => `${store.loading}${store.error}`,
       () => this.forceUpdate()
@@ -194,7 +199,7 @@ export default class Dialog extends React.Component<DialogProps, DialogState> {
     ret.push({
       type: 'button',
       actionType: 'cancel',
-      label: __('cancle')
+      label: __('cancel')
     });
 
     if (confirm) {
@@ -296,10 +301,12 @@ export default class Dialog extends React.Component<DialogProps, DialogState> {
   }
 
   handleEntered() {
-    this.state.entered ||
-      this.setState({
-        entered: true
-      });
+    const {lazySchema, store} = this.props;
+
+    store.setEntered(true);
+    if (typeof lazySchema === 'function') {
+      store.setSchema(lazySchema(this.props));
+    }
 
     const activeElem = document.activeElement as HTMLElement;
     if (activeElem) {
@@ -309,13 +316,14 @@ export default class Dialog extends React.Component<DialogProps, DialogState> {
   }
 
   handleExited() {
-    const {store} = this.props;
-    isAlive(store) && store.setFormData({});
-
-    this.state.entered &&
-      this.setState({
-        entered: false
-      });
+    const {lazySchema, store} = this.props;
+    if (isAlive(store)) {
+      store.setFormData({});
+      store.setEntered(false);
+      if (typeof lazySchema === 'function') {
+        store.setSchema('');
+      }
+    }
   }
 
   handleFormInit(data: any) {
@@ -324,8 +332,15 @@ export default class Dialog extends React.Component<DialogProps, DialogState> {
     store.setFormData(data);
   }
 
-  handleFormChange(data: any) {
+  handleFormChange(data: any, name?: string) {
     const {store} = this.props;
+
+    // 如果 dialog 里面不放 form，而是直接放表单项就会进到这里来。
+    if (typeof name === 'string') {
+      data = {
+        [name]: data
+      };
+    }
 
     store.setFormData(data);
   }
@@ -433,12 +448,13 @@ export default class Dialog extends React.Component<DialogProps, DialogState> {
   }
 
   render() {
+    const store = this.props.store;
     const {
       className,
       size,
       closeOnEsc,
+      closeOnOutside,
       title,
-      store,
       render,
       header,
       body,
@@ -446,17 +462,19 @@ export default class Dialog extends React.Component<DialogProps, DialogState> {
       headerClassName,
       show,
       lazyRender,
+      lazySchema,
       wrapperComponent,
       showCloseButton,
       env,
       classnames: cx,
       classPrefix,
       translate: __
-    } = this.props;
+    } = {
+      ...this.props,
+      ...store.schema
+    } as any;
 
-    // console.log('Render Dialog');
     const Wrapper = wrapperComponent || Modal;
-
     return (
       <Wrapper
         classPrefix={classPrefix}
@@ -466,6 +484,7 @@ export default class Dialog extends React.Component<DialogProps, DialogState> {
         onHide={this.handleSelfClose}
         keyboard={closeOnEsc && !store.loading}
         closeOnEsc={closeOnEsc}
+        closeOnOutside={!store.dialogOpen && closeOnOutside}
         show={show}
         onEntered={this.handleEntered}
         onExited={this.handleExited}
@@ -522,7 +541,7 @@ export default class Dialog extends React.Component<DialogProps, DialogState> {
             })
           : null}
 
-        {!this.state.entered && lazyRender ? (
+        {(!store.entered && lazyRender) || (lazySchema && !body) ? (
           <div className={cx('Modal-body', bodyClassName)}>
             <Spinner overlay show size="lg" />
           </div>
@@ -579,21 +598,25 @@ export default class Dialog extends React.Component<DialogProps, DialogState> {
 }
 
 @Renderer({
-  test: /(^|\/)dialog$/,
+  type: 'dialog',
   storeType: ModalStore.name,
   storeExtendsData: false,
-  name: 'dialog',
   isolateScope: true,
-  shouldSyncSuperStore: (store: IServiceStore, props: any) =>
-    store.dialogOpen || props.show
+  shouldSyncSuperStore: (store: IServiceStore, props: any, prevProps: any) =>
+    !!(
+      (store.dialogOpen || props.show) &&
+      (props.show !== prevProps.show ||
+        isObjectShallowModified(prevProps.data, props.data))
+    )
 })
 export class DialogRenderer extends Dialog {
   static contextType = ScopedContext;
 
-  componentWillMount() {
-    const scoped = this.context as IScopedContext;
+  constructor(props: DialogProps, context: IScopedContext) {
+    super(props);
+
+    const scoped = context;
     scoped.registerComponent(this);
-    super.componentWillMount();
   }
 
   componentWillUnmount() {
@@ -609,7 +632,6 @@ export class DialogRenderer extends Dialog {
       return false;
     }
 
-    const components = scoped.getComponents();
     const targets: Array<any> = [];
     const {onConfirm, store} = this.props;
 
@@ -623,26 +645,24 @@ export class DialogRenderer extends Dialog {
     }
 
     if (!targets.length) {
-      const page = findLast(
-        components,
-        component => component.props.type === 'page'
-      );
+      let components = scoped
+        .getComponents()
+        .filter(item => !~['drawer', 'dialog'].indexOf(item.props.type));
 
-      if (page) {
-        components.push(...page.context.getComponents());
+      const pool = components.concat();
+
+      while (pool.length) {
+        const item = pool.pop()!;
+
+        if (~['crud', 'form', 'wizard'].indexOf(item.props.type)) {
+          targets.push(item);
+          break;
+        } else if (~['drawer', 'dialog'].indexOf(item.props.type)) {
+          continue;
+        } else if (~['page', 'service'].indexOf(item.props.type)) {
+          pool.unshift.apply(pool, item.context.getComponents());
+        }
       }
-
-      const form = findLast(
-        components,
-        component => component.props.type === 'form'
-      );
-      form && targets.push(form);
-
-      const crud = findLast(
-        components,
-        component => component.props.type === 'crud'
-      );
-      crud && targets.push(crud);
     }
 
     if (targets.length) {
@@ -751,7 +771,7 @@ export class DialogRenderer extends Dialog {
     } else if (action.actionType === 'reload') {
       store.setCurrentAction(action);
       action.target && scoped.reload(action.target, data);
-      if (action.close) {
+      if (action.close || action.type === 'submit') {
         this.handleSelfClose();
         this.closeTarget(action.close);
       }
@@ -827,11 +847,10 @@ export class DialogRenderer extends Dialog {
     const scoped = this.context as IScopedContext;
     const store = this.props.store;
     const dialogAction = store.action as Action;
+    const reload = action.reload ?? dialogAction.reload;
 
-    if (dialogAction.reload) {
-      scoped.reload(dialogAction.reload, store.data);
-    } else if (action.reload) {
-      scoped.reload(action.reload, store.data);
+    if (reload) {
+      scoped.reload(reload, store.data);
     } else {
       // 没有设置，则自动让页面中 crud 刷新。
       scoped

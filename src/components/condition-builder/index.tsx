@@ -24,6 +24,9 @@ export interface ConditionBuilderProps extends ThemeProps, LocaleProps {
   data?: any;
   onChange: (value: ConditionGroupValue) => void;
   config?: Config;
+  disabled?: boolean;
+  searchable?: boolean;
+  fieldClassName?: string;
 }
 
 export class QueryBuilder extends React.Component<ConditionBuilderProps> {
@@ -192,12 +195,15 @@ export class QueryBuilder extends React.Component<ConditionBuilderProps> {
   render() {
     const {
       classnames: cx,
+      fieldClassName,
       fields,
       funcs,
       onChange,
       value,
       showNot,
-      data
+      data,
+      disabled,
+      searchable
     } = this.props;
 
     const normalizedValue = Array.isArray(value?.children)
@@ -224,10 +230,13 @@ export class QueryBuilder extends React.Component<ConditionBuilderProps> {
         value={normalizedValue as any}
         onChange={onChange}
         classnames={cx}
+        fieldClassName={fieldClassName}
         removeable={false}
         onDragStart={this.handleDragStart}
         showNot={showNot}
         data={data}
+        disabled={disabled}
+        searchable={searchable}
       />
     );
   }

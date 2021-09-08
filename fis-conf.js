@@ -11,10 +11,25 @@ fis.get('project.ignore').push('public/**', 'npm/**', 'gh-pages/**');
 // 配置只编译哪些文件。
 
 const Resource = fis.require('postpackager-loader/lib/resource.js');
+const versionHash = fis.util.md5(package.version);
 
 Resource.extend({
   buildResourceMap: function () {
-    return 'amis.' + this.__super();
+    const resourceMap = this.__super();
+
+    const map = JSON.parse(resourceMap.substring(20, resourceMap.length - 2));
+
+    Object.keys(map.res).forEach(function (key) {
+      if (map.res[key].pkg) {
+        map.res[key].pkg = `${versionHash}-${map.res[key].pkg}`;
+      }
+    });
+    Object.keys(map.pkg).forEach(function (key) {
+      map.pkg[`${versionHash}-${key}`] = map.pkg[key];
+      delete map.pkg[key];
+    });
+
+    return `amis.require.resourceMap(${JSON.stringify(map)});`;
   },
 
   calculate: function () {
@@ -37,7 +52,14 @@ fis.set('project.files', [
   '/scss/themes/*.scss',
   '/examples/*.html',
   '/examples/*.tpl',
-  '/examples/static/*',
+  '/examples/static/*.png',
+  '/examples/static/*.svg',
+  '/examples/static/*.jpg',
+  '/examples/static/*.jpeg',
+  '/examples/static/photo/*.jpeg',
+  '/examples/static/photo/*.png',
+  '/examples/static/audio/*.mp3',
+  '/examples/static/video/*.mp4',
   '/src/**.html',
   'mock/**'
 ]);
@@ -95,7 +117,7 @@ fis.match('tinymce/plugins/*/index.js', {
   ignoreDependencies: false
 });
 
-fis.match(/(?:flv\.js)/, {
+fis.match(/(?:mpegts\.js)/, {
   ignoreDependencies: true
 });
 
@@ -158,14 +180,18 @@ fis.match('{*.ts,*.jsx,*.tsx,/src/**.js,/src/**.ts}', {
     }),
 
     function (content) {
-      return content
-        .replace(/\b[a-zA-Z_0-9$]+\.__uri\s*\(/g, '__uri(')
-        .replace(
-          /(return|=>)\s*(tslib_\d+)\.__importStar\(require\(('|")(.*?)\3\)\)/g,
-          function (_, r, tslib, quto, value) {
-            return `${r} new Promise(function(resolve){require(['${value}'], function(ret) {resolve(${tslib}.__importStar(ret));})})`;
-          }
-        );
+      return (
+        content
+          // ts 4.4 生成的代码是 (0, tslib_1.__importStar)，直接改成 tslib_1.__importStar
+          .replace(/\(\d+, (tslib_\d+\.__importStar)\)/g, '$1')
+          .replace(/\b[a-zA-Z_0-9$]+\.__uri\s*\(/g, '__uri(')
+          .replace(
+            /(return|=>)\s*(tslib_\d+)\.__importStar\(require\(('|")(.*?)\3\)\)/g,
+            function (_, r, tslib, quto, value) {
+              return `${r} new Promise(function(resolve){require(['${value}'], function(ret) {resolve(${tslib}.__importStar(ret));})})`;
+            }
+          )
+      );
     }
   ],
   preprocessor: fis.plugin('js-require-css'),
@@ -173,11 +199,29 @@ fis.match('{*.ts,*.jsx,*.tsx,/src/**.js,/src/**.ts}', {
   rExt: '.js'
 });
 
+fis.match('markdown-it/**', {
+  preprocessor: fis.plugin('js-require-file')
+});
+
 fis.match('*.html:jsx', {
   parser: fis.plugin('typescript'),
   rExt: '.js',
   isMod: false
 });
+
+// 这些用了 esm
+fis.match(
+  '{echarts/extension/**.js,zrender/**.js,ansi-to-react/lib/index.js}',
+  {
+    parser: fis.plugin('typescript', {
+      sourceMap: false,
+      importHelpers: true,
+      esModuleInterop: true,
+      emitDecoratorMetadata: false,
+      experimentalDecorators: false
+    })
+  }
+);
 
 fis.hook('node_modules', {
   shimProcess: false,
@@ -291,6 +335,7 @@ if (fis.project.currentMedia() === 'publish') {
               );
             }
           )
+          .replace(/\(\d+, (tslib_\d+\.__importStar)\)/g, '$1')
           .replace(
             /return\s+(tslib_\d+)\.__importStar\(require\(('|")(.*?)\2\)\);/g,
             function (_, tslib, quto, value) {
@@ -359,9 +404,10 @@ if (fis.project.currentMedia() === 'publish') {
   fis.on('compile:end', function (file) {
     if (
       file.subpath === '/src/index.tsx' ||
-      file.subpath === '/examples/mod.js'
+      file.subpath === '/examples/mod.js' ||
+      file.subpath === '/examples/loader.ts'
     ) {
-      file.setContent(file.getContent().replace('@version', package.version));
+      file.setContent(file.getContent().replace(/@version/g, package.version));
     }
   });
 
@@ -402,6 +448,7 @@ if (fis.project.currentMedia() === 'publish') {
       function (content) {
         return content
           .replace(/\b[a-zA-Z_0-9$]+\.__uri\s*\(/g, '__uri(')
+          .replace(/\(\d+, (tslib_\d+\.__importStar)\)/g, '$1')
           .replace(
             /return\s+(tslib_\d+)\.__importStar\(require\(('|")(.*?)\2\)\);/g,
             function (_, tslib, quto, value) {
@@ -417,20 +464,20 @@ if (fis.project.currentMedia() === 'publish') {
 
   env.match('/examples/mod.js', {
     isMod: false,
-    optimizer: fis.plugin('uglify-js')
+    optimizer: fis.plugin('terser')
   });
 
   env.match('*.{js,jsx,ts,tsx}', {
-    optimizer: fis.plugin('uglify-js'),
+    optimizer: fis.plugin('terser'),
     moduleId: function (m, path) {
-      return fis.util.md5('amis-sdk' + path);
+      return fis.util.md5(package.version + 'amis-sdk' + path);
     }
   });
 
   env.match('/src/icons/**.svg', {
     optimizer: fis.plugin('uglify-js'),
     moduleId: function (m, path) {
-      return fis.util.md5('amis-sdk' + path);
+      return fis.util.md5(package.version + 'amis-sdk' + path);
     }
   });
 
@@ -441,20 +488,37 @@ if (fis.project.currentMedia() === 'publish') {
         'examples/embed.tsx',
         'examples/embed.tsx:deps',
         'examples/loadMonacoEditor.ts',
-        '!flv.js/**',
+        '!mpegts.js/**',
         '!hls.js/**',
         '!froala-editor/**',
         '!tinymce/**',
         '!jquery/**',
         '!zrender/**',
         '!echarts/**',
+        '!echarts-stat/**',
         '!papaparse/**',
         '!exceljs/**',
         '!docsearch.js/**',
         '!monaco-editor/**.css',
         '!src/components/RichText.tsx',
         '!src/components/Tinymce.tsx',
-        '!src/lib/renderers/Form/CityDB.js'
+        '!src/components/ColorPicker.tsx',
+        '!react-color/**',
+        '!material-colors/**',
+        '!reactcss/**',
+        '!tinycolor2/**',
+        '!cropperjs/**',
+        '!react-cropper/**',
+        '!src/lib/renderers/Form/CityDB.js',
+        '!src/components/Markdown.tsx',
+        '!src/utils/markdown.ts',
+        '!highlight.js/**',
+        '!entities/**',
+        '!linkify-it/**',
+        '!mdurl/**',
+        '!uc.micro/**',
+        '!markdown-it/**',
+        '!punycode/**'
       ],
 
       'rich-text.js': [
@@ -469,12 +533,34 @@ if (fis.project.currentMedia() === 'publish') {
 
       'exceljs.js': ['exceljs/**'],
 
-      'charts.js': ['zrender/**', 'echarts/**'],
+      'markdown.js': [
+        'src/components/Markdown.tsx',
+        'src/utils/markdown.ts',
+        'highlight.js/**',
+        'entities/**',
+        'linkify-it/**',
+        'mdurl/**',
+        'uc.micro/**',
+        'markdown-it/**',
+        'punycode/**'
+      ],
+
+      'color-picker.js': [
+        'src/components/ColorPicker.tsx',
+        'react-color/**',
+        'material-colors/**',
+        'reactcss/**',
+        'tinycolor2/**'
+      ],
+
+      'cropperjs.js': ['cropperjs/**', 'react-cropper/**'],
+
+      'charts.js': ['zrender/**', 'echarts/**', 'echarts-stat/**'],
 
       'rest.js': [
         '*.js',
         '!monaco-editor/**',
-        '!flv.js/**',
+        '!mpegts.js/**',
         '!hls.js/**',
         '!froala-editor/**',
         '!src/components/RichText.tsx',
@@ -482,7 +568,15 @@ if (fis.project.currentMedia() === 'publish') {
         '!zrender/**',
         '!echarts/**',
         '!papaparse/**',
-        '!exceljs/**'
+        '!exceljs/**',
+        '!src/utils/markdown.ts',
+        '!highlight.js/**',
+        '!argparse/**',
+        '!entities/**',
+        '!linkify-it/**',
+        '!mdurl/**',
+        '!uc.micro/**',
+        '!markdown-it/**'
       ]
     }),
     postpackager: [
@@ -520,7 +614,7 @@ if (fis.project.currentMedia() === 'publish') {
     try {
       throw new Error()
     } catch (e) {
-      _path = (/((?:https?|file)\:.*)\\n?$/.test(e.stack) && RegExp.$1).replace(/\\/[^\\/]*$/, '');
+      _path = (/((?:https?|file):.*?)\\n/.test(e.stack) && RegExp.$1).replace(/\\/[^\\/]*$/, '');
     }
     function filterUrl(url) {
       return _path + url.substring(1);`;
@@ -641,6 +735,13 @@ if (fis.project.currentMedia() === 'publish') {
     release: '/$1'
   });
 
+  // 在爱速搭中不用 cfc，而是放 amis 目录下的路由接管
+  let cfcAddress =
+    'https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock';
+  if (process.env.IS_AISUDA) {
+    cfcAddress = '/amis/api';
+  }
+
   ghPages.match('/{examples,docs}/**', {
     preprocessor: function (contents, file) {
       if (!file.isText() || typeof contents !== 'string') {
@@ -651,21 +752,13 @@ if (fis.project.currentMedia() === 'publish') {
         .replace(
           /(\\?(?:'|"))((?:get|post|delete|put)\:)?\/api\/mock2?/gi,
           function (_, qutoa, method) {
-            return (
-              qutoa +
-              (method || '') +
-              'https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/mock2'
-            );
+            return qutoa + (method || '') + `${cfcAddress}/mock2`;
           }
         )
         .replace(
           /(\\?(?:'|"))((?:get|post|delete|put)\:)?\/api\/sample/gi,
           function (_, qutoa, method) {
-            return (
-              qutoa +
-              (method || '') +
-              'https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/sample'
-            );
+            return qutoa + (method || '') + `${cfcAddress}/sample`;
           }
         );
     }
@@ -681,7 +774,7 @@ if (fis.project.currentMedia() === 'publish') {
         '/examples/mod.js',
         'node_modules/**.js',
         '!monaco-editor/**',
-        '!flv.js/**',
+        '!mpegts.js/**',
         '!hls.js/**',
         '!froala-editor/**',
         '!tinymce/**',
@@ -716,7 +809,7 @@ if (fis.project.currentMedia() === 'publish') {
         '**.{js,jsx,ts,tsx}',
         '!static/mod.js',
         '!monaco-editor/**',
-        '!flv.js/**',
+        '!mpegts.js/**',
         '!hls.js/**',
         '!froala-editor/**',
         '!jquery/**',
@@ -809,7 +902,7 @@ if (fis.project.currentMedia() === 'publish') {
   });
 
   ghPages.match('*.{js,ts,tsx,jsx}', {
-    optimizer: fis.plugin('uglify-js'),
+    optimizer: fis.plugin('terser'),
     useHash: true
   });
 
@@ -845,6 +938,7 @@ if (fis.project.currentMedia() === 'publish') {
               );
             }
           )
+          .replace(/\(\d+, (tslib_\d+\.__importStar)\)/g, '$1')
           .replace(
             /return\s+(tslib_\d+)\.__importStar\(require\(('|")(.*?)\2\)\);/g,
             function (_, tslib, quto, value) {

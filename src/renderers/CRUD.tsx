@@ -19,7 +19,8 @@ import {
   noop,
   isVisible,
   getVariable,
-  qsstringify
+  qsstringify,
+  qsparse
 } from '../utils/helper';
 import {observer} from 'mobx-react';
 import partition from 'lodash/partition';
@@ -31,7 +32,12 @@ import pick from 'lodash/pick';
 import qs from 'qs';
 import {findDOMNode} from 'react-dom';
 import {evalExpression, filter} from '../utils/tpl';
-import {isValidApi, buildApi, isEffectiveApi} from '../utils/api';
+import {
+  isValidApi,
+  buildApi,
+  isEffectiveApi,
+  isApiOutdated
+} from '../utils/api';
 import omit from 'lodash/omit';
 import find from 'lodash/find';
 import findIndex from 'lodash/findIndex';
@@ -54,6 +60,7 @@ import {ActionSchema} from './Action';
 import {CardsSchema} from './Cards';
 import {ListSchema} from './List';
 import {TableSchema} from './Table';
+import {isPureVariable, resolveVariableAndFilter} from '../utils/tpl-builtin';
 
 export type CRUDBultinToolbarType =
   | 'columns-toggler'
@@ -301,7 +308,7 @@ export type CRUDListSchema = CRUDCommonSchema & {
   mode: 'list';
 } & Omit<ListSchema, 'type'>;
 
-export type CRUDTableSchem = CRUDCommonSchema & {
+export type CRUDTableSchema = CRUDCommonSchema & {
   mode?: 'table';
 } & Omit<TableSchema, 'type'>;
 
@@ -309,7 +316,7 @@ export type CRUDTableSchem = CRUDCommonSchema & {
  * CRUD 增删改查渲染器。
  * 文档：https://baidu.gitee.io/amis/docs/components/crud
  */
-export type CRUDSchema = CRUDCardsSchema | CRUDListSchema | CRUDTableSchem;
+export type CRUDSchema = CRUDCardsSchema | CRUDListSchema | CRUDTableSchema;
 
 export interface CRUDProps
   extends RendererProps,
@@ -389,7 +396,6 @@ export default class CRUD extends React.Component<CRUDProps, any> {
 
   control: any;
   lastQuery: any;
-  dataInvalid: boolean = false;
   timer: ReturnType<typeof setTimeout>;
   mounted: boolean;
   constructor(props: CRUDProps) {
@@ -416,9 +422,7 @@ export default class CRUD extends React.Component<CRUDProps, any> {
     this.renderHeaderToolbar = this.renderHeaderToolbar.bind(this);
     this.renderFooterToolbar = this.renderFooterToolbar.bind(this);
     this.clearSelection = this.clearSelection.bind(this);
-  }
 
-  componentWillMount() {
     const {
       location,
       store,
@@ -426,20 +430,20 @@ export default class CRUD extends React.Component<CRUDProps, any> {
       perPageField,
       syncLocation,
       loadDataOnce
-    } = this.props;
+    } = props;
 
     this.mounted = true;
 
     if (syncLocation && location && (location.query || location.search)) {
       store.updateQuery(
-        qs.parse(location.search.substring(1)),
+        qsparse(location.search.substring(1)),
         undefined,
         pageField,
         perPageField
       );
     } else if (syncLocation && !location && window.location.search) {
       store.updateQuery(
-        qs.parse(window.location.search.substring(1)) as object,
+        qsparse(window.location.search.substring(1)) as object,
         undefined,
         pageField,
         perPageField
@@ -450,6 +454,16 @@ export default class CRUD extends React.Component<CRUDProps, any> {
       !!this.props.filterTogglable,
       this.props.filterDefaultVisible
     );
+
+    // 如果有 api，data 里面先写个 空数组，面得继承外层的 items
+    // 比如 crud 打开一个弹框，里面也是个 crud，默认一开始其实显示
+    // 的是外层 crud 的数据，等接口回来后就会变成新的。
+    // 加上这个就是为了解决这种情况
+    if (this.props.api) {
+      this.props.store.updateData({
+        items: []
+      });
+    }
   }
 
   componentDidMount() {
@@ -468,15 +482,15 @@ export default class CRUD extends React.Component<CRUDProps, any> {
     }
   }
 
-  componentWillReceiveProps(nextProps: CRUDProps) {
+  componentDidUpdate(prevProps: CRUDProps) {
     const props = this.props;
-    const store = props.store;
+    const store = prevProps.store;
 
     if (
       anyChanged(
         ['toolbar', 'headerToolbar', 'footerToolbar', 'bulkActions'],
-        props,
-        nextProps
+        prevProps,
+        props
       )
     ) {
       // 来点参数变化。
@@ -484,56 +498,69 @@ export default class CRUD extends React.Component<CRUDProps, any> {
       this.renderFooterToolbar = this.renderFooterToolbar.bind(this);
     }
 
-    if (this.props.pickerMode && this.props.value !== nextProps.value) {
-      store.setSelectedItems(nextProps.value);
+    if (this.props.pickerMode && this.props.value !== prevProps.value) {
+      store.setSelectedItems(props.value);
     }
 
-    if (this.props.filterTogglable !== nextProps.filterTogglable) {
+    if (this.props.filterTogglable !== prevProps.filterTogglable) {
       store.setFilterTogglable(
-        !!nextProps.filterTogglable,
-        nextProps.filterDefaultVisible
+        !!props.filterTogglable,
+        props.filterDefaultVisible
       );
     }
 
+    let dataInvalid = false;
+
     if (
-      props.syncLocation &&
-      props.location &&
-      props.location.search !== nextProps.location.search
+      prevProps.syncLocation &&
+      prevProps.location &&
+      prevProps.location.search !== props.location.search
     ) {
       // 同步地址栏，那么直接检测 query 是否变了，变了就重新拉数据
       store.updateQuery(
-        qs.parse(nextProps.location.search.substring(1)),
+        qsparse(props.location.search.substring(1)),
         undefined,
-        nextProps.pageField,
-        nextProps.perPageField
+        props.pageField,
+        props.perPageField
       );
-      this.dataInvalid = isObjectShallowModified(
-        store.query,
-        this.lastQuery,
-        false
+      dataInvalid = !!(
+        props.api && isObjectShallowModified(store.query, this.lastQuery, false)
       );
-    } else if (!props.syncLocation && props.api && nextProps.api) {
-      // 如果不同步地址栏，则直接看api上是否绑定参数，结果变了就重新刷新。
-      let prevApi = buildApi(props.api, props.data as object, {
-        ignoreData: true
-      });
-      let nextApi = buildApi(nextProps.api, nextProps.data as object, {
-        ignoreData: true
-      });
+    }
 
-      if (
-        prevApi.url !== nextApi.url &&
-        isValidApi(nextApi.url) &&
-        (!nextApi.sendOn || evalExpression(nextApi.sendOn, nextProps.data))
-      ) {
-        this.dataInvalid = true;
+    if (dataInvalid) {
+      // 要同步数据
+    } else if (
+      prevProps.api &&
+      props.api &&
+      isApiOutdated(
+        prevProps.api,
+        props.api,
+        store.fetchCtxOf(prevProps.data, {
+          pageField: prevProps.pageField,
+          perPageField: prevProps.perPageField
+        }),
+        store.fetchCtxOf(props.data, {
+          pageField: props.pageField,
+          perPageField: props.perPageField
+        })
+      )
+    ) {
+      dataInvalid = true;
+    } else if (!props.api && isPureVariable(props.source)) {
+      const prev = resolveVariableAndFilter(
+        prevProps.source,
+        prevProps.data,
+        '| raw'
+      );
+      const next = resolveVariableAndFilter(props.source, props.data, '| raw');
+
+      if (prev !== next) {
+        store.initFromScope(props.data, props.source);
       }
     }
-  }
 
-  componentDidUpdate() {
-    if (this.dataInvalid) {
-      this.dataInvalid = false;
+    if (dataInvalid) {
       this.search();
     }
   }
@@ -778,7 +805,10 @@ export default class CRUD extends React.Component<CRUDProps, any> {
       perPageField,
       loadDataOnceFetchOnFilter
     } = this.props;
-    values = syncLocation ? qs.parse(qsstringify(values)) : values;
+
+    values = syncLocation
+      ? qsparse(qsstringify(values, undefined, true))
+      : values;
 
     store.updateQuery(
       {
@@ -895,8 +925,9 @@ export default class CRUD extends React.Component<CRUDProps, any> {
       if (component && component.props.type === 'form') {
         // 数据保存了，说明列表数据已经无效了，重新刷新。
         if (value && (value as any).__saved) {
+          const reload = action.reload ?? dialogAction.reload;
           // 配置了 reload 则跳过自动更新。
-          dialogAction.reload ||
+          reload ||
             this.search(
               dialogAction.__from ? {[pageField || 'page']: 1} : undefined,
               undefined,
@@ -914,11 +945,13 @@ export default class CRUD extends React.Component<CRUDProps, any> {
       }
     }
 
-    if (dialogAction.reload) {
-      this.reloadTarget(dialogAction.reload, ctx);
+    const reload = action.reload ?? dialogAction.reload;
+    if (reload) {
+      this.reloadTarget(reload, ctx);
     }
 
-    const redirect = dialogAction.redirect && filter(action.redirect, ctx);
+    let redirect = action.redirect ?? dialogAction.redirect;
+    redirect = redirect && filter(redirect, ctx);
     redirect && env.jumpTo(redirect, dialogAction);
   }
 
@@ -1087,7 +1120,7 @@ export default class CRUD extends React.Component<CRUDProps, any> {
   handleSave(
     rows: Array<object> | object,
     diff: Array<object> | object,
-    indexes: Array<number>,
+    indexes: Array<string>,
     unModifiedItems?: Array<any>,
     rowsOrigin?: Array<object> | object,
     resetOnFailed?: boolean
@@ -1557,7 +1590,7 @@ export default class CRUD extends React.Component<CRUDProps, any> {
       selectedItems.length ? selectedItems[0] : {}
     );
 
-    if (itemActions && selectedItems.length === 1) {
+    if (itemActions && selectedItems.length <= 1) {
       itemBtns = itemActions
         .map(item => ({
           ...item,
@@ -1603,7 +1636,7 @@ export default class CRUD extends React.Component<CRUDProps, any> {
             {
               key: `item-${index}`,
               data: itemData,
-              disabled: btn.disabled,
+              disabled: btn.disabled || selectedItems.length !== 1,
               onAction: this.handleItemAction.bind(this, btn, itemData)
             }
           )
@@ -1612,7 +1645,7 @@ export default class CRUD extends React.Component<CRUDProps, any> {
     ) : null;
   }
 
-  renderPagination() {
+  renderPagination(toolbar: SchemaNode) {
     const {store, render, classnames: cx, alwaysShowPagination} = this.props;
 
     const {page, lastPage} = store;
@@ -1625,6 +1658,12 @@ export default class CRUD extends React.Component<CRUDProps, any> {
       return null;
     }
 
+    const extraProps: any = {};
+    if (typeof toolbar !== 'string') {
+      extraProps.showPageInput = (toolbar as Schema).showPageInput;
+      extraProps.maxButtons = (toolbar as Schema).maxButtons;
+    }
+
     return (
       <div className={cx('Crud-pager')}>
         {render(
@@ -1633,6 +1672,7 @@ export default class CRUD extends React.Component<CRUDProps, any> {
             type: 'pagination'
           },
           {
+            ...extraProps,
             activePage: page,
             lastPage: lastPage,
             hasNext: store.hasNext,
@@ -1787,7 +1827,7 @@ export default class CRUD extends React.Component<CRUDProps, any> {
     if (type === 'bulkActions' || type === 'bulk-actions') {
       return this.renderBulkActions(childProps);
     } else if (type === 'pagination') {
-      return this.renderPagination();
+      return this.renderPagination(toolbar);
     } else if (type === 'statistics') {
       return this.renderStatistics();
     } else if (type === 'switch-per-page') {
@@ -1813,13 +1853,7 @@ export default class CRUD extends React.Component<CRUDProps, any> {
             {children.map(({toolbar, dom: child}, index) => {
               const type = (toolbar as Schema).type || toolbar;
               let align =
-                toolbar.align ||
-                (type === 'pagination' || (index === len - 1 && index > 0)
-                  ? 'right'
-                  : index < len - 1
-                  ? 'left'
-                  : '');
-
+                toolbar.align || (type === 'pagination' ? 'right' : 'left');
               return (
                 <div
                   key={index}
@@ -1985,6 +2019,7 @@ export default class CRUD extends React.Component<CRUDProps, any> {
       itemActions,
       classnames: cx,
       keepItemSelectionOnPageChange,
+      maxKeepItemSelectionLength,
       onAction,
       popOverContainer,
       translate: __,
@@ -2011,6 +2046,10 @@ export default class CRUD extends React.Component<CRUDProps, any> {
               },
               {
                 key: 'filter',
+                panelClassName: cx(
+                  'Crud-filter',
+                  filter.panelClassName || 'Panel--default'
+                ),
                 data: store.filterData,
                 onReset: this.handleFilterReset,
                 onSubmit: this.handleFilterSubmit,
@@ -2027,6 +2066,7 @@ export default class CRUD extends React.Component<CRUDProps, any> {
           'body',
           {
             ...rest,
+            columns: store.columns ?? rest.columns,
             type: mode || 'table'
           },
           {
@@ -2048,6 +2088,8 @@ export default class CRUD extends React.Component<CRUDProps, any> {
               pickerMode || keepItemSelectionOnPageChange
                 ? store.selectedItemsAsArray
                 : undefined,
+            keepItemSelectionOnPageChange,
+            maxKeepItemSelectionLength,
             valueField: valueField || primaryField,
             primaryField: primaryField,
             hideQuickSaveBtn,
@@ -2092,17 +2134,17 @@ export default class CRUD extends React.Component<CRUDProps, any> {
 }
 
 @Renderer({
-  test: /(^|\/)crud$/,
+  type: 'crud',
   storeType: CRUDStore.name,
-  name: 'crud'
+  isolateScope: true
 })
 export class CRUDRenderer extends CRUD {
   static contextType = ScopedContext;
 
-  componentWillMount() {
-    super.componentWillMount();
+  constructor(props: CRUDProps, context: IScopedContext) {
+    super(props);
 
-    const scoped = this.context as IScopedContext;
+    const scoped = context;
     scoped.registerComponent(this);
   }
 
@@ -2110,6 +2152,27 @@ export class CRUDRenderer extends CRUD {
     super.componentWillUnmount();
     const scoped = this.context as IScopedContext;
     scoped.unRegisterComponent(this);
+  }
+
+  reload(subpath?: string, query?: any, ctx?: any) {
+    const scoped = this.context as IScopedContext;
+    if (subpath) {
+      return scoped.reload(
+        query ? `${subpath}?${qsstringify(query)}` : subpath,
+        ctx
+      );
+    }
+
+    return super.reload(subpath, query);
+  }
+
+  receive(values: any, subPath?: string) {
+    const scoped = this.context as IScopedContext;
+    if (subPath) {
+      return scoped.send(subPath, values);
+    }
+
+    return super.receive(values);
   }
 
   reloadTarget(target: string, data: any) {

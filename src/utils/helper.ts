@@ -1,5 +1,6 @@
 import isPlainObject from 'lodash/isPlainObject';
 import isEqual from 'lodash/isEqual';
+import isNaN from 'lodash/isNaN';
 import uniq from 'lodash/uniq';
 import {Schema, PlainObject, FunctionPropertyNames} from '../types';
 import {evalExpression} from './tpl';
@@ -7,6 +8,12 @@ import qs from 'qs';
 import {IIRendererStore} from '../store';
 import {IFormStore} from '../store/form';
 import {autobindMethod} from './autobind';
+import {
+  isPureVariable,
+  resolveVariable,
+  resolveVariableAndFilter
+} from './tpl-builtin';
+import {isObservable} from 'mobx';
 
 // 方便取值的时候能够把上层的取到，但是获取的时候不会全部把所有的数据获取到。
 export function createObject(
@@ -150,7 +157,7 @@ export function findIndex(
 
 export function getVariable(
   data: {[propName: string]: any},
-  key: string,
+  key: string | undefined,
   canAccessSuper: boolean = true
 ): any {
   if (!data || !key) {
@@ -290,7 +297,8 @@ export function isObjectShallowModified(
   prev: any,
   next: any,
   strictMode: boolean = true,
-  ignoreUndefined: boolean = false
+  ignoreUndefined: boolean = false,
+  statck: Array<any> = []
 ): boolean {
   if (Array.isArray(prev) && Array.isArray(next)) {
     return prev.length !== next.length
@@ -300,14 +308,19 @@ export function isObjectShallowModified(
             prev,
             next[index],
             strictMode,
-            ignoreUndefined
+            ignoreUndefined,
+            statck
           )
         );
+  } else if (isNaN(prev) && isNaN(next)) {
+    return false;
   } else if (
     null == prev ||
     null == next ||
     !isObject(prev) ||
-    !isObject(next)
+    !isObject(next) ||
+    isObservable(prev) ||
+    isObservable(next)
   ) {
     return strictMode ? prev !== next : prev != next;
   }
@@ -325,12 +338,23 @@ export function isObjectShallowModified(
   ) {
     return true;
   }
+
+  // 避免循环引用死循环。
+  if (~statck.indexOf(prev)) {
+    return false;
+  }
+  statck.push(prev);
+
   for (let i: number = keys.length - 1; i >= 0; i--) {
     let key = keys[i];
     if (
-      strictMode
-        ? next[key] !== prev[key]
-        : isObjectShallowModified(next[key], prev[key], false, ignoreUndefined)
+      isObjectShallowModified(
+        prev[key],
+        next[key],
+        strictMode,
+        ignoreUndefined,
+        statck
+      )
     ) {
       return true;
     }
@@ -439,6 +463,37 @@ export function isVisible(
   );
 }
 
+export function isUnfolded(
+  node: any,
+  config: {
+    foldedField?: string;
+    unfoldedField?: string;
+  }
+): boolean {
+  let {foldedField, unfoldedField} = config;
+
+  unfoldedField = unfoldedField || 'unfolded';
+  foldedField = foldedField || 'folded';
+
+  let ret: boolean = false;
+  if (unfoldedField && typeof node[unfoldedField] !== 'undefined') {
+    ret = !!node[unfoldedField];
+  } else if (foldedField && typeof node[foldedField] !== 'undefined') {
+    ret = !node[foldedField];
+  }
+
+  return ret;
+}
+
+/**
+ * 过滤掉被隐藏的数组元素
+ */
+export function visibilityFilter(items: any, data?: object) {
+  return items.filter((item: any) => {
+    return isVisible(item, data);
+  });
+}
+
 export function isDisabled(
   schema: {
     disabledOn?: string;
@@ -523,7 +578,7 @@ export function promisify<T extends Function>(
       }
       return Promise.resolve(ret);
     } catch (e) {
-      Promise.reject(e);
+      return Promise.reject(e);
     }
   };
   (promisified as any).raw = fn;
@@ -916,7 +971,7 @@ export function getTree<T extends TreeItem>(
  */
 export function filterTree<T extends TreeItem>(
   tree: Array<T>,
-  iterator: (item: T, key: number, level: number) => boolean,
+  iterator: (item: T, key: number, level: number) => any,
   level: number = 1,
   depthFirst: boolean = false
 ) {
@@ -926,7 +981,15 @@ export function filterTree<T extends TreeItem>(
         let children: TreeArray | undefined = item.children
           ? filterTree(item.children, iterator, level + 1, depthFirst)
           : undefined;
-        children && (item = {...item, children: children});
+
+        if (
+          Array.isArray(children) &&
+          Array.isArray(item.children) &&
+          children.length !== item.children.length
+        ) {
+          item = {...item, children: children};
+        }
+
         return item;
       })
       .filter((item, index) => iterator(item, index, level));
@@ -936,10 +999,20 @@ export function filterTree<T extends TreeItem>(
     .filter((item, index) => iterator(item, index, level))
     .map(item => {
       if (item.children && item.children.splice) {
-        item = {
-          ...item,
-          children: filterTree(item.children, iterator, level + 1, depthFirst)
-        };
+        let children = filterTree(
+          item.children,
+          iterator,
+          level + 1,
+          depthFirst
+        );
+
+        if (
+          Array.isArray(children) &&
+          Array.isArray(item.children) &&
+          children.length !== item.children.length
+        ) {
+          item = {...item, children: children};
+        }
       }
       return item;
     });
@@ -1127,7 +1200,9 @@ export function getTreeParent<T extends TreeItem>(tree: Array<T>, value: T) {
 }
 
 export function ucFirst(str?: string) {
-  return str ? str.substring(0, 1).toUpperCase() + str.substring(1) : '';
+  return typeof str === 'string'
+    ? str.substring(0, 1).toUpperCase() + str.substring(1)
+    : str;
 }
 
 export function lcFirst(str?: string) {
@@ -1233,9 +1308,26 @@ export function qsstringify(
   options: any = {
     arrayFormat: 'indices',
     encodeValuesOnly: true
+  },
+  keepEmptyArray?: boolean
+) {
+  // qs会保留空字符串。fix: Combo模式的空数组，无法清空。改为存为空字符串；只转换一层
+  keepEmptyArray &&
+    Object.keys(data).forEach((key: any) => {
+      Array.isArray(data[key]) && !data[key].length && (data[key] = '');
+    });
+  return qs.stringify(data, options);
+}
+
+export function qsparse(
+  data: string,
+  options: any = {
+    arrayFormat: 'indices',
+    encodeValuesOnly: true,
+    depth: 1000 // 默认是 5， 所以condition-builder只要来个条件组就会导致报错
   }
 ) {
-  return qs.stringify(data, options);
+  return qs.parse(data, options);
 }
 
 export function object2formData(
@@ -1307,7 +1399,12 @@ export function chainEvents(props: any, schema: any) {
       typeof schema[key] === 'function' &&
       schema[key] !== props[key]
     ) {
-      ret[key] = chainFunctions(schema[key], props[key]);
+      // 表单项里面的 onChange 很特殊，这个不要处理。
+      if (props.formStore && key === 'onChange') {
+        ret[key] = props[key];
+      } else {
+        ret[key] = chainFunctions(schema[key], props[key]);
+      }
     } else {
       ret[key] = props[key];
     }
@@ -1389,19 +1486,138 @@ export const keyToPath = (string: string) => {
 };
 
 /**
- * 深度查找具有某个 key 名字段的对象
+ * 检查对象是否有循环引用，来自 https://stackoverflow.com/a/34909127
  * @param obj
- * @param key
  */
-export function findObjectsWithKey(obj: any, key: string) {
+function isCyclic(obj: any): boolean {
+  const seenObjects: any = [];
+  function detect(obj: any) {
+    if (obj && typeof obj === 'object') {
+      if (seenObjects.indexOf(obj) !== -1) {
+        return true;
+      }
+      seenObjects.push(obj);
+      for (var key in obj) {
+        if (obj.hasOwnProperty(key) && detect(obj[key])) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+  return detect(obj);
+}
+
+function internalFindObjectsWithKey(obj: any, key: string) {
   let objects: any[] = [];
   for (const k in obj) {
     if (!obj.hasOwnProperty(k)) continue;
     if (k === key) {
       objects.push(obj);
     } else if (typeof obj[k] === 'object') {
-      objects = objects.concat(findObjectsWithKey(obj[k], key));
+      objects = objects.concat(internalFindObjectsWithKey(obj[k], key));
     }
   }
   return objects;
+}
+
+/**
+ * 深度查找具有某个 key 名字段的对象，实际实现是 internalFindObjectsWithKey，这里包一层是为了做循环引用检测
+ * @param obj
+ * @param key
+ */
+export function findObjectsWithKey(obj: any, key: string) {
+  // 避免循环引用导致死循环
+  if (isCyclic(obj)) {
+    return [];
+  }
+  return internalFindObjectsWithKey(obj, key);
+}
+
+let scrollbarWidth: number;
+
+/**
+ * 获取浏览器滚动条宽度 https://stackoverflow.com/a/13382873
+ */
+
+export function getScrollbarWidth() {
+  if (typeof scrollbarWidth !== 'undefined') {
+    return scrollbarWidth;
+  }
+  // Creating invisible container
+  const outer = document.createElement('div');
+  outer.style.visibility = 'hidden';
+  outer.style.overflow = 'scroll'; // forcing scrollbar to appear
+  // @ts-ignore
+  outer.style.msOverflowStyle = 'scrollbar'; // needed for WinJS apps
+  document.body.appendChild(outer);
+
+  // Creating inner element and placing it in the container
+  const inner = document.createElement('div');
+  outer.appendChild(inner);
+
+  // Calculating difference between container's full width and the child width
+  scrollbarWidth = outer.offsetWidth - inner.offsetWidth;
+
+  // Removing temporary elements from the DOM
+  // @ts-ignore
+  outer.parentNode.removeChild(outer);
+
+  return scrollbarWidth;
+}
+
+function resolveValueByName(data: any, name?: string) {
+  return isPureVariable(name)
+    ? resolveVariableAndFilter(name, data)
+    : resolveVariable(name, data);
+}
+
+// 统一的获取 value 值方法
+export function getPropValue<
+  T extends {
+    value?: any;
+    name?: string;
+    data?: any;
+    defaultValue?: any;
+  }
+>(props: T, getter?: (props: T) => any) {
+  const {name, value, data, defaultValue} = props;
+  return (
+    value ?? getter?.(props) ?? resolveValueByName(data, name) ?? defaultValue
+  );
+}
+
+// 检测 value 是否有变化，有变化就执行 onChange
+export function detectPropValueChanged<
+  T extends {
+    value?: any;
+    name?: string;
+    data?: any;
+    defaultValue?: any;
+  }
+>(
+  props: T,
+  prevProps: T,
+  onChange: (value: any) => void,
+  getter?: (props: T) => any
+) {
+  let nextValue: any;
+  if (typeof props.value !== 'undefined') {
+    props.value !== prevProps.value && onChange(props.value);
+  } else if ((nextValue = getter?.(props)) !== undefined) {
+    nextValue !== getter!(prevProps) && onChange(nextValue);
+  } else if (
+    typeof props.name === 'string' &&
+    (nextValue = resolveValueByName(props.data, props.name)) !== undefined
+  ) {
+    nextValue !== resolveValueByName(prevProps.data, prevProps.name) &&
+      onChange(nextValue);
+  } else if (props.defaultValue !== prevProps.defaultValue) {
+    onChange(props.defaultValue);
+  }
+}
+
+// 去掉字符串中的 html 标签，不完全准确但效率比较高
+export function removeHTMLTag(str: string) {
+  return str.replace(/<\/?[^>]+(>|$)/g, '');
 }

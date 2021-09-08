@@ -1,7 +1,9 @@
 import React from 'react';
 import {Renderer, RendererProps} from '../factory';
 import {BaseSchema, SchemaTpl} from '../Schema';
+import {getPropValue} from '../utils/helper';
 import {filter} from '../utils/tpl';
+import {BadgeSchema, withBadge} from '../components/Badge';
 
 /**
  * Link 链接展示控件。
@@ -22,6 +24,11 @@ export interface LinkSchema extends BaseSchema {
    * 链接内容，如果不配置将显示链接地址。
    */
   body?: SchemaTpl;
+
+  /**
+   * 角标
+   */
+  badge?: BadgeSchema;
 }
 
 export interface LinkProps
@@ -44,10 +51,11 @@ export class LinkField extends React.Component<LinkProps, object> {
       htmlTarget,
       data,
       render,
-      translate: __
+      translate: __,
+      title
     } = this.props;
 
-    let value = this.props.value;
+    let value = getPropValue(this.props);
     const finnalHref = href ? filter(href, data, '| raw') : '';
 
     return (
@@ -55,6 +63,7 @@ export class LinkField extends React.Component<LinkProps, object> {
         href={finnalHref || value}
         target={htmlTarget || (blank ? '_blank' : '_self')}
         className={cx('Link', className)}
+        title={title}
       >
         {body ? render('body', body) : finnalHref || value || __('link')}
       </a>
@@ -63,7 +72,8 @@ export class LinkField extends React.Component<LinkProps, object> {
 }
 
 @Renderer({
-  test: /(^|\/)link$/,
-  name: 'link'
+  type: 'link'
 })
+// @ts-ignore 类型没搞定
+@withBadge
 export class LinkFieldRenderer extends LinkField {}

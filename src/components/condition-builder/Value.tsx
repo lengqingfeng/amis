@@ -14,6 +14,7 @@ export interface ValueProps extends ThemeProps, LocaleProps {
   onChange: (value: any) => void;
   field: FieldSimple;
   op?: OperatorType;
+  disabled?: boolean;
 }
 
 export class Value extends React.Component<ValueProps> {
@@ -25,7 +26,8 @@ export class Value extends React.Component<ValueProps> {
       onChange,
       op,
       translate: __,
-      data
+      data,
+      disabled
     } = this.props;
     let input: JSX.Element | undefined = undefined;
 
@@ -34,54 +36,59 @@ export class Value extends React.Component<ValueProps> {
         <InputBox
           value={value ?? field.defaultValue}
           onChange={onChange}
-          placeholder={field.placeholder}
+          placeholder={__(field.placeholder)}
+          disabled={disabled}
         />
       );
     } else if (field.type === 'number') {
       input = (
         <NumberInput
-          placeholder={field.placeholder || __('NumberInput.placeholder')}
+          placeholder={__(field.placeholder) || __('NumberInput.placeholder')}
           step={field.step}
           min={field.minimum}
           max={field.maximum}
           precision={field.precision}
           value={value ?? field.defaultValue}
           onChange={onChange}
+          disabled={disabled}
         />
       );
     } else if (field.type === 'date') {
       input = (
         <DatePicker
-          placeholder={field.placeholder || __('Date.placeholder')}
+          placeholder={__(field.placeholder) || __('Date.placeholder')}
           format={field.format || 'YYYY-MM-DD'}
           inputFormat={field.inputFormat || 'YYYY-MM-DD'}
           value={value ?? field.defaultValue}
           onChange={onChange}
           timeFormat=""
+          disabled={disabled}
         />
       );
     } else if (field.type === 'time') {
       input = (
         <DatePicker
           viewMode="time"
-          placeholder={field.placeholder || 'Time.placeholder'}
+          placeholder={__(field.placeholder) || 'Time.placeholder'}
           format={field.format || 'HH:mm'}
           inputFormat={field.inputFormat || 'HH:mm'}
           value={value ?? field.defaultValue}
           onChange={onChange}
           dateFormat=""
           timeFormat={field.format || 'HH:mm'}
+          disabled={disabled}
         />
       );
     } else if (field.type === 'datetime') {
       input = (
         <DatePicker
-          placeholder={field.placeholder || '请选择日期时间'}
+          placeholder={__(field.placeholder) || 'Time.placeholder'}
           format={field.format || ''}
           inputFormat={field.inputFormat || 'YYYY-MM-DD HH:mm'}
           value={value ?? field.defaultValue}
           onChange={onChange}
           timeFormat={field.timeFormat || 'HH:mm'}
+          disabled={disabled}
         />
       );
     } else if (field.type === 'select') {
@@ -95,11 +102,16 @@ export class Value extends React.Component<ValueProps> {
           data={data}
           onChange={onChange}
           multiple={op === 'select_any_in' || op === 'select_not_any_in'}
+          disabled={disabled}
         />
       );
     } else if (field.type === 'boolean') {
       input = (
-        <Switch value={value ?? field.defaultValue} onChange={onChange} />
+        <Switch
+          value={value ?? field.defaultValue}
+          onChange={onChange}
+          disabled={disabled}
+        />
       );
     }
 

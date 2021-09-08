@@ -4,6 +4,10 @@ import LazyComponent from '../../components/LazyComponent';
 import debouce from 'lodash/debounce';
 import Editor from '../../components/Editor';
 import {autobind} from '../../utils/helper';
+import {
+  isPureVariable,
+  resolveVariableAndFilter
+} from '../../utils/tpl-builtin';
 
 /**
  * Editor 代码编辑器
@@ -86,6 +90,7 @@ export interface EditorControlSchema extends Omit<FormBaseControl, 'size'> {
     | 'ruby'
     | 'sb'
     | 'scss'
+    | 'shell'
     | 'sol'
     | 'sql'
     | 'swift'
@@ -98,6 +103,11 @@ export interface EditorControlSchema extends Omit<FormBaseControl, 'size'> {
    * 编辑器大小
    */
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'xxl';
+
+  /**
+   * 是否展示全屏模式开关
+   */
+  allowFullscreen?: boolean;
 }
 
 export interface EditorProps extends FormControlProps {
@@ -108,6 +118,7 @@ export default class EditorControl extends React.Component<EditorProps, any> {
   static defaultProps: Partial<EditorProps> = {
     language: 'javascript',
     editorTheme: 'vs',
+    allowFullscreen: false,
     options: {
       automaticLayout: true,
       selectOnLineNumbers: true,
@@ -189,15 +200,22 @@ export default class EditorControl extends React.Component<EditorProps, any> {
       onChange,
       disabled,
       options,
-      language,
       editorTheme,
-      size
+      size,
+      data,
+      allowFullscreen
     } = this.props;
+
+    let language = this.props.language;
 
     let finnalValue = value;
 
     if (finnalValue && typeof finnalValue !== 'string') {
       finnalValue = JSON.stringify(finnalValue, null, 2);
+    }
+
+    if (isPureVariable(language)) {
+      language = resolveVariableAndFilter(language, data);
     }
 
     return (
@@ -215,6 +233,7 @@ export default class EditorControl extends React.Component<EditorProps, any> {
         <LazyComponent
           classPrefix={ns}
           component={Editor}
+          allowFullscreen={allowFullscreen}
           value={finnalValue}
           onChange={onChange}
           disabled={disabled}
@@ -266,6 +285,7 @@ export const availableLanguages = [
   'sb',
   'scss',
   'sol',
+  'shell',
   'sql',
   'swift',
   'typescript',

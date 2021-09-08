@@ -11,7 +11,7 @@ export interface RendererEnv {
   fetcher: (api: Api, data?: any, options?: object) => Promise<Payload>;
   isCancel: (val: any) => boolean;
   notify: (
-    type: 'error' | 'success',
+    type: 'error' | 'success' | 'warning',
     msg: string,
     conf?: {
       closeButton?: boolean;
@@ -78,7 +78,7 @@ export function withRendererEnv<
         ComposedComponent.displayName || ComposedComponent.name
       })`;
       static contextType = EnvContext;
-      static ComposedComponent = ComposedComponent;
+      static ComposedComponent = ComposedComponent as React.ComponentType<T>;
 
       render() {
         const injectedProps: {

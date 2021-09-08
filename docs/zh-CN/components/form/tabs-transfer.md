@@ -12,8 +12,8 @@ icon:
 ```schema: scope="body"
 {
   "type": "form",
-  "api": "https://3xsw4ap8wah59.cfc-execute.bj.baidubce.com/api/amis-mock/mock2/form/saveForm",
-  "controls": [
+  "api": "/api/mock2/form/saveForm",
+  "body": [
     {
     "label": "组合穿梭器",
     "type": "tabs-transfer",

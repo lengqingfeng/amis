@@ -20,17 +20,21 @@ import {Config, OperationMap} from './config';
 import PopOverContainer from '../PopOverContainer';
 import ListRadios from '../ListRadios';
 import ResultBox from '../ResultBox';
+import {localeable, LocaleProps} from '../../locale';
 
 const option2value = (item: any) => item.value;
 
-export interface ConditionItemProps extends ThemeProps {
+export interface ConditionItemProps extends ThemeProps, LocaleProps {
   config: Config;
   fields: Fields;
   funcs?: Funcs;
   index?: number;
   value: ConditionRule;
   data?: any;
+  disabled?: boolean;
+  searchable?: boolean;
   onChange: (value: ConditionRule, index?: number) => void;
+  fieldClassName?: string;
 }
 
 export class ConditionItem extends React.Component<ConditionItemProps> {
@@ -96,15 +100,25 @@ export class ConditionItem extends React.Component<ConditionItemProps> {
   }
 
   renderLeft() {
-    const {value, fields, funcs, config} = this.props;
-
+    const {
+      value,
+      fields,
+      funcs,
+      config,
+      disabled,
+      fieldClassName,
+      searchable
+    } = this.props;
     return (
       <Expression
         config={config}
         funcs={funcs}
         value={value.left}
+        fieldClassName={fieldClassName}
         onChange={this.handleLeftChange}
         fields={fields}
+        disabled={disabled}
+        searchable={searchable}
         allowedTypes={
           ['field', 'func'].filter(
             type => type === 'field' || type === 'func'
@@ -115,7 +129,7 @@ export class ConditionItem extends React.Component<ConditionItemProps> {
   }
 
   renderOperator() {
-    const {funcs, config, fields, value, classnames: cx} = this.props;
+    const {funcs, config, fields, value, classnames: cx, disabled} = this.props;
     const left = value?.left;
     let operators: Array<string> = [];
 
@@ -140,6 +154,7 @@ export class ConditionItem extends React.Component<ConditionItemProps> {
     }
 
     if (Array.isArray(operators) && operators.length) {
+      const __ = this.props.translate;
       return (
         <PopOverContainer
           popOverRender={({onClose}) => (
@@ -148,7 +163,7 @@ export class ConditionItem extends React.Component<ConditionItemProps> {
               option2value={option2value}
               onChange={this.handleOperatorChange}
               options={operators.map(operator => ({
-                label: OperationMap[operator as keyof typeof OperationMap],
+                label: __(OperationMap[operator as keyof typeof OperationMap]),
                 value: operator
               }))}
               value={value.op}
@@ -165,10 +180,13 @@ export class ConditionItem extends React.Component<ConditionItemProps> {
                 )}
                 ref={ref}
                 allowInput={false}
-                result={OperationMap[value?.op as keyof typeof OperationMap]}
+                result={__(
+                  OperationMap[value?.op as keyof typeof OperationMap]
+                )}
                 onResultChange={noop}
                 onResultClick={onClick}
-                placeholder="请选择操作"
+                disabled={disabled}
+                placeholder={__('Condition.cond_placeholder')}
               >
                 <span className={cx('CBGroup-operatorCaret')}>
                   <Icon icon="caret" className="icon" />
@@ -221,7 +239,15 @@ export class ConditionItem extends React.Component<ConditionItemProps> {
   }
 
   renderRightWidgets(type: string, op: OperatorType) {
-    const {funcs, value, data, fields, config, classnames: cx} = this.props;
+    const {
+      funcs,
+      value,
+      data,
+      fields,
+      config,
+      classnames: cx,
+      disabled
+    } = this.props;
     let field = {
       ...config.types[type],
       type
@@ -258,6 +284,7 @@ export class ConditionItem extends React.Component<ConditionItemProps> {
               field?.valueTypes ||
               config.valueTypes || ['value', 'field', 'func', 'formula']
             }
+            disabled={disabled}
           />
 
           <span className={cx('CBSeprator')}>~</span>
@@ -274,6 +301,7 @@ export class ConditionItem extends React.Component<ConditionItemProps> {
               field?.valueTypes ||
               config.valueTypes || ['value', 'field', 'func', 'formula']
             }
+            disabled={disabled}
           />
         </>
       );
@@ -293,6 +321,7 @@ export class ConditionItem extends React.Component<ConditionItemProps> {
           field?.valueTypes ||
           config.valueTypes || ['value', 'field', 'func', 'formula']
         }
+        disabled={disabled}
       />
     );
   }
@@ -310,4 +339,4 @@ export class ConditionItem extends React.Component<ConditionItemProps> {
   }
 }
 
-export default themeable(ConditionItem);
+export default themeable(localeable(ConditionItem));

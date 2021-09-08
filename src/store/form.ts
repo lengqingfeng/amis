@@ -28,6 +28,7 @@ import {
 import isEqual from 'lodash/isEqual';
 import flatten from 'lodash/flatten';
 import {getStoreById, removeStore} from './manager';
+import {filter} from '../utils/tpl';
 
 export const FormStore = ServiceStore.named('FormStore')
   .props({
@@ -35,17 +36,29 @@ export const FormStore = ServiceStore.named('FormStore')
     validated: false,
     submited: false,
     submiting: false,
-    validating: false,
     savedData: types.frozen(),
     // items: types.optional(types.array(types.late(() => FormItemStore)), []),
-    itemsRef: types.optional(types.array(types.string), []),
     canAccessSuperData: true,
-    persistData: false,
+    persistData: types.optional(types.union(types.string, types.boolean), ''),
     restError: types.optional(types.array(types.string), []) // 没有映射到表达项上的 errors
   })
   .views(self => {
     function getItems() {
-      return self.itemsRef.map(item => getStoreById(item) as IFormItemStore);
+      const formItems: Array<IFormItemStore> = [];
+
+      // 查找孩子节点中是 formItem 的表单项
+      const pool = self.children.concat();
+      while (pool.length) {
+        const current = pool.shift()!;
+
+        if (current.storeType === FormItemStore.name) {
+          formItems.push(current);
+        } else {
+          pool.push(...current.children);
+        }
+      }
+
+      return formItems;
     }
 
     return {
@@ -73,8 +86,11 @@ export const FormStore = ServiceStore.named('FormStore')
         return errors;
       },
 
-      getValueByName(name: string) {
-        return getVariable(self.data, name, self.canAccessSuperData);
+      getValueByName(
+        name: string,
+        canAccessSuperData = self.canAccessSuperData
+      ) {
+        return getVariable(self.data, name, canAccessSuperData);
       },
 
       getPristineValueByName(name: string) {
@@ -100,6 +116,10 @@ export const FormStore = ServiceStore.named('FormStore')
         );
       },
 
+      get validating() {
+        return getItems().some(item => item.validating);
+      },
+
       get isPristine() {
         return isEqual(self.pristine, self.data);
       },
@@ -110,6 +130,14 @@ export const FormStore = ServiceStore.named('FormStore')
         }
 
         return !this.isPristine;
+      },
+
+      get persistKey() {
+        return `${location.pathname}/${self.path}/${
+          typeof self.persistData === 'string'
+            ? filter(self.persistData, self.data)
+            : self.persistData
+        }`;
       }
     };
   })
@@ -178,10 +206,6 @@ export const FormStore = ServiceStore.named('FormStore')
 
       self.data = data;
 
-      if (self.persistData) {
-        setPersistData();
-      }
-
       // 同步 options
       syncOptions();
     }
@@ -221,7 +245,7 @@ export const FormStore = ServiceStore.named('FormStore')
     }
 
     const syncOptions = debounce(
-      () => self.items.forEach(item => item.syncOptions()),
+      () => self.items.forEach(item => item.syncOptions(undefined, self.data)),
       250,
       {
         trailing: true,
@@ -373,7 +397,7 @@ export const FormStore = ServiceStore.named('FormStore')
           delete errors[key];
         } else if (items.length) {
           // 通过 name 直接找到的
-          items.forEach(item => item.setError(errors[key]));
+          items.forEach(item => item.setError(errors[key], 'remote'));
           delete errors[key];
         } else {
           // 尝试通过path寻找
@@ -427,10 +451,26 @@ export const FormStore = ServiceStore.named('FormStore')
       try {
         let valid = yield validate(hooks);
 
-        if (!valid) {
-          const msg = failedMessage ?? self.__('Form.validateFailed');
+        // 如果不是valid，而且有包含不是remote的报错的表单项时，不可提交
+        if (
+          (!valid &&
+            self.items.some(item =>
+              item.errorData.some(e => e.tag !== 'remote')
+            )) ||
+          self.restError.length
+        ) {
+          let msg = failedMessage ?? self.__('Form.validateFailed');
+          // 同时也列出所有表单项报错，方便在很长的表单中知道是哪个字段的问题
+          failedMessage ??
+            self.items.forEach(item => {
+              item.errorData.forEach(errorData => {
+                msg = `${msg}\n${item.name}: ${errorData.msg}`;
+              });
+            });
+
           msg && getEnv(self).notify('error', msg);
-          throw new Error(self.__('Form.validateFailed'));
+
+          throw new Error(msg);
         }
 
         if (fn) {
@@ -461,15 +501,19 @@ export const FormStore = ServiceStore.named('FormStore')
       hooks?: Array<() => Promise<any>>,
       forceValidate?: boolean
     ) {
-      self.validating = true;
       self.validated = true;
       const items = self.items.concat();
       for (let i = 0, len = items.length; i < len; i++) {
         let item = items[i] as IFormItemStore;
 
-        // 验证过，或者是 unique 的表单项，或者强制验证
-        if (!item.validated || item.unique || forceValidate) {
-          yield item.validate();
+        // 验证过，或者是 unique 的表单项，或者强制验证，或者有远端校验api
+        if (
+          !item.validated ||
+          item.unique ||
+          forceValidate ||
+          !!item.validateApi
+        ) {
+          yield item.validate(self.data);
         }
       }
 
@@ -479,23 +523,20 @@ export const FormStore = ServiceStore.named('FormStore')
         }
       }
 
-      self.validating = false;
       return self.valid;
     });
 
     const validateFields: (fields: Array<string>) => Promise<boolean> = flow(
       function* validateFields(fields: Array<string>) {
-        self.validating = true;
         const items = self.items.concat();
         let result: Array<boolean> = [];
         for (let i = 0, len = items.length; i < len; i++) {
           let item = items[i] as IFormItemStore;
 
           if (~fields.indexOf(item.name)) {
-            result.push(yield item.validate());
+            result.push(yield item.validate(self.data));
           }
         }
-        self.validating = false;
         return result.every(item => item);
       }
     );
@@ -521,7 +562,7 @@ export const FormStore = ServiceStore.named('FormStore')
       const toClear: any = {};
       self.items.forEach(item => {
         if (item.name && item.type !== 'hidden') {
-          toClear[item.name] = item.resetValue;
+          setVariable(toClear, item.name, item.resetValue);
         }
       });
       setValues(toClear);
@@ -529,17 +570,6 @@ export const FormStore = ServiceStore.named('FormStore')
       self.submited = false;
       self.items.forEach(item => item.reset());
       cb && cb(self.data);
-    }
-
-    function addFormItem(item: IFormItemStore) {
-      self.itemsRef.push(item.id);
-      // 默认值可能在原型上，把他挪到当前对象上。
-      setValueByName(item.name, item.value, false, false);
-    }
-
-    function removeFormItem(item: IFormItemStore) {
-      item.clearValueOnHidden && deleteValueByName(item.name);
-      removeStore(item);
     }
 
     function setCanAccessSuperData(value: boolean = true) {
@@ -550,12 +580,12 @@ export const FormStore = ServiceStore.named('FormStore')
       self.inited = value;
     }
 
-    const setPersistData = debounce(
-      () =>
-        localStorage.setItem(
-          location.pathname + self.path,
-          JSON.stringify(self.data)
-        ),
+    function setPersistData(value = '') {
+      self.persistData = value;
+    }
+
+    const setLocalPersistData = debounce(
+      () => localStorage.setItem(self.persistKey, JSON.stringify(self.data)),
       250,
       {
         trailing: true,
@@ -563,24 +593,15 @@ export const FormStore = ServiceStore.named('FormStore')
       }
     );
 
-    function getPersistData() {
-      self.persistData = true;
-      let data = localStorage.getItem(location.pathname + self.path);
+    function getLocalPersistData() {
+      let data = localStorage.getItem(self.persistKey);
       if (data) {
         self.updateData(JSON.parse(data));
       }
     }
 
-    function clearPersistData() {
-      localStorage.removeItem(location.pathname + self.path);
-    }
-
-    function onChildStoreDispose(child: IFormItemStore) {
-      if (child.storeType === FormItemStore.name) {
-        const itemsRef = self.itemsRef.filter(id => id !== child.id);
-        self.itemsRef.replace(itemsRef);
-      }
-      self.removeChildId(child.id);
+    function clearLocalPersistData() {
+      localStorage.removeItem(self.persistKey);
     }
 
     function updateSavedData() {
@@ -598,16 +619,14 @@ export const FormStore = ServiceStore.named('FormStore')
       clearErrors,
       saveRemote,
       reset,
-      addFormItem,
-      removeFormItem,
       syncOptions,
       setCanAccessSuperData,
       deleteValueByName,
-      getPersistData,
+      getLocalPersistData,
+      setLocalPersistData,
+      clearLocalPersistData,
       setPersistData,
-      clearPersistData,
       clear,
-      onChildStoreDispose,
       updateSavedData,
       handleRemoteError,
       getItemsByPath,
@@ -616,7 +635,7 @@ export const FormStore = ServiceStore.named('FormStore')
       clearRestError,
       beforeDestroy() {
         syncOptions.cancel();
-        setPersistData.cancel();
+        setLocalPersistData.cancel();
       }
     };
   });

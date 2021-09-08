@@ -10,10 +10,13 @@ import {
   autobind,
   createObject,
   isObject,
-  isArrayChildrenModified
+  isArrayChildrenModified,
+  getPropValue
 } from '../utils/helper';
 import {Icon} from '../components/icons';
 import {BaseSchema, SchemaCollection, SchemaName, SchemaTpl} from '../Schema';
+import Html from '../components/Html';
+import Image from '../renderers/Image';
 
 /**
  * Carousel 轮播图渲染器。
@@ -75,6 +78,11 @@ export interface CarouselSchema extends BaseSchema {
   name?: SchemaName;
 
   /**
+   * 预览图模式
+   */
+  thumbMode?: 'contain' | 'cover';
+
+  /**
    * 配置固定值
    */
   options?: Array<any>;
@@ -97,37 +105,36 @@ export interface CarouselProps
 export interface CarouselState {
   current: number;
   options: any[];
-  showArrows: boolean;
   nextAnimation: string;
 }
 
 const defaultSchema = {
-  type: 'tpl',
-  tpl: `
-    <% if (data.hasOwnProperty('image')) { %>
-        <div style="background-image: url('<%= data.image %>'); background-size: contain; background-repeat: no-repeat; background-position: center center;" class="image <%= data.imageClassName %>"></div>
-        <% if (data.hasOwnProperty('title')) { %>
-            <div class="title <%= data.titleClassName %>"><%= data.title %></div>
-        <% } if (data.hasOwnProperty('description')) { %> 
-            <div class="description <%= data.descriptionClassName %>"><%= data.description %></div> 
-        <% } %>
-    <% } else if (data.hasOwnProperty('html')) { %>
-        <%= data.html %>"
-    <% } else if (data.hasOwnProperty('image')) { %>
-        <div style="background-image: url('<%= data.image %>')" class="image <%= data.imageClassName %>"></div>
-        <% if (data.title) { %>
-            <div class="title <%= data.titleClassName %>"><%= data.title %></div>
-        <% } if (data.description) { %> 
-            <div class="description <%= data.descriptionClassName %>"><%= data.description %></div> 
-        <% } %>
-    <% } else if (data.hasOwnProperty('html')) { %>
-        <%= data.html %>
-    <% } else if (data.hasOwnProperty('item')) { %>
-        <%= data.item %>
-    <% } else { %>
-        <%= '未找到渲染数据' %>
-    <% } %>
-    `
+  component: (props: any) => {
+    const data = props.data || {};
+    const thumbMode = props.thumbMode;
+    const cx = props.classnames;
+
+    return (
+      <>
+        {data.hasOwnProperty('image') ? (
+          <Image
+            src={data.image}
+            title={data.title}
+            imageCaption={data.description}
+            thumbMode={data.thumbMode ?? thumbMode ?? 'contain'}
+            imageMode="original"
+            className={cx('Carousel-image')}
+          />
+        ) : data.hasOwnProperty('html') ? (
+          <Html html={data.html} />
+        ) : data.hasOwnProperty('item') ? (
+          <span>{data.item}</span>
+        ) : (
+          <p></p>
+        )}
+      </>
+    );
+  }
 };
 
 export class Carousel extends React.Component<CarouselProps, CarouselState> {
@@ -156,31 +163,25 @@ export class Carousel extends React.Component<CarouselProps, CarouselState> {
 
   state = {
     current: 0,
-    options:
-      this.props.value ||
-      this.props.options ||
-      resolveVariable(this.props.name, this.props.data) ||
-      [],
-    showArrows: false,
+    options: this.props.options || getPropValue(this.props) || [],
     nextAnimation: ''
   };
 
-  componentWillReceiveProps(nextProps: CarouselProps) {
-    const currentOptions = this.state.options;
-    const nextOptions =
-      nextProps.value ||
-      nextProps.options ||
-      resolveVariable(nextProps.name, nextProps.data) ||
-      [];
-    if (isArrayChildrenModified(currentOptions, nextOptions)) {
+  componentDidMount() {
+    this.prepareAutoSlide();
+  }
+
+  componentDidUpdate(prevProps: CarouselProps) {
+    const props = this.props;
+
+    const nextOptions = props.options || getPropValue(props) || [];
+    const prevOptions = prevProps.options || getPropValue(prevProps) || [];
+
+    if (isArrayChildrenModified(prevOptions, nextOptions)) {
       this.setState({
         options: nextOptions
       });
     }
-  }
-
-  componentDidMount() {
-    this.prepareAutoSlide();
   }
 
   componentWillUnmount() {
@@ -313,17 +314,11 @@ export class Carousel extends React.Component<CarouselProps, CarouselState> {
 
   @autobind
   handleMouseEnter() {
-    this.setState({
-      showArrows: true
-    });
     this.clearAutoTimeout();
   }
 
   @autobind
   handleMouseLeave() {
-    this.setState({
-      showArrows: false
-    });
     this.prepareAutoSlide();
   }
 
@@ -342,7 +337,7 @@ export class Carousel extends React.Component<CarouselProps, CarouselState> {
       data,
       name
     } = this.props;
-    const {options, showArrows, current, nextAnimation} = this.state;
+    const {options, current, nextAnimation} = this.state;
 
     let body: JSX.Element | null = null;
     let carouselStyles: {
@@ -390,8 +385,9 @@ export class Carousel extends React.Component<CarouselProps, CarouselState> {
                   >
                     {render(
                       `${current}/body`,
-                      itemSchema ? itemSchema : defaultSchema,
+                      itemSchema ? itemSchema : (defaultSchema as any),
                       {
+                        thumbMode: this.props.thumbMode,
                         data: createObject(
                           data,
                           isObject(option)
@@ -405,8 +401,6 @@ export class Carousel extends React.Component<CarouselProps, CarouselState> {
               }}
             </Transition>
           ))}
-          {dots ? this.renderDots() : null}
-          {arrows && showArrows ? this.renderArrows() : null}
         </div>
       );
     }
@@ -417,13 +411,15 @@ export class Carousel extends React.Component<CarouselProps, CarouselState> {
         style={carouselStyles}
       >
         {body ? body : placeholder}
+
+        {dots ? this.renderDots() : null}
+        {arrows ? this.renderArrows() : null}
       </div>
     );
   }
 }
 
 @Renderer({
-  test: /(^|\/)carousel/,
-  name: 'carousel'
+  type: 'carousel'
 })
 export class CarouselRenderer extends Carousel {}

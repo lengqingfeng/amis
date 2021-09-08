@@ -16,10 +16,17 @@ interface BaseDatePickerProps
   requiredConfirm?: boolean;
   onClose?: () => void;
   isEndDate?: boolean;
+  minDate?: moment.Moment;
   renderDay?: (
     props: any,
     currentDate: moment.Moment,
     selectedDate: moment.Moment
+  ) => JSX.Element;
+  renderQuarter?: (
+    props: any,
+    quartar: number,
+    year?: number,
+    date?: moment.Moment
   ) => JSX.Element;
 }
 
@@ -65,6 +72,10 @@ class BaseDatePicker extends ReactDatePicker {
       const props = origin.call(this);
       props.setDateTimeState = this.setState.bind(this);
 
+      // if ((this.props.minDate as moment.Moment)?.isValid()) {
+      //   props.viewDate = this.props.minDate;
+      // }
+
       [
         'inputFormat',
         'onChange',
@@ -106,7 +117,7 @@ class BaseDatePicker extends ReactDatePicker {
           .startOf(type),
         currentView: nextViews[type]
       });
-      this.props.onViewModeChange!(nextViews[type]);
+      this.props.onViewModeChange?.(nextViews[type]);
     };
   };
 
@@ -135,6 +146,7 @@ class BaseDatePicker extends ReactDatePicker {
       date = viewDate
         .clone()
         .quarter(parseInt(target.getAttribute('data-value')!, 10))
+        .startOf('quarter')
         .date(currentDate.date());
     } else if (target.className.indexOf('rdtYear') !== -1) {
       date = viewDate
@@ -173,13 +185,19 @@ class BaseDatePicker extends ReactDatePicker {
 
   render() {
     const Component = CustomCalendarContainer as any;
+    const viewProps = this.getComponentProps();
+
+    if (this.props.viewMode === 'quarters') {
+      [viewProps.updateOn, viewProps.renderQuarter] = [
+        'quarters',
+        this.props.renderQuarter
+      ];
+    }
+
     return (
       <div className={cx('rdt rdtStatic rdtOpen', this.props.className)}>
         <div key="dt" className="rdtPicker">
-          <Component
-            view={this.state.currentView}
-            viewProps={this.getComponentProps()}
-          />
+          <Component view={this.state.currentView} viewProps={viewProps} />
         </div>
       </div>
     );

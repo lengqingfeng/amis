@@ -8,11 +8,13 @@ import {
   setVariable,
   qsstringify,
   keyToPath,
-  string2regExp
+  string2regExp,
+  deleteVariable
 } from './helper';
 import {Enginer} from './tpl';
 import uniqBy from 'lodash/uniqBy';
 import uniq from 'lodash/uniq';
+import transform from 'lodash/transform';
 
 const UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
 
@@ -162,7 +164,7 @@ export const filterDate = (
 };
 
 export function parseDuration(str: string): moment.Duration | undefined {
-  const matches = /^((?:\-|\+)?(?:\d*\.)?\d+)(minute|min|hour|day|week|month|year|weekday|second|millisecond)s?$/.exec(
+  const matches = /^((?:\-|\+)?(?:\d*\.)?\d+)(minute|min|hour|day|week|month|quarter|year|weekday|second|millisecond)s?$/.exec(
     str
   );
 
@@ -180,6 +182,10 @@ export function parseDuration(str: string): moment.Duration | undefined {
 export const filters: {
   [propName: string]: (input: any, ...args: any[]) => any;
 } = {
+  map: (input: Array<unknown>, fn: string, ...arg: any) =>
+    Array.isArray(input) && filters[fn]
+      ? input.map(item => filters[fn](item, ...arg))
+      : input,
   html: (input: string) => escapeHtml(input),
   json: (input, tabSize: number | string = 2) =>
     tabSize
@@ -294,6 +300,21 @@ export const filters: {
     order?: 'asc' | 'desc'
   ) =>
     Array.isArray(input) ? input.sort(makeSorter(key, method, order)) : input,
+  objectToArray: (
+    input: any,
+    label: string = 'label',
+    value: string = 'value'
+  ) =>
+    transform(
+      input,
+      (result: any, v, k) => {
+        (result || (result = [])).push({
+          [label]: v,
+          [value]: k
+        });
+      },
+      []
+    ),
   unique: (input: any, key?: string) =>
     Array.isArray(input) ? (key ? uniqBy(input, key) : uniq(input)) : input,
   topAndOther: (
@@ -427,9 +448,14 @@ export const filters: {
       fn = value => reg.test(String(value));
     }
 
+    // 判断keys是否为*
+    const isAsterisk = /\s*\*\s*/.test(keys);
     keys = keys.split(/\s*,\s*/);
     return input.filter((item: any) =>
-      keys.some((key: string) => fn(resolveVariable(key, item), key, item))
+      // 当keys为*时从item中获取key
+      (isAsterisk ? Object.keys(item) : keys).some((key: string) =>
+        fn(resolveVariable(key, item), key, item)
+      )
     );
   },
   base64Encode(str) {
@@ -601,19 +627,7 @@ export function pickValues(names: string, data: object) {
   return ret;
 }
 
-export const resolveVariable = (path?: string, data: any = {}): any => {
-  if (!path || !data) {
-    return undefined;
-  }
-
-  if (path === '$$') {
-    return data;
-  } else if (path[0] === '$') {
-    path = path.substring(1);
-  } else if (path === '&') {
-    return data;
-  }
-
+function objectGet(data: any, path: string) {
   if (typeof data[path] !== 'undefined') {
     return data[path];
   }
@@ -626,13 +640,77 @@ export const resolveVariable = (path?: string, data: any = {}): any => {
 
     return undefined;
   }, data);
+}
+
+function parseJson(str: string, defaultValue?: any) {
+  try {
+    return JSON.parse(str);
+  } catch (e) {
+    return defaultValue;
+  }
+}
+
+function getCookie(name: string) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) {
+    return parts.pop()!.split(';').shift();
+  }
+  return undefined;
+}
+
+export const resolveVariable = (path?: string, data: any = {}): any => {
+  if (!path || !data || typeof path !== 'string') {
+    return undefined;
+  }
+
+  let [ns, varname] = path.split(':');
+
+  if (!varname && ns) {
+    varname = ns;
+    ns = '';
+  }
+
+  if (ns === 'window') {
+    data = window;
+  } else if (ns === 'ls' || ns === 'ss') {
+    let parts = keyToPath(varname.replace(/^{|}$/g, ''));
+    const key = parts.shift()!;
+    const raw =
+      ns === 'ss' ? sessionStorage.getItem(key) : localStorage.getItem(key);
+
+    if (typeof raw === 'string') {
+      const data = parseJson(raw, raw);
+
+      if (isObject(data) && parts.length) {
+        return objectGet(data, parts.join('.'));
+      }
+
+      return data;
+    }
+
+    return undefined;
+  } else if (ns === 'cookie') {
+    const key = varname.replace(/^{|}$/g, '').trim();
+    return getCookie(key);
+  }
+
+  if (varname === '$$') {
+    return data;
+  } else if (varname[0] === '$') {
+    varname = path.substring(1);
+  } else if (varname === '&') {
+    return data;
+  }
+
+  return objectGet(data, varname);
 };
 
-export const isPureVariable = (path?: any) =>
-  typeof path === 'string'
-    ? /^\$(?:([a-z0-9_.]+)|{[^}{]+})$/.test(path)
+export function isPureVariable(path?: any): path is string {
+  return typeof path === 'string'
+    ? /^\$(?:((?:\w+\:)?[a-z0-9_.][a-z0-9_.\[\]]*)|{[^}{]+})$/i.test(path)
     : false;
-
+}
 export const resolveVariableAndFilter = (
   path?: string,
   data: object = {},
@@ -643,7 +721,9 @@ export const resolveVariableAndFilter = (
     return undefined;
   }
 
-  const m = /^(\\)?\$(?:([a-z0-9_.]+)|{([\s\S]+)})$/i.exec(path);
+  const m = /^(\\)?\$(?:((?:\w+\:)?[a-z0-9_.][a-z0-9_.\[\]]*)|{([\s\S]+)})$/i.exec(
+    path
+  );
 
   if (!m) {
     return undefined;
@@ -660,7 +740,7 @@ export const resolveVariableAndFilter = (
 
   // 先只支持一层吧
   finalKey = finalKey.replace(
-    /(\\|\\\$)?\$(?:([a-zA-Z0-9_.]+)|{([^}{]+)})/g,
+    /(\\|\\\$)?\$(?:([a-zA-Z0-9_.][a-zA-Z0-9_.\[\]]*)|{([^}{]+)})/g,
     (_, escape) => {
       return escape
         ? _.substring(1)
@@ -736,7 +816,7 @@ export const tokenize = (
   }
 
   return str.replace(
-    /(\\)?\$(?:([a-z0-9_\.]+|&|\$)|{([^}{]+?)})/gi,
+    /(\\)?\$(?:((?:\w+\:)?[a-z0-9_\.][a-z0-9_\.\[\]]*|&|\$)|{([^}{]+?)})/gi,
     (_, escape, key1, key2, index, source) => {
       if (!escape && key1 === '$') {
         const prefix = source[index - 1];
@@ -752,7 +832,7 @@ export const tokenize = (
   );
 };
 
-function resolveMapping(
+export function resolveMapping(
   value: any,
   data: PlainObject,
   defaultFilter = '| raw'
@@ -766,7 +846,7 @@ function resolveMapping(
 
 export function dataMapping(
   to: any,
-  from: PlainObject,
+  from: PlainObject = {},
   ignoreFunction: boolean | ((key: string, value: any) => boolean) = false
 ): any {
   if (Array.isArray(to)) {
@@ -784,7 +864,7 @@ export function dataMapping(
 
     if (typeof ignoreFunction === 'function' && ignoreFunction(key, value)) {
       // 如果被ignore，不做数据映射处理。
-      (ret as PlainObject)[key] = value;
+      setVariable(ret, key, value);
     } else if (key === '&' && value === '$$') {
       ret = {
         ...ret,
@@ -820,21 +900,23 @@ export function dataMapping(
         };
       }
     } else if (value === '$$') {
-      (ret as PlainObject)[key] = from;
+      setVariable(ret, key, from);
     } else if (value && value[0] === '$') {
       const v = resolveMapping(value, from);
-      (ret as PlainObject)[key] = v;
+      setVariable(ret, key, v);
 
       if (v === '__undefined') {
-        delete (ret as PlainObject)[key];
+        deleteVariable(ret, key);
       }
     } else if (
       isPlainObject(value) &&
       (keys = Object.keys(value)) &&
       keys.length === 1 &&
-      from[keys[0].substring(1)] &&
-      Array.isArray(from[keys[0].substring(1)])
+      keys[0][0] === '$' &&
+      isPlainObject(value[keys[0]])
     ) {
+      // from[keys[0].substring(1)] &&
+      // Array.isArray(from[keys[0].substring(1)])
       // 支持只取数组中的部分值这个需求
       // 如:
       // data: {
@@ -845,29 +927,35 @@ export function dataMapping(
       //      }
       //   }
       // }
-      const arr = from[keys[0].substring(1)];
+      const arr = Array.isArray(from[keys[0].substring(1)])
+        ? from[keys[0].substring(1)]
+        : [];
       const mapping = value[keys[0]];
 
       (ret as PlainObject)[key] = arr.map((raw: object) =>
         dataMapping(mapping, createObject(from, raw), ignoreFunction)
       );
     } else if (isPlainObject(value)) {
-      (ret as PlainObject)[key] = dataMapping(value, from, ignoreFunction);
+      setVariable(ret, key, dataMapping(value, from, ignoreFunction));
     } else if (Array.isArray(value)) {
-      (ret as PlainObject)[key] = value.map((value: any) =>
-        isPlainObject(value)
-          ? dataMapping(value, from, ignoreFunction)
-          : resolveMapping(value, from)
+      setVariable(
+        ret,
+        key,
+        value.map((value: any) =>
+          isPlainObject(value)
+            ? dataMapping(value, from, ignoreFunction)
+            : resolveMapping(value, from)
+        )
       );
     } else if (typeof value == 'string' && ~value.indexOf('$')) {
-      (ret as PlainObject)[key] = resolveMapping(value, from);
+      setVariable(ret, key, resolveMapping(value, from));
     } else if (typeof value === 'function' && ignoreFunction !== true) {
-      (ret as PlainObject)[key] = value(from);
+      setVariable(ret, key, value(from));
     } else {
-      (ret as PlainObject)[key] = value;
+      setVariable(ret, key, value);
 
       if (value === '__undefined') {
-        delete (ret as PlainObject)[key];
+        deleteVariable(ret, key);
       }
     }
   });
@@ -875,10 +963,41 @@ export function dataMapping(
   return ret;
 }
 
+function matchSynatax(str: string) {
+  let from = 0;
+  while (true) {
+    const idx = str.indexOf('$', from);
+    if (~idx) {
+      const nextToken = str[idx + 1];
+
+      // 如果没有下一个字符，或者下一个字符是引号或者空格
+      // 这个一般不是取值用法
+      if (!nextToken || ~['"', "'", ' '].indexOf(nextToken)) {
+        from = idx + 1;
+        continue;
+      }
+
+      // 如果上个字符是转义也不是取值用法
+      const prevToken = str[idx - 1];
+      if (prevToken && prevToken === '\\') {
+        from = idx + 1;
+        continue;
+      }
+
+      return true;
+    } else {
+      break;
+    }
+  }
+  return false;
+}
+
 export function register(): Enginer & {name: string} {
   return {
     name: 'builtin',
-    test: (str: string) => !!~str.indexOf('$'),
+    test: (str: string) => typeof str === 'string' && matchSynatax(str),
+    removeEscapeToken: (str: string) =>
+      typeof str === 'string' ? str.replace(/\\\$/g, '$') : str,
     compile: (str: string, data: object, defaultFilter = '| html') =>
       tokenize(str, data, defaultFilter)
   };

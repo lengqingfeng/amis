@@ -37,6 +37,7 @@ export const CRUDStore = ServiceStore.named('CRUDStore')
     mode: 'normal',
     hasNext: false,
     selectedAction: types.frozen(),
+    columns: types.frozen(),
     items: types.optional(types.array(types.frozen()), []),
     selectedItems: types.optional(types.array(types.frozen()), []),
     unSelectedItems: types.optional(types.array(types.frozen()), []),
@@ -73,6 +74,21 @@ export const CRUDStore = ServiceStore.named('CRUDStore')
 
     get selectedItemsAsArray() {
       return self.selectedItems.concat();
+    },
+
+    fetchCtxOf(
+      data: any,
+      options: {
+        pageField?: string;
+        perPageField?: string;
+      }
+    ) {
+      return createObject(data, {
+        ...self.query,
+        [options.pageField || 'page']: self.page,
+        [options.perPageField || 'perPage']: self.perPage,
+        ...data
+      });
     }
   }))
   .actions(self => {
@@ -175,9 +191,9 @@ export const CRUDStore = ServiceStore.named('CRUDStore')
         options.silent || self.markFetching(true);
         const ctx: any = createObject(self.data, {
           ...self.query,
+          ...data,
           [options.pageField || 'page']: self.page,
-          [options.perPageField || 'perPage']: self.perPage,
-          ...data
+          [options.perPageField || 'perPage']: self.perPage
         });
 
         // 一次性加载不要发送 perPage 属性
@@ -227,6 +243,7 @@ export const CRUDStore = ServiceStore.named('CRUDStore')
             hasNext,
             items: oItems,
             rows: oRows,
+            columns,
             ...rest
           } = result;
 
@@ -282,6 +299,12 @@ export const CRUDStore = ServiceStore.named('CRUDStore')
             data.count = data.total = rowsData.length;
           }
 
+          if (Array.isArray(columns)) {
+            self.columns = columns.concat();
+          } else {
+            self.columns = undefined;
+          }
+
           self.items.replace(rowsData);
           self.reInitData(data, !!(api as ApiObject).replaceData);
           options.syncResponse2Query !== false &&
@@ -331,9 +354,9 @@ export const CRUDStore = ServiceStore.named('CRUDStore')
       }
     });
 
-    function changePage(page: number, perPage?: number) {
+    function changePage(page: number, perPage?: number | string) {
       self.page = page;
-      perPage && (self.perPage = perPage);
+      perPage && (self.perPage = parseInt(perPage as string, 10));
     }
 
     function selectAction(action: Action) {
@@ -442,9 +465,11 @@ export const CRUDStore = ServiceStore.named('CRUDStore')
         '| raw'
       );
 
-      if (!Array.isArray(rowsData)) {
+      if (!Array.isArray(rowsData) && !self.items.length) {
         return;
       }
+
+      rowsData = Array.isArray(rowsData) ? rowsData : [];
 
       const data = {
         ...self.pristine,
@@ -497,9 +522,13 @@ export const CRUDStore = ServiceStore.named('CRUDStore')
         import('papaparse').then((papaparse: any) => {
           const csvText = papaparse.unparse(items);
           if (csvText) {
-            const blob = new Blob([csvText], {
-              type: 'text/plain;charset=utf-8'
-            });
+            const blob = new Blob(
+              // 加上 BOM 这样 Excel 打开的时候就不会乱码
+              [new Uint8Array([0xef, 0xbb, 0xbf]), csvText],
+              {
+                type: 'text/plain;charset=utf-8'
+              }
+            );
             saveAs(blob, 'data.csv');
           }
         });

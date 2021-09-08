@@ -9,7 +9,8 @@ import {
   SchemaIcon,
   SchemaUrlPath
 } from '../Schema';
-import {resolveVariable, resolveVariableAndFilter} from '../utils/tpl-builtin';
+import {BadgeSchema, withBadge} from '../components/Badge';
+import {isPureVariable, resolveVariable, resolveVariableAndFilter} from '../utils/tpl-builtin';
 
 /**
  * Avatar 用户头像显示
@@ -67,6 +68,11 @@ export interface AvatarSchema extends BaseSchema {
   style?: {
     [propName: string]: any;
   };
+
+  /**
+   * 角标
+   */
+  badge?: BadgeSchema;
 }
 
 export interface AvatarProps
@@ -74,23 +80,16 @@ export interface AvatarProps
     Omit<AvatarSchema, 'type' | 'className'> {}
 
 export class AvatarField extends React.Component<AvatarProps, object> {
-  static defaultProps = {
-    size: 40,
-    shape: 'circle',
-    fit: 'cover',
-    icon: 'fa fa-user'
-  };
-
   render() {
     let {
       className,
-      icon,
+      icon = 'fa fa-user',
       text,
       src,
-      fit,
+      fit = 'cover',
       data,
-      shape,
-      size,
+      shape = 'circle',
+      size = 40,
       style,
       classnames: cx,
       props
@@ -102,15 +101,19 @@ export class AvatarField extends React.Component<AvatarProps, object> {
       lineHeight: size + 'px'
     };
 
-    let avatar = <i className={icon} />;
-
-    if (typeof text === 'string' && text[0] === '$') {
+    if (isPureVariable(text)) {
       text = resolveVariable(text, data);
     }
 
-    if (typeof src === 'string' && src[0] === '$') {
+    if (isPureVariable(src)) {
       src = resolveVariable(src, data);
     }
+
+    if (isPureVariable(icon)) {
+      icon = resolveVariable(icon, data);
+    }
+
+    let avatar = <i className={icon} />;
 
     if (text) {
       if (text.length > 2) {
@@ -136,7 +139,7 @@ export class AvatarField extends React.Component<AvatarProps, object> {
 }
 
 @Renderer({
-  test: /(^|\/)avatar$/,
-  name: 'avatar'
+  type: 'avatar'
 })
+@withBadge
 export class AvatarFieldRenderer extends AvatarField {}

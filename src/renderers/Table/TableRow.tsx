@@ -25,41 +25,15 @@ interface TableRowProps extends Pick<RendererProps, 'render'> {
   [propName: string]: any;
 }
 
+@observer
 export class TableRow extends React.Component<TableRowProps> {
-  reaction?: () => void;
+  // reaction?: () => void;
   constructor(props: TableRowProps) {
     super(props);
     this.handleAction = this.handleAction.bind(this);
     this.handleQuickChange = this.handleQuickChange.bind(this);
+    this.handleChange = this.handleChange.bind(this);
     this.handleClick = this.handleClick.bind(this);
-
-    const item = props.item;
-    const parent = props.parent;
-    const columns = props.columns;
-    this.reaction = reaction(
-      () =>
-        `${item.isHover}${item.checked}${JSON.stringify(item.data)}${
-          item.moved
-        }${item.modified}${item.expanded}${parent?.expanded}${columns.length}`,
-      () => this.forceUpdate(),
-      {
-        onError: () => this.reaction!()
-      }
-    );
-  }
-
-  shouldComponentUpdate(nextProps: TableRowProps) {
-    const props = this.props;
-    if (props.columns !== nextProps.columns) {
-      return true;
-    }
-
-    // 不需要更新，因为子节点已经 observer 了
-    return false;
-  }
-
-  componentWillUnmount() {
-    this.reaction?.();
   }
 
   handleClick(e: React.MouseEvent<HTMLTableRowElement>) {
@@ -93,6 +67,28 @@ export class TableRow extends React.Component<TableRowProps> {
     const {onQuickChange, item} = this.props;
     onQuickChange &&
       onQuickChange(item, values, saveImmediately, savePristine, resetOnFailed);
+  }
+
+  handleChange(
+    value: any,
+    name: string,
+    submit?: boolean,
+    changePristine?: boolean
+  ) {
+    if (!name || typeof name !== 'string') {
+      return;
+    }
+
+    const {item, onQuickChange} = this.props;
+
+    onQuickChange?.(
+      item,
+      {
+        [name]: value
+      },
+      submit,
+      changePristine
+    );
   }
 
   render() {
@@ -168,7 +164,8 @@ export class TableRow extends React.Component<TableRowProps> {
                             colIndex: column.index,
                             key: column.index,
                             onAction: this.handleAction,
-                            onQuickChange: this.handleQuickChange
+                            onQuickChange: this.handleQuickChange,
+                            onChange: this.handleChange
                           }
                         )}
                       </tr>
@@ -211,7 +208,8 @@ export class TableRow extends React.Component<TableRowProps> {
             colIndex: column.index,
             key: column.index,
             onAction: this.handleAction,
-            onQuickChange: this.handleQuickChange
+            onQuickChange: this.handleQuickChange,
+            onChange: this.handleChange
           })
         )}
       </tr>

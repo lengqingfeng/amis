@@ -10,7 +10,8 @@ import {
   filterTree,
   string2regExp,
   getTreeAncestors,
-  getTreeParent
+  getTreeParent,
+  ucFirst
 } from '../../utils/helper';
 import {
   FormOptionsControl,
@@ -22,7 +23,6 @@ import {findDOMNode} from 'react-dom';
 import {ResultBox, Spinner} from '../../components';
 import xor from 'lodash/xor';
 import union from 'lodash/union';
-import {isEqual} from 'lodash';
 
 /**
  * Nested Select
@@ -30,10 +30,20 @@ import {isEqual} from 'lodash';
  */
 export interface NestedSelectControlSchema extends FormOptionsControl {
   type: 'nested-select';
+  /**
+   * 边框模式，全边框，还是半边框，或者没边框。
+   */
+  borderMode?: 'full' | 'half' | 'none';
+
+  /**
+   * 弹框的 css 类
+   */
+  menuClassName?: string;
 }
 
 export interface NestedSelectProps extends OptionsControlProps {
   cascade?: boolean;
+  noResultsText?: string;
   withChildren?: boolean;
 }
 
@@ -52,6 +62,7 @@ export default class NestedSelectControl extends React.Component<
     cascade: false,
     withChildren: false,
     searchPromptText: 'Select.searchPromptText',
+    noResultsText: 'noResult',
     checkAll: true,
     checkAllLabel: '全选'
   };
@@ -141,13 +152,8 @@ export default class NestedSelectControl extends React.Component<
 
   @autobind
   handleOptionClick(option: Option) {
-    const {
-      multiple,
-      onChange,
-      joinValues,
-      extractValue,
-      valueField
-    } = this.props;
+    const {multiple, onChange, joinValues, extractValue, valueField} =
+      this.props;
 
     if (multiple) {
       return;
@@ -389,6 +395,7 @@ export default class NestedSelectControl extends React.Component<
       checkAllLabel,
       translate: __,
       labelField,
+      menuClassName,
       cascade
     } = this.props;
     const valueField = this.props.valueField || 'value';
@@ -401,7 +408,7 @@ export default class NestedSelectControl extends React.Component<
     return (
       <>
         {stack.map((options, index) => (
-          <div key={index} className={cx('NestedSelect-menu')}>
+          <div key={index} className={cx('NestedSelect-menu', menuClassName)}>
             {multiple && checkAll && index === 0 ? (
               <div className={cx('NestedSelect-option', 'checkall')}>
                 <Checkbox
@@ -501,7 +508,18 @@ export default class NestedSelectControl extends React.Component<
   }
 
   renderOuter() {
-    const {popOverContainer, classnames: cx} = this.props;
+    const {
+      popOverContainer,
+      translate: __,
+      classnames: cx,
+      options,
+      render
+    } = this.props;
+    let noResultsText: any = this.props.noResultsText;
+
+    if (noResultsText) {
+      noResultsText = render('noResultText', __(noResultsText));
+    }
 
     let body = (
       <RootCloseWrapper
@@ -509,7 +527,11 @@ export default class NestedSelectControl extends React.Component<
         onRootClose={this.close}
       >
         <div className={cx('NestedSelect-menuOuter')}>
-          {this.renderOptions()}
+          {options.length ? (
+            this.renderOptions()
+          ) : (
+            <div className={cx('NestedSelect-noResult')}>{noResultsText}</div>
+          )}
         </div>
       </RootCloseWrapper>
     );
@@ -538,7 +560,8 @@ export default class NestedSelectControl extends React.Component<
       autoComplete,
       selectedOptions,
       clearable,
-      loading
+      loading,
+      borderMode
     } = this.props;
 
     return (
@@ -553,7 +576,8 @@ export default class NestedSelectControl extends React.Component<
             'NestedSelect--multi': multiple,
             'NestedSelect--searchable': searchable,
             'is-opened': this.state.isOpened,
-            'is-focused': this.state.isFocused
+            'is-focused': this.state.isFocused,
+            [`NestedSelect--border${ucFirst(borderMode)}`]: borderMode
           })}
           result={
             multiple
