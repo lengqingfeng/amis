@@ -120,9 +120,9 @@ export interface FormulaPickerState {
   value: string;
   editorValue: string;
   isError: boolean | string;
-
   variables?: Array<VariableItem>;
   functions?: Array<FuncGroup>;
+  functionsCustom?: boolean
   variableMode?: any;
 }
 
@@ -297,6 +297,7 @@ export class FormulaPicker extends React.Component<
       clearable,
       variables,
       functions,
+      functionsCustom
       children,
       variableMode,
       ...rest
@@ -444,6 +445,7 @@ export class FormulaPicker extends React.Component<
               {...rest}
               variables={this.state.variables ?? variables}
               functions={this.state.functions ?? functions}
+              functionsCustom={this.state.functionsCustom ?? functionsCustom}
               variableMode={this.state.variableMode ?? variableMode}
               value={editorValue}
               onChange={this.handleEditorChange}

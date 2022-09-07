@@ -69,6 +69,11 @@ export interface FormulaEditorProps extends ThemeProps, LocaleProps {
   functions?: Array<FuncGroup>;
 
   /**
+   * false 追加, true清除默认公式
+   */
+  functionsCustom: false;
+
+  /**
    * 顶部标题，默认为表达式
    */
   header: string;
@@ -285,6 +290,7 @@ export class FormulaEditor extends React.Component<
       header,
       value,
       functions,
+      functionsCustom,
       variableMode,
       translate: __,
       classnames: cx,
@@ -295,10 +301,9 @@ export class FormulaEditor extends React.Component<
     } = this.props;
     const {focused} = this.state;
     const customFunctions = Array.isArray(functions) ? functions : [];
-    const functionList = [
-      ...FormulaEditor.buildDefaultFunctions(doc),
-      ...customFunctions
-    ];
+    const functionList = functionsCustom
+      ? customFunctions
+      : [...FormulaEditor.buildDefaultFunctions(doc), ...customFunctions];
 
     return (
       <div
