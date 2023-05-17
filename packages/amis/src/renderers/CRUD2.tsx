@@ -1,6 +1,6 @@
 import React from 'react';
 import omitBy from 'lodash/omitBy';
-import {Renderer, RendererProps} from 'amis-core';
+import {Renderer, RendererProps, filterTarget} from 'amis-core';
 import {CRUDStore, ICRUDStore} from 'amis-core';
 import {
   createObject,
@@ -676,7 +676,7 @@ export default class CRUD2 extends React.Component<CRUD2Props, any> {
           errorMessage: messages && messages.saveSuccess
         })
         .then(() => {
-          reload && this.reloadTarget(filter(reload, data), data);
+          reload && this.reloadTarget(filterTarget(reload, data), data);
           this.getData(undefined, undefined, true);
         })
         .catch(() => {});
@@ -696,7 +696,7 @@ export default class CRUD2 extends React.Component<CRUD2Props, any> {
       store
         .saveRemote(quickSaveItemApi, sendData)
         .then(() => {
-          reload && this.reloadTarget(filter(reload, data), data);
+          reload && this.reloadTarget(filterTarget(reload, data), data);
 
           this.getData(undefined, undefined, true);
         })
@@ -803,7 +803,7 @@ export default class CRUD2 extends React.Component<CRUD2Props, any> {
       store
         .saveRemote(saveOrderApi, model)
         .then(() => {
-          reload && this.reloadTarget(filter(reload, model), model);
+          reload && this.reloadTarget(filterTarget(reload, model), model);
           this.getData(undefined, undefined, true);
         })
         .catch(() => {});
@@ -909,7 +909,10 @@ export default class CRUD2 extends React.Component<CRUD2Props, any> {
         newItems.splice(0, newItems.length - 1)
       );
     }
-    store.updateSelectData(newItems, newUnSelectedItems);
+    // store.updateSelectData(newItems, newUnSelectedItems);
+    store.setSelectedItems(newItems);
+    store.setUnSelectedItems(newUnSelectedItems);
+
     onSelect && onSelect(newItems);
   }
 

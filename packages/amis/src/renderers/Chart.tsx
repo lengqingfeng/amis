@@ -51,7 +51,7 @@ const DEFAULT_EVENT_PARAMS = [
 
 /**
  * Chart 图表渲染器。
- * 文档：https://baidu.gitee.io/amis/docs/components/carousel
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/carousel
  */
 export interface ChartSchema extends BaseSchema {
   /**
@@ -224,6 +224,7 @@ export class Chart extends React.Component<ChartProps> {
   timer: ReturnType<typeof setTimeout>;
   mounted: boolean;
   reloadCancel?: Function;
+  onChartMount?: ((chart: any, echarts: any) => void) | undefined;
 
   constructor(props: ChartProps) {
     super(props);
@@ -334,7 +335,7 @@ export class Chart extends React.Component<ChartProps> {
     } = this.props;
     let {mapURL, mapName} = this.props;
 
-    let onChartMount = this.props.onChartMount;
+    let onChartMount = this.props.onChartMount || this.onChartMount;
 
     if (ref) {
       Promise.all([

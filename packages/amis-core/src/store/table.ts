@@ -174,12 +174,17 @@ export const Row = types
         children = self.children.map(item => item.locals);
       }
 
+      const table = getParent(self, self.depth * 2) as ITableStore;
       const parent = getParent(self, 2) as ITableStore;
       return createObject(
         extendObject((getParent(self, self.depth * 2) as ITableStore).data, {
           index: self.index,
           // todo 以后再支持多层，目前先一层
-          parent: parent.storeType === Row.name ? parent.data : undefined
+          parent: parent.storeType === Row.name ? parent.data : undefined,
+
+          // 只有table时，也可以获取选中行
+          selectedItems: table.selectedRows.map(item => item.data),
+          unSelectedItems: table.unSelectedRows.map(item => item.data)
         }),
         children
           ? {
@@ -344,6 +349,8 @@ export const TableStore = iRendererStore
     formsRef: types.optional(types.array(types.frozen()), []),
     maxKeepItemSelectionLength: Infinity,
     keepItemSelectionOnPageChange: false,
+    // 导出 Excel 按钮的 loading 状态
+    exportExcelLoading: false,
     searchFormExpanded: false // 用来控制搜索框是否展开了，那个自动根据 searchable 生成的表单 autoGenerateFilter
   })
   .views(self => {
@@ -804,6 +811,9 @@ export const TableStore = iRendererStore
       config.keepItemSelectionOnPageChange !== void 0 &&
         (self.keepItemSelectionOnPageChange =
           config.keepItemSelectionOnPageChange);
+
+      config.exportExcelLoading !== undefined &&
+        (self.exportExcelLoading = config.exportExcelLoading);
 
       if (config.columns && Array.isArray(config.columns)) {
         let columns: Array<SColumn> = config.columns

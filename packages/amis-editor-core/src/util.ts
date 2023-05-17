@@ -931,32 +931,43 @@ export function isObject(curObj: any) {
   return isObject;
 }
 
-export function jsonToJsonSchema(json: any = {}) {
+export function jsonToJsonSchema(
+  json: any = {},
+  titleBuilder?: (type: string, key: string) => string,
+  maxDepth: number = 3
+) {
   const jsonschema: any = {
     type: 'object',
     properties: {}
   };
-  Object.keys(json).forEach(key => {
-    const value = json[key];
-    const type = typeof value;
 
-    if (~['string', 'number'].indexOf(type)) {
-      jsonschema.properties[key] = {
-        type: type,
-        title: key
-      };
-    } else if (type === 'object' && value) {
-      jsonschema.properties[key] = {
-        type: 'object',
-        title: key
-      };
-    } else {
-      jsonschema.properties[key] = {
-        type: '',
-        title: key
-      };
-    }
-  });
+  isObservable(json) ||
+    maxDepth <= 0 ||
+    Object.keys(json).forEach(key => {
+      const value = json[key];
+      const type = Array.isArray(value) ? 'array' : typeof value;
+
+      if (~['string', 'number'].indexOf(type)) {
+        jsonschema.properties[key] = {
+          type,
+          title: titleBuilder?.(type, key) || key
+        };
+      } else if (~['object', 'array'].indexOf(type) && value) {
+        jsonschema.properties[key] = {
+          type,
+          title: titleBuilder?.(type, key) || key,
+          ...(type === 'object'
+            ? jsonToJsonSchema(value, titleBuilder, maxDepth - 1)
+            : {items: jsonToJsonSchema(value[0], titleBuilder, maxDepth - 1)})
+        };
+      } else {
+        jsonschema.properties[key] = {
+          type: '',
+          title: titleBuilder?.(type, key) || key
+        };
+      }
+    });
+
   return jsonschema;
 }
 

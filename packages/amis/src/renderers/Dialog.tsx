@@ -1,5 +1,5 @@
 import React from 'react';
-import {ScopedContext, IScopedContext} from 'amis-core';
+import {ScopedContext, IScopedContext, filterTarget} from 'amis-core';
 import {Renderer, RendererProps} from 'amis-core';
 import {SchemaNode, Schema, ActionObject} from 'amis-core';
 import {filter} from 'amis-core';
@@ -29,7 +29,7 @@ import {isAlive} from 'mobx-state-tree';
 
 /**
  * Dialog 弹框渲染器。
- * 文档：https://baidu.gitee.io/amis/docs/components/dialog
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/dialog
  */
 export interface DialogSchema extends BaseSchema {
   type: 'dialog';
@@ -105,6 +105,11 @@ export interface DialogSchema extends BaseSchema {
    * 是否显示 spinner
    */
   showLoading?: boolean;
+
+  /**
+   * 是否显示蒙层
+   */
+  overlay?: boolean;
 }
 
 export type DialogSchemaBase = Omit<DialogSchema, 'type'>;
@@ -145,7 +150,8 @@ export default class Dialog extends React.Component<DialogProps> {
     'showCloseButton',
     'showErrorMsg',
     'actions',
-    'popOverContainer'
+    'popOverContainer',
+    'overlay'
   ];
   static defaultProps = {
     title: 'Dialog.title',
@@ -532,7 +538,8 @@ export default class Dialog extends React.Component<DialogProps> {
       classnames: cx,
       classPrefix,
       translate: __,
-      loadingConfig
+      loadingConfig,
+      overlay
     } = {
       ...this.props,
       ...store.schema
@@ -560,6 +567,7 @@ export default class Dialog extends React.Component<DialogProps> {
         }
         enforceFocus={false}
         disabled={store.loading}
+        overlay={overlay}
       >
         {title && typeof title === 'string' ? (
           <div className={cx('Modal-header', headerClassName)}>
@@ -906,7 +914,10 @@ export class DialogRenderer extends Dialog {
             action.redirect && filter(action.redirect, store.data);
           reidrect && env.jumpTo(reidrect, action);
           action.reload &&
-            this.reloadTarget(filter(action.reload, store.data), store.data);
+            this.reloadTarget(
+              filterTarget(action.reload, store.data),
+              store.data
+            );
           if (action.close) {
             action.close === true
               ? this.handleSelfClose()

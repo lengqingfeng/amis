@@ -2,7 +2,7 @@ import React from 'react';
 import isEqual from 'lodash/isEqual';
 import pickBy from 'lodash/pickBy';
 import omitBy from 'lodash/omitBy';
-import {Renderer, RendererProps} from 'amis-core';
+import {Renderer, RendererProps, filterTarget} from 'amis-core';
 import {SchemaNode, Schema, ActionObject, PlainObject} from 'amis-core';
 import {CRUDStore, ICRUDStore} from 'amis-core';
 import {
@@ -50,6 +50,7 @@ import type {CardsRendererEvent} from './Cards';
 import {isPureVariable, resolveVariableAndFilter, parseQuery} from 'amis-core';
 
 import type {PaginationProps} from './Pagination';
+import {isAlive} from 'mobx-state-tree';
 
 export type CRUDBultinToolbarType =
   | 'columns-toggler'
@@ -75,6 +76,21 @@ export type CRUDToolbarObject = {
    * 对齐方式
    */
   align?: 'left' | 'right';
+};
+
+export type AutoGenerateFilterObject = {
+  /**
+   * 过滤条件单行列数
+   */
+  columnsNum?: number;
+  /**
+   * 是否显示设置查询字段
+   */
+  showBtnToolbar?: boolean;
+  /**
+   * 是否显示展开/收起
+   */
+  // showExpand?: boolean;
 };
 
 export type CRUDRendererEvent = TableRendererEvent | CardsRendererEvent;
@@ -303,7 +319,7 @@ export interface CRUDCommonSchema extends BaseSchema, SpinnerExtraProps {
   /**
    * 开启查询区域，会根据列元素的searchable属性值，自动生成查询条件表单
    */
-  autoGenerateFilter?: boolean;
+  autoGenerateFilter?: AutoGenerateFilterObject | boolean;
 
   /**
    * 内容区域占满屏幕剩余空间
@@ -325,7 +341,7 @@ export type CRUDTableSchema = CRUDCommonSchema & {
 
 /**
  * CRUD 增删改查渲染器。
- * 文档：https://baidu.gitee.io/amis/docs/components/crud
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/crud
  */
 export type CRUDSchema = CRUDCardsSchema | CRUDListSchema | CRUDTableSchema;
 
@@ -698,7 +714,7 @@ export default class CRUD extends React.Component<CRUDProps, any> {
           const redirect = action.redirect && filter(action.redirect, data);
           redirect && !action.blank && env.jumpTo(redirect, action);
           action.reload
-            ? this.reloadTarget(filter(action.reload, data), data)
+            ? this.reloadTarget(filterTarget(action.reload, data), data)
             : redirect
             ? null
             : this.search(undefined, undefined, true, true);
@@ -760,7 +776,7 @@ export default class CRUD extends React.Component<CRUDProps, any> {
 
     const ctx = createObject(store.mergedData, {
       ...selectedItems[0],
-      currentPageData: store.mergedData.items.concat(),
+      currentPageData: (store.mergedData?.items || []).concat(),
       rows: selectedItems,
       items: selectedItems,
       selectedItems,
@@ -797,7 +813,7 @@ export default class CRUD extends React.Component<CRUDProps, any> {
               }
 
               action.reload
-                ? this.reloadTarget(filter(action.reload, data), data)
+                ? this.reloadTarget(filterTarget(action.reload, data), data)
                 : this.search(
                     {[pageField || 'page']: 1},
                     undefined,
@@ -850,7 +866,8 @@ export default class CRUD extends React.Component<CRUDProps, any> {
       },
       false,
       true,
-      this.props.initFetch !== false
+      this.props.initFetch !== false,
+      true
     );
 
     store.setPristineQuery();
@@ -895,7 +912,8 @@ export default class CRUD extends React.Component<CRUDProps, any> {
     values: Record<string, any>,
     jumpToFirstPage: boolean = true,
     replaceLocation: boolean = false,
-    search: boolean = true
+    search: boolean = true,
+    isInit: boolean = false
   ) {
     const {
       store,
@@ -927,8 +945,15 @@ export default class CRUD extends React.Component<CRUDProps, any> {
       perPageField
     );
     this.lastQuery = store.query;
+
     search &&
-      this.search(undefined, undefined, undefined, loadDataOnceFetchOnFilter);
+      this.search(
+        undefined,
+        undefined,
+        undefined,
+        loadDataOnceFetchOnFilter,
+        isInit
+      );
   }
 
   handleBulkGo(
@@ -1056,7 +1081,7 @@ export default class CRUD extends React.Component<CRUDProps, any> {
 
     const reload = action.reload ?? dialogAction.reload;
     if (reload) {
-      this.reloadTarget(filter(reload, ctx), ctx);
+      this.reloadTarget(filterTarget(reload, ctx), ctx);
     }
 
     let redirect = action.redirect ?? dialogAction.redirect;
@@ -1095,7 +1120,8 @@ export default class CRUD extends React.Component<CRUDProps, any> {
     values?: any,
     silent?: boolean,
     clearSelection?: boolean,
-    forceReload = false
+    forceReload = false,
+    isInit: boolean = false
   ) {
     const {
       store,
@@ -1115,7 +1141,8 @@ export default class CRUD extends React.Component<CRUDProps, any> {
       loadDataOnce,
       loadDataOnceFetchOnFilter,
       source,
-      columns
+      columns,
+      dispatchEvent
     } = this.props;
 
     // reload 需要清空用户选择。
@@ -1159,8 +1186,34 @@ export default class CRUD extends React.Component<CRUDProps, any> {
             syncResponse2Query,
             columns: store.columns ?? columns
           })
-          .then(value => {
-            const {page, lastPage} = store;
+          .then(async value => {
+            if (!isAlive(store)) {
+              return value;
+            }
+
+            const {page, lastPage, data, msg, error} = store;
+
+            if (isInit) {
+              // 初始化请求完成
+              const rendererEvent = await dispatchEvent?.(
+                'fetchInited',
+                createObject(this.props.data, {
+                  responseData: value.ok ? data ?? {} : value,
+                  responseStatus:
+                    value?.status === undefined
+                      ? error
+                        ? 1
+                        : 0
+                      : value?.status,
+                  responseMsg: msg
+                })
+              );
+
+              if (rendererEvent?.prevented) {
+                return;
+              }
+            }
+
             // 空列表 且 页数已经非法超出，则跳转到最后的合法页数
             if (
               !store.data.items.length &&
@@ -1297,7 +1350,7 @@ export default class CRUD extends React.Component<CRUDProps, any> {
         .then(() => {
           const finalReload = options?.reload ?? reload;
           finalReload
-            ? this.reloadTarget(filter(finalReload, data), data)
+            ? this.reloadTarget(filterTarget(finalReload, data), data)
             : this.search(undefined, undefined, true, true);
         })
         .catch(() => {});
@@ -1319,7 +1372,7 @@ export default class CRUD extends React.Component<CRUDProps, any> {
         .then(() => {
           const finalReload = options?.reload ?? reload;
           finalReload
-            ? this.reloadTarget(filter(finalReload, data), data)
+            ? this.reloadTarget(filterTarget(finalReload, data), data)
             : this.search(undefined, undefined, true, true);
         })
         .catch(() => {
@@ -1424,7 +1477,7 @@ export default class CRUD extends React.Component<CRUDProps, any> {
       store
         .saveRemote(saveOrderApi, model)
         .then(() => {
-          reload && this.reloadTarget(filter(reload, model), model);
+          reload && this.reloadTarget(filterTarget(reload, model), model);
           this.search(undefined, undefined, true, true);
         })
         .catch(() => {});
@@ -1522,8 +1575,11 @@ export default class CRUD extends React.Component<CRUDProps, any> {
         newItems.splice(0, newItems.length - 1)
       );
     }
+    // 用 updateSelectData 导致 CRUD 无线刷新
+    // store.updateSelectData(newItems, newUnSelectedItems);
     store.setSelectedItems(newItems);
     store.setUnSelectedItems(newUnSelectedItems);
+
     onSelect && onSelect(newItems, newUnSelectedItems);
   }
 
@@ -1686,7 +1742,6 @@ export default class CRUD extends React.Component<CRUDProps, any> {
 
     let bulkBtns: Array<ActionSchema> = [];
     let itemBtns: Array<ActionSchema> = [];
-
     const ctx = createObject(store.mergedData, {
       currentPageData: (store.mergedData?.items || []).concat(),
       rows: selectedItems.concat(),
@@ -2398,5 +2453,14 @@ export class CRUDRenderer extends CRUD {
   closeTarget(target: string) {
     const scoped = this.context as IScopedContext;
     scoped.close(target);
+  }
+
+  setData(values: object, replace?: boolean) {
+    return this.props.store.updateData(values, undefined, replace);
+  }
+
+  getData() {
+    const {store, data} = this.props;
+    return store.getData(data);
   }
 }

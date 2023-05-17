@@ -25,7 +25,8 @@ import {
   ITableStore2,
   IRow2,
   ClassNamesFn,
-  isArrayChildrenModified
+  isArrayChildrenModified,
+  filterTarget
 } from 'amis-core';
 import {Icon, Table, Spinner, BadgeObject, SpinnerExtraProps} from 'amis-ui';
 import type {
@@ -49,7 +50,7 @@ import {Action} from '../../types';
 
 /**
  * Table 表格2渲染器。
- * 文档：https://baidu.gitee.io/amis/docs/components/table2
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/table2
  */
 
 export interface CellSpan {
@@ -944,7 +945,7 @@ export default class Table2 extends React.Component<Table2Props, object> {
           errorMessage: messages && messages.saveSuccess
         })
         .then(() => {
-          reload && this.reloadTarget(filter(reload, data), data);
+          reload && this.reloadTarget(filterTarget(reload, data), data);
         })
         .catch(() => {});
     } else {
@@ -963,7 +964,7 @@ export default class Table2 extends React.Component<Table2Props, object> {
       store
         .saveRemote(quickSaveItemApi, sendData)
         .then(() => {
-          reload && this.reloadTarget(filter(reload, data), data);
+          reload && this.reloadTarget(filterTarget(reload, data), data);
         })
         .catch(() => {
           options?.resetOnFailed && this.reset();

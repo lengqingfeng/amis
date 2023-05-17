@@ -14,7 +14,13 @@ import {FileRejection, ErrorCode, DropEvent} from 'react-dropzone';
 import 'blueimp-canvastoblob';
 import find from 'lodash/find';
 import {Payload, ActionObject} from 'amis-core';
-import {buildApi} from 'amis-core';
+import {
+  buildApi,
+  isEffectiveApi,
+  normalizeApi,
+  isApiOutdated,
+  isApiOutdatedWithData
+} from 'amis-core';
 import {createObject, qsstringify, guid, isEmpty, qsparse} from 'amis-core';
 import {Icon, TooltipWrapper, Button} from 'amis-ui';
 import accepts from 'attr-accept';
@@ -37,7 +43,7 @@ import {TplSchema} from '../Tpl';
 
 /**
  * Image 图片上传控件
- * 文档：https://baidu.gitee.io/amis/docs/components/form/image
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/image
  */
 export interface ImageControlSchema extends FormBaseControlSchema {
   /**
@@ -626,7 +632,9 @@ export default class ImageControl extends React.Component<
             }
             // 文件太大
             else if (err.code === ErrorCode.FileTooLarge) {
-              return __('File.sizeLimit', {maxSize});
+              return __('File.sizeLimit', {
+                maxSize: prettyBytes(maxSize as number, 1024)
+              });
             }
           })
           .join('; ');
@@ -1913,6 +1921,20 @@ export default class ImageControl extends React.Component<
 
 @FormItem({
   type: 'input-image',
-  sizeMutable: false
+  sizeMutable: false,
+  shouldComponentUpdate: (props: any, prevProps: any) =>
+    !!isEffectiveApi(props.receiver, props.data) &&
+    (isApiOutdated(
+      props.receiver,
+      prevProps.receiver,
+      props.data,
+      prevProps.data
+    ) ||
+      isApiOutdatedWithData(
+        props.receiver,
+        prevProps.receiver,
+        props.data,
+        prevProps.data
+      ))
 })
 export class ImageControlRenderer extends ImageControl {}
