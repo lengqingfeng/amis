@@ -2,16 +2,19 @@ import {
   EditorManager,
   JSONGetById,
   JSONGetParentById,
+  JSONGetPathById,
   JSONPipeIn,
   JSONPipeOut,
   JSONUpdate,
   addModal,
+  diff,
   getVariables,
-  modalsToDefinitions
+  modalsToDefinitions,
+  patchDiff
 } from 'amis-editor-core';
 import React from 'react';
 import {observer} from 'mobx-react';
-import {JSONTraverse, JSONValueMap, RendererProps} from 'amis-core';
+import {JSONTraverse, JSONValueMap, RendererProps, guid} from 'amis-core';
 import {
   Button,
   FormField,
@@ -40,6 +43,9 @@ export interface LocalModal {
   isNew?: boolean;
   isModified?: boolean;
   isActive?: boolean;
+
+  // 是否被引用
+  isRefered?: boolean;
   // 是否为当前动作内嵌的弹窗
   isCurrentActionModal?: boolean;
 
@@ -79,7 +85,7 @@ function DialogActionPanel({
     subscribeSchemaSubmit((schema: any, nodeSchema: any, id: string) => {
       const rawActions = JSONGetById(schema, id)?.onEvent[eventKey]?.actions;
       if (!rawActions || !Array.isArray(rawActions)) {
-        throw new Error('动作配置错误');
+        return;
       }
 
       const actionSchema =
@@ -88,8 +94,9 @@ function DialogActionPanel({
             ? rawActions.length - 1
             : actionIndex
         ];
-      const modals: Array<LocalModal> = actionSchema.__actionModals;
+      const modals: Array<LocalModal> = actionSchema?.__actionModals;
       if (!Array.isArray(modals)) {
+        // 不是编辑确定触发的，直接返回
         return schema;
       }
 
@@ -102,28 +109,65 @@ function DialogActionPanel({
         .filter(
           item => item.isModified && item !== currentModal && item.modal.$$ref
         )
-        .forEach(({modal}) => {
+        .forEach(({modal, isRefered}) => {
           const {$$originId: originId, ...def} = modal as any;
           if (originId) {
             const parent = JSONGetParentById(schema, originId);
-            if (!parent) {
+            if (id === originId) {
+              return;
+            } else if (!parent) {
               // 找不到就丢回去，上层去处理
               def.$$originId = originId;
-            } else {
-              // TODO 这里要不要再加个判断？
-              // 只更新当前动作中关联的弹窗？
+            } else if (isRefered === false) {
               const modalType = def.type === 'drawer' ? 'drawer' : 'dialog';
-              schema = JSONUpdate(schema, parent.$$id, {
-                ...parent,
-                __actionModals: undefined,
-                args: undefined,
-                dialog: undefined,
-                drawer: undefined,
-                actionType: def.actionType ?? modalType,
-                [modalType]: JSONPipeIn({
-                  $ref: modal.$$ref!
-                })
-              });
+
+              // 这样处理是为了不要修改原来的 $$id
+              const origin = parent[modalType] || {};
+              const changes = diff(
+                origin,
+                modal,
+                (path, key) => key === '$$id'
+              );
+              if (changes) {
+                const newModal = patchDiff(origin, changes);
+                delete newModal.$$originId;
+                delete newModal.$$ref;
+                schema = JSONUpdate(
+                  schema,
+                  parent.$$id,
+                  {
+                    ...parent,
+                    __actionModals: undefined,
+                    args: undefined,
+                    dialog: undefined,
+                    drawer: undefined,
+                    actionType: def.actionType ?? modalType,
+                    [modalType]: newModal
+                  },
+                  true
+                );
+              }
+
+              // 不要写下面的 defintions 了
+              return;
+            } else {
+              const modalType = def.type === 'drawer' ? 'drawer' : 'dialog';
+              schema = JSONUpdate(
+                schema,
+                parent.$$id,
+                {
+                  ...parent,
+                  __actionModals: undefined,
+                  args: undefined,
+                  dialog: undefined,
+                  drawer: undefined,
+                  actionType: def.actionType ?? modalType,
+                  [modalType]: JSONPipeIn({
+                    $ref: modal.$$ref!
+                  })
+                },
+                true
+              );
             }
           }
           schema.definitions[modal.$$ref!] = JSONPipeIn(def);
@@ -185,6 +229,7 @@ function DialogActionPanel({
             // 没找到很可能是在主页面里面的弹窗
             // 还得继续把 originId 给到上一层去处理
             schema.definitions[currentModal.modal.$$ref].$$originId = originInd;
+            newActionSchema[modalType].$$originId = originInd;
           }
         }
       } else {
@@ -193,6 +238,8 @@ function DialogActionPanel({
         // 然后都引用这个 definition
         let refKey: string = '';
         [schema, refKey] = addModal(schema, currentModal.modal);
+        // 需要记录原始的弹窗 id，方便上层处理合并
+        schema.definitions[refKey].$$originId = currentModal.modal.$$id;
         newActionSchema = {
           ...actionSchema,
           __actionModals: undefined,
@@ -216,6 +263,50 @@ function DialogActionPanel({
         JSONPipeIn(newActionSchema),
         true
       );
+
+      // 自己就是个弹窗，可能有 definition 里面引用自己
+      if (['dialog', 'drawer', 'confirmDialog'].includes(schema.type)) {
+        const id = schema.$$originId || schema.$$id;
+        Object.keys(schema.definitions).forEach(key => {
+          const definition = schema.definitions[key];
+          const exits = JSONGetById(definition, id);
+          if (exits) {
+            schema.definitions[key] = JSONUpdate(
+              schema.definitions[key],
+              id,
+              {
+                ...schema,
+                definitions: undefined
+              },
+              true
+            );
+          }
+        });
+      }
+
+      // 如果弹窗里面又弹窗指向自己，那么也要更新
+      const currentModalId = currentModal.modal.$$id;
+      let refIds: string[] = [];
+      JSONTraverse(currentModal.modal, (value: any, key: string, host: any) => {
+        if (key === '$ref' && host.$$originId === currentModalId) {
+          refIds.push(host.$$id);
+        }
+      });
+      if (refIds.length) {
+        let refKey = '';
+        [schema, refKey] = addModal(schema, currentModal.modal);
+        schema = JSONUpdate(schema, actionSchema.$$id, {
+          [modalType]: JSONPipeIn({
+            $ref: refKey
+          })
+        });
+        refIds.forEach(refId => {
+          schema = JSONUpdate(schema, refId, {
+            $ref: refKey,
+            $$originId: undefined
+          });
+        });
+      }
 
       // 原来的动作也要更新
       if (originActionId && newRefName) {
@@ -288,6 +379,7 @@ function DialogActionPanel({
         actionSchema.actionType === 'drawer' ? 'drawer' : 'dialog'
       ] || actionSchema.args;
 
+    const schema = store.schema;
     const modals: Array<LocalModal> = store.modals.map(modal => {
       const isCurrentActionModal = modal.$$id === dialogBody?.$$id;
 
@@ -310,7 +402,11 @@ function DialogActionPanel({
         value: modal.$$id,
         modal: modal,
         isCurrentActionModal,
-        data: modal.data
+        data: modal.data,
+        // 当前编辑的弹窗不让再里面再次弹出
+        disabled: modal.$$ref
+          ? modal.$$ref === schema.$$ref
+          : modal.$$id === schema.$$id
       };
     });
 
@@ -396,11 +492,6 @@ function DialogActionPanel({
 
       let arr = members;
       Object.keys(definitions).forEach(key => {
-        // 弹窗里面用到了才更新
-        if (!refs.includes(key)) {
-          return;
-        }
-
         // 要修改就复制一份，避免污染原始数据
         if (arr === members) {
           arr = members.concat();
@@ -408,7 +499,9 @@ function DialogActionPanel({
 
         const {$$originId, ...modal} = definitions[key];
         const idx = arr.findIndex(item =>
-          $$originId ? item.value === $$originId : item.modal.$$ref === key
+          $$originId
+            ? (item.modal.$$originId || item.modal.$$id) === $$originId
+            : item.modal.$$ref === key
         );
         const label = `${
           modal.editorSetting?.displayName || modal.title || '未命名弹窗'
@@ -426,9 +519,10 @@ function DialogActionPanel({
             label: label,
             tip: tip,
             modal: {...modal, $$ref: key, $$originId},
-            isModified: true
+            isModified: true,
+            isRefered: refs.includes(key)
           });
-        } else {
+        } else if (refs.includes(key)) {
           if ($$originId) {
             throw new Error('Definition merge exception');
           }
@@ -458,21 +552,25 @@ function DialogActionPanel({
       skipForm?: boolean,
       closePopOver?: () => void
     ) => {
-      store.openSubEditor({
+      const modal = {
+        $$id: guid(),
+        type: 'dialog',
+        title: '未命名弹窗',
+        body: [
+          {
+            type: 'tpl',
+            tpl: '弹窗内容'
+          }
+        ],
+        definitions: modalsToDefinitions(modals.map(item => item.modal))
+      };
+      const modalId = modal.$$id;
+      manager.openSubEditor({
         title: '新建弹窗',
-        value: {
-          type: 'dialog',
-          title: '未命名弹窗',
-          body: [
-            {
-              type: 'tpl',
-              tpl: '弹窗内容'
-            }
-          ],
-          definitions: modalsToDefinitions(modals.map(item => item.modal))
-        },
+        value: modal,
         onChange: ({definitions, ...modal}: any, diff: any) => {
-          modal = JSONPipeIn(modal);
+          // 不能变 $$id 如果有内部有引用，就找不到了
+          modal = JSONPipeIn({...modal, $$id: modalId});
           let arr = modals.concat();
           if (!arr.some(item => item.isNew)) {
             arr.push({
@@ -513,7 +611,7 @@ function DialogActionPanel({
     if (!currentModal) {
       return;
     }
-    store.openSubEditor({
+    manager.openSubEditor({
       title: '编辑弹窗',
       value: {
         type: 'dialog',
@@ -526,7 +624,9 @@ function DialogActionPanel({
         ],
         ...(currentModal.modal as any),
         definitions: modalsToDefinitions(
-          modals.filter(item => !item.isActive).map(item => item.modal)
+          modals.map(item => item.modal),
+          {},
+          currentModal.modal
         )
       },
       onChange: ({definitions, ...modal}: any, diff: any) => {

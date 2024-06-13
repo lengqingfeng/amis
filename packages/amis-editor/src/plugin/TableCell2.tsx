@@ -1,8 +1,8 @@
-import React from 'react';
+import React, {StrictMode} from 'react';
 import get from 'lodash/get';
 import flattenDeep from 'lodash/flattenDeep';
 import {Button, Icon} from 'amis';
-import {getVariable, isObject} from 'amis-core';
+import {dataMapping, getVariable, isObject} from 'amis-core';
 import {
   BasePlugin,
   BasicRendererInfo,
@@ -170,7 +170,7 @@ export class TableCell2Plugin extends BasePlugin {
       }),
 
       {
-        visibleOn: 'data.searchable',
+        visibleOn: 'this.searchable',
         name: 'searchable',
         asFormItem: true,
         label: false,
@@ -191,14 +191,14 @@ export class TableCell2Plugin extends BasePlugin {
       getSchemaTpl('formItemName', {
         name: 'name',
         label: '列字段',
-        visibleOn: 'data.name !== undefined || data.key === undefined'
+        visibleOn: 'this.name !== undefined || this.key === undefined'
       }),
     /** 字段配置，兼容key */
     key: () =>
       getSchemaTpl('formItemName', {
         name: 'key',
         label: '列字段',
-        visibleOn: 'data.name === undefined && data.key'
+        visibleOn: 'this.name === undefined && this.key'
       }),
     /** 排序配置 */
     sorter: () =>
@@ -221,7 +221,7 @@ export class TableCell2Plugin extends BasePlugin {
         }),
         {
           name: 'searchable',
-          visibleOn: 'data.searchable',
+          visibleOn: 'this.searchable',
           asFormItem: true,
           label: false,
           children: ({value, onChange, data}: any) => {
@@ -610,6 +610,7 @@ export class TableCell2Plugin extends BasePlugin {
               body: [
                 {
                   type: 'ae-feature-control',
+                  strictMode: false, // 注意需要添加这个才能及时获取表单data变更
                   label: false,
                   manager,
                   addable: true,
@@ -652,8 +653,8 @@ export class TableCell2Plugin extends BasePlugin {
                         schema.buttons.push({
                           label: '新增按钮',
                           level: 'link'
-                        }),
-                          onBulkChange(schema);
+                        });
+                        onBulkChange(schema);
                       }
                     };
                   }
@@ -702,7 +703,7 @@ export class TableCell2Plugin extends BasePlugin {
                     body: [
                       {
                         name: 'copyable.content',
-                        visibleOn: 'data.copyable',
+                        visibleOn: 'this.copyable',
                         type: 'ae-formulaControl',
                         label: '复制内容'
                       }

@@ -10,7 +10,7 @@ import {
   resolveEventData,
   ApiObject,
   FormHorizontal,
-  evalExpressionWithConditionBuilder,
+  evalExpressionWithConditionBuilderAsync,
   IFormStore,
   getVariable,
   IFormItemStore,
@@ -516,14 +516,19 @@ export default class ComboControl extends React.Component<ComboProps> {
     args?: any
   ) {
     const actionType = action?.actionType as string;
-    const {onChange, resetValue} = this.props;
+    const {onChange, resetValue, formStore, store, name} = this.props;
 
     if (actionType === 'addItem') {
       this.addItemValue(args?.item ?? {});
     } else if (actionType === 'clear') {
       onChange('');
     } else if (actionType === 'reset') {
-      onChange(resetValue ?? '');
+      const pristineVal =
+        getVariable(
+          formStore?.pristine ?? store?.parentStore?.pristine,
+          name
+        ) ?? resetValue;
+      onChange(pristineVal ?? '');
     }
   }
 
@@ -1298,7 +1303,8 @@ export default class ComboControl extends React.Component<ComboProps> {
       changeImmediately,
       addBtnText,
       static: isStatic,
-      translate: __
+      translate: __,
+      testIdBuilder
     } = this.props;
 
     let items = this.props.items;
@@ -1326,6 +1332,7 @@ export default class ComboControl extends React.Component<ComboProps> {
         mode={tabsStyle}
         activeKey={store.activeKey}
         onSelect={this.handleTabSelect}
+        testIdBuilder={testIdBuilder}
         additionBtns={
           !disabled && addable !== false && store.addable ? (
             <li className={cx(`Tabs-link ComboTabs-addLink`)}>
@@ -1336,6 +1343,7 @@ export default class ComboControl extends React.Component<ComboProps> {
       >
         {value.map((value: any, index: number) => {
           const data = this.formatValue(value, index);
+          const tabTIDBuilder = testIdBuilder?.getChild(`tab-${index}`);
           let condition: ComboCondition | null | undefined = null;
           let toolbar = undefined;
           if (
@@ -1352,6 +1360,7 @@ export default class ComboControl extends React.Component<ComboProps> {
                 )}
                 data-tooltip={__('delete')}
                 data-position="bottom"
+                {...tabTIDBuilder?.getChild('delBtn').getTestId()}
               >
                 {deleteIcon ? (
                   <i className={deleteIcon} />
@@ -1404,6 +1413,7 @@ export default class ComboControl extends React.Component<ComboProps> {
               tabClassName={
                 store.memberValidMap[index] === false ? 'has-error' : ''
               }
+              testIdBuilder={tabTIDBuilder}
             >
               {condition && typeSwitchable !== false ? (
                 <div className={cx('Combo-itemTag')}>
@@ -2028,7 +2038,7 @@ export class ComboControlRenderer extends ComboControl {
       } else if (condition !== undefined) {
         for (let i = 0; i < len; i++) {
           const item = items[i];
-          const isUpdate = await evalExpressionWithConditionBuilder(
+          const isUpdate = await evalExpressionWithConditionBuilderAsync(
             condition,
             item
           );

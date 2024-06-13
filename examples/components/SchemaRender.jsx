@@ -3,7 +3,7 @@ import {render, toast, makeTranslator, LazyComponent, Drawer} from 'amis';
 import axios from 'axios';
 import Portal from 'react-overlays/Portal';
 import {normalizeLink} from 'amis-core';
-import {withRouter} from 'react-router';
+import {withRouter} from 'react-router-dom';
 import copy from 'copy-to-clipboard';
 import {qsparse, parseQuery, attachmentAdpator} from 'amis-core';
 import isPlainObject from 'lodash/isPlainObject';

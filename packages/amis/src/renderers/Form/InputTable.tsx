@@ -24,7 +24,7 @@ import {
   getRendererByName,
   resolveEventData,
   ListenerAction,
-  evalExpressionWithConditionBuilder,
+  evalExpressionWithConditionBuilderAsync,
   mapTree,
   isObject,
   eachTree,
@@ -38,8 +38,6 @@ import {TableSchema} from '../Table';
 import {SchemaApi, SchemaCollection, SchemaClassName} from '../../Schema';
 import find from 'lodash/find';
 import moment from 'moment';
-import merge from 'lodash/merge';
-import mergeWith from 'lodash/mergeWith';
 
 import type {SchemaTokenizeableString} from '../../Schema';
 
@@ -496,8 +494,9 @@ export default class FormTable extends React.Component<TableProps, TableState> {
     return msg;
   }
 
-  async emitValue() {
-    const items = this.state.items.filter(item => !item.__isPlaceholder);
+  async emitValue(value?: any[]) {
+    const items =
+      value ?? this.state.items.filter(item => !item.__isPlaceholder);
     const {onChange} = this.props;
     const isPrevented = await this.dispatchEvent('change');
     isPrevented || onChange?.(items);
@@ -708,7 +707,10 @@ export default class FormTable extends React.Component<TableProps, TableState> {
       });
     }
 
-    value = merge({}, value, scaffold);
+    value = {
+      ...value,
+      ...scaffold
+    };
 
     if (needConfirm === false) {
       delete value.__isPlaceholder;
@@ -745,7 +747,7 @@ export default class FormTable extends React.Component<TableProps, TableState> {
           await this.dispatchEvent('add', {
             index: next[next.length - 1],
             indexPath: next.join('.'),
-            value
+            item: value
           });
         }
         if (needConfirm === false) {
@@ -885,11 +887,12 @@ export default class FormTable extends React.Component<TableProps, TableState> {
       });
       return;
     } else if (remote && remote.ok) {
-      item = merge(
-        {},
-        ((isNew ? addApi : updateApi) as ApiObject).replaceData ? {} : item,
-        remote.data
-      );
+      item = {
+        ...(((isNew ? addApi : updateApi) as ApiObject).replaceData
+          ? {}
+          : item),
+        ...remote.data
+      };
     }
 
     delete item.__isPlaceholder;
@@ -1019,7 +1022,13 @@ export default class FormTable extends React.Component<TableProps, TableState> {
     const originItems = newValue;
     newValue = spliceTree(newValue, indexes, 1);
     this.reUseRowId(newValue, originItems, indexes);
-    onChange(newValue);
+
+    // change value
+    const prevented = await this.emitValue(newValue);
+    if (prevented) {
+      return;
+    }
+
     this.dispatchEvent('deleteSuccess', {
       value: newValue,
       index: indexes[indexes.length - 1],
@@ -1629,8 +1638,10 @@ export default class FormTable extends React.Component<TableProps, TableState> {
             if (page && page > 1 && typeof perPage === 'number') {
               indexes[0] += (page - 1) * perPage;
             }
-            const origin = getTree(items, indexes);
-            const data = merge({}, origin, (diff as Array<object>)[index]);
+            // const origin = getTree(items, indexes);
+            const data = {
+              ...getTree(rows, indexes)
+            };
 
             items = spliceTree(items, indexes, 1, data);
           });
@@ -1643,35 +1654,9 @@ export default class FormTable extends React.Component<TableProps, TableState> {
             indexes[0] += (page - 1) * perPage;
           }
 
-          const origin = getTree(items, indexes);
+          // const origin = getTree(items, indexes);
 
-          const comboNames: Array<string> = [];
-          (props.$schema.columns ?? []).forEach((e: any) => {
-            if (e.type === 'combo' && !Array.isArray(diff)) {
-              comboNames.push(e.name);
-            }
-          });
-
-          const data = mergeWith(
-            {},
-            origin,
-            diff,
-            (
-              objValue: any,
-              srcValue: any,
-              key: string,
-              object: any,
-              source: any,
-              stack: any
-            ) => {
-              if (Array.isArray(objValue) && Array.isArray(srcValue)) {
-                // 处理combo
-                return srcValue;
-              }
-              // 直接return，默认走的mergeWith自身的merge
-              return;
-            }
-          );
+          const data = {...rows};
 
           const originItems = items;
           items = spliceTree(items, indexes, 1, data);
@@ -1869,6 +1854,7 @@ export default class FormTable extends React.Component<TableProps, TableState> {
             draggable: draggable && !this.state.editIndex,
             items: items,
             getEntryId: this.getEntryId,
+            reUseRow: false, // 这个会导致 getEntryId 无效，因为复用的话，row 的 id 不会更新
             onSave: this.handleTableSave,
             onRadioChange: this.handleRadioChange,
             onSaveOrder: this.handleSaveTableOrder,
@@ -1963,7 +1949,7 @@ export class TableControlRenderer extends FormTable {
       const promises: Array<() => Promise<any>> = [];
       everyTree(items, (item, index, paths, indexes) => {
         promises.unshift(async () => {
-          const isUpdate = await evalExpressionWithConditionBuilder(
+          const isUpdate = await evalExpressionWithConditionBuilderAsync(
             condition,
             item
           );
@@ -2008,7 +1994,10 @@ export class TableControlRenderer extends FormTable {
       deleteApi,
       resetValue,
       translate: __,
-      onChange
+      onChange,
+      formStore,
+      store,
+      name
     } = this.props;
 
     const actionType = action.actionType as string;
@@ -2096,7 +2085,7 @@ export class TableControlRenderer extends FormTable {
         const promises: Array<() => Promise<any>> = [];
         everyTree(items, (item, index, paths, indexes) => {
           promises.unshift(async () => {
-            const result = await evalExpressionWithConditionBuilder(
+            const result = await evalExpressionWithConditionBuilderAsync(
               args?.condition,
               item
             );
@@ -2148,7 +2137,9 @@ export class TableControlRenderer extends FormTable {
       );
       return;
     } else if (actionType === 'reset') {
-      const newItems = Array.isArray(resetValue) ? resetValue : [];
+      const pristineVal =
+        getVariable(formStore?.pristine ?? store?.pristine, name) ?? resetValue;
+      const newItems = Array.isArray(pristineVal) ? pristineVal : [];
       this.setState(
         {
           items: newItems

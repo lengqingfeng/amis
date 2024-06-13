@@ -20,7 +20,10 @@ import {
   ScaffoldForm,
   RegionConfig,
   registerEditorPlugin,
-  JSONPipeOut
+  JSONPipeOut,
+  InsertEventContext,
+  MoveEventContext,
+  DeleteEventContext
 } from 'amis-editor-core';
 import {
   DSFeatureType,
@@ -750,7 +753,7 @@ export class FormPlugin extends BasePlugin {
                 '异步检测接口',
                 '设置此属性后，表单提交发送保存接口后，还会继续轮询请求该接口，直到返回 finished 属性为 true 才 结束'
               ),
-              visibleOn: 'data.asyncApi != null'
+              visibleOn: 'this.asyncApi != null'
             }),
             getSchemaTpl('apiControl', {
               name: 'initAsyncApi',
@@ -758,7 +761,7 @@ export class FormPlugin extends BasePlugin {
                 '异步检测接口',
                 '设置此属性后，表单请求 initApi 后，还会继续轮询请求该接口，直到返回 finished 属性为 true 才 结束'
               ),
-              visibleOn: 'data.initAsyncApi != null'
+              visibleOn: 'this.initAsyncApi != null'
             }),
             getSchemaTpl('apiControl', {
               name: 'initApi',
@@ -872,7 +875,7 @@ export class FormPlugin extends BasePlugin {
                   {
                     type: 'container',
                     className: 'ae-ExtendMore mb-3',
-                    visibleOn: 'data.persistData',
+                    visibleOn: 'this.persistData',
                     body: [
                       getSchemaTpl('tplFormulaControl', {
                         name: 'persistData',
@@ -1195,7 +1198,8 @@ export class FormPlugin extends BasePlugin {
 
   /** 重新构建 API */
   panelFormPipeOut = async (schema: any, oldSchema: any) => {
-    const entity = schema?.api?.entity;
+    // 查看场景下，没有api，只有initApi
+    const entity = schema?.api?.entity || schema?.initApi?.entity;
 
     if (!entity || schema?.dsType !== ModelDSBuilderKey) {
       return schema;
@@ -1216,7 +1220,7 @@ export class FormPlugin extends BasePlugin {
       const updatedSchema = await builder.buildApiSchema({
         schema,
         renderer: 'form',
-        sourceKey: 'api',
+        sourceKey: DSFeatureEnum.View === schema.feat ? 'initApi' : 'api',
         feat: schema.feat ?? 'Insert',
         apiSettings: {
           diffConfig: {

@@ -117,6 +117,7 @@
 
   &-value-wrap {
     flex-grow: 1;
+    min-width: 0;
     display: flex;
     align-items: center;
     flex-wrap: wrap;
@@ -169,6 +170,10 @@
     &-with-arrow {
       right: 33px;
     }
+  }
+
+  &-clear-wrap {
+    line-height: 1;
   }
 
   > svg {
@@ -314,10 +319,15 @@
     font-size: var(--fontSizeLg);
     border: none;
     justify-content: flex-end;
+    width: 100%;
 
     &.is-focused,
     &:hover {
       border: none !important;
+    }
+
+    .#{$ns}ResultBox-value-wrap {
+      text-align: left;
     }
 
     .#{$ns}ResultBox-clear {
@@ -352,7 +362,6 @@
         width: 10px;
         height: 10px;
         top: 0;
-        transform: rotate(-90deg);
       }
     }
   }

@@ -24,7 +24,8 @@ export class DividerPlugin extends BasePlugin {
   description = '用来展示一个分割线，可用来做视觉上的隔离。';
   docLink = '/amis/zh-CN/components/divider';
   scaffold = {
-    type: 'divider'
+    type: 'divider',
+    $$dragMode: 'hv'
   };
   previewSchema: any = {
     type: 'divider',
@@ -73,7 +74,7 @@ export class DividerPlugin extends BasePlugin {
               getSchemaTpl('layout:originPosition', {value: 'left-top'}),
               getSchemaTpl('layout:width:v2', {
                 visibleOn:
-                  'data.style && data.style.position && (data.style.position === "fixed" || data.style.position === "absolute")'
+                  'this.style && this.style.position && (this.style.position === "fixed" || this.style.position === "absolute")'
               }),
               {
                 mode: 'horizontal',
@@ -123,7 +124,7 @@ export class DividerPlugin extends BasePlugin {
                 label: '线长',
                 name: 'style.width',
                 placeholder: '100%',
-                visibleOn: 'data.direction !== "vertical"',
+                visibleOn: 'this.direction !== "vertical"',
                 clearValueOnHidden: true
               }),
               getSchemaTpl('theme:select', {
@@ -131,7 +132,7 @@ export class DividerPlugin extends BasePlugin {
                 label: '线长',
                 name: 'style.height',
                 placeholder: 'var(--sizes-base-15)',
-                visibleOn: 'data.direction === "vertical"',
+                visibleOn: 'this.direction === "vertical"',
                 clearValueOnHidden: true
               }),
               getSchemaTpl('theme:select', {
@@ -139,14 +140,14 @@ export class DividerPlugin extends BasePlugin {
                 label: '线宽',
                 name: 'style.borderWidth',
                 placeholder: '1px',
-                visibleOn: '!data.title || data.direction === "vertical"'
+                visibleOn: '!this.title || this.direction === "vertical"'
               }),
               getSchemaTpl('theme:select', {
                 mode: 'horizontal',
                 label: '线宽',
                 name: 'themeCss.titleWrapperControlClassName.border-bottom-width',
                 placeholder: '1px',
-                visibleOn: '!!data.title && data.direction !== "vertical"',
+                visibleOn: '!!this.title && this.direction !== "vertical"',
                 clearValueOnHidden: true,
                 pipeIn: (value: any, form: any) => {
                   if (
@@ -181,7 +182,7 @@ export class DividerPlugin extends BasePlugin {
           },
           {
             title: '标题样式',
-            visibleOn: '!!data.title && data.direction !== "vertical"',
+            visibleOn: '!!this.title && this.direction !== "vertical"',
             body: [
               {
                 type: 'select',
@@ -212,7 +213,7 @@ export class DividerPlugin extends BasePlugin {
                 name: 'themeCss.titleWrapperControlClassName.flex-basis',
                 placeholder: '5%',
                 visibleOn:
-                  'data.titlePosition === "left" || data.titlePosition === "right"',
+                  'this.titlePosition === "left" || this.titlePosition === "right"',
                 clearValueOnHidden: true
               }),
               getSchemaTpl('theme:font', {

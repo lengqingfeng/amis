@@ -100,7 +100,7 @@ export class ButtonGroupControlPlugin extends BasePlugin {
     {
       actionType: 'reset',
       actionLabel: '重置',
-      description: '将值重置为resetValue，若没有配置resetValue，则清空'
+      description: '将值重置为初始值'
     },
     {
       actionType: 'reload',
@@ -160,7 +160,7 @@ export class ButtonGroupControlPlugin extends BasePlugin {
                 getSchemaTpl('horizontal', {
                   label: '',
                   visibleOn:
-                    'data.mode == "horizontal" && data.label !== false && data.horizontal'
+                    'this.mode == "horizontal" && this.label !== false && this.horizontal'
                 }),
                 getSchemaTpl('switch', {
                   name: 'tiled',
@@ -169,7 +169,7 @@ export class ButtonGroupControlPlugin extends BasePlugin {
                     '使按钮宽度占满父容器，各按钮宽度自适应'
                   ),
                   pipeIn: defaultValue(false),
-                  visibleOn: 'data.mode !== "inline"'
+                  visibleOn: 'this.mode !== "inline"'
                 }),
                 getSchemaTpl('size'),
                 getSchemaTpl('buttonLevel', {

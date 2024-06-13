@@ -84,6 +84,10 @@ export interface FormulaEditorProps extends ThemeProps, LocaleProps {
    * 编辑器配置
    */
   editorOptions?: any;
+
+  enableRunPanel?: boolean;
+
+  simplifyMemberOprs?: boolean;
 }
 
 export interface FunctionsProps {
@@ -212,7 +216,8 @@ export class FormulaEditor extends React.Component<
   static highlightValue(
     value: string,
     variables: Array<VariableItem>,
-    evalMode: boolean = true
+    evalMode: boolean = true,
+    sourceCode: boolean = true
   ) {
     if (!Array.isArray(variables) || !variables.length || !value) {
       return;
@@ -266,7 +271,7 @@ export class FormulaEditor extends React.Component<
         if (reg.test(encodeHtml)) {
           html = encodeHtml.replace(
             REPLACE_KEY,
-            `<span class="c-field">${v}</span>`
+            `<span class="c-field">${sourceCode ? v : varMap[v]}</span>`
           );
         } else {
           html = encodeHtml.replace(REPLACE_KEY, v);
@@ -484,7 +489,9 @@ export class FormulaEditor extends React.Component<
       functionClassName,
       classPrefix,
       selfVariableName,
-      evalMode
+      evalMode,
+      simplifyMemberOprs,
+      enableRunPanel = true
     } = this.props;
     const {
       focused,
@@ -514,10 +521,12 @@ export class FormulaEditor extends React.Component<
           <div className={cx(`FormulaEditor-content`)}>
             <header className={cx(`FormulaEditor-header`)}>
               {__(header || 'FormulaEditor.title')}
-              <div className={cx(`FormulaEditor-header-toolbar m-l`)}>
-                <span>{__('FormulaEditor.run')}</span>
-                <Switch value={showRunPanel} onChange={this.toggleRunPanel} />
-              </div>
+              {enableRunPanel ? (
+                <div className={cx(`FormulaEditor-header-toolbar m-l`)}>
+                  <span>{__('FormulaEditor.run')}</span>
+                  <Switch value={showRunPanel} onChange={this.toggleRunPanel} />
+                </div>
+              ) : null}
               <div className={cx(`FormulaEditor-header-toolbar`)}>
                 <span>{__('FormulaEditor.sourceMode')}</span>
                 <Switch
@@ -616,6 +625,7 @@ export class FormulaEditor extends React.Component<
                 data={variables!}
                 onSelect={this.handleVariableSelect}
                 selfVariableName={selfVariableName}
+                simplifyMemberOprs={simplifyMemberOprs}
               />
             </div>
           </div>

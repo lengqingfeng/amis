@@ -103,7 +103,7 @@ export class RadiosControlPlugin extends BasePlugin {
     {
       actionType: 'reset',
       actionLabel: '重置',
-      description: '将值重置为resetValue，若没有配置resetValue，则清空'
+      description: '将值重置为初始值'
     },
     {
       actionType: 'reload',
@@ -162,13 +162,13 @@ export class RadiosControlPlugin extends BasePlugin {
                 getSchemaTpl('switch', {
                   label: '一行选项显示',
                   name: 'inline',
-                  hiddenOn: 'data.mode === "inline"',
+                  hiddenOn: 'this.mode === "inline"',
                   pipeIn: defaultValue(true)
                 }),
                 {
                   label: '每行选项个数',
                   name: 'columnsCount',
-                  hiddenOn: 'data.mode === "inline" || data.inline !== false',
+                  hiddenOn: 'this.mode === "inline" || this.inline !== false',
                   type: 'input-range',
                   min: 1,
                   max: 6,

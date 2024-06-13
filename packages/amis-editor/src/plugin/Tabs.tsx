@@ -124,7 +124,7 @@ export class TabsPlugin extends BasePlugin {
   panelJustify = true;
   panelBodyCreator = (context: BaseEventContext) => {
     const isNewTabMode =
-      'data.tabsMode !=="vertical" && data.tabsMode !=="sidebar" && data.tabsMode !=="chrome"';
+      'this.tabsMode !=="vertical" && this.tabsMode !=="sidebar" && this.tabsMode !=="chrome"';
 
     return getSchemaTpl('tabs', [
       {
@@ -145,11 +145,13 @@ export class TabsPlugin extends BasePlugin {
                 minLength: 1,
                 scaffold: {
                   title: '选项卡',
-                  body: {
-                    type: 'tpl',
-                    tpl: '内容',
-                    inline: false
-                  }
+                  body: [
+                    {
+                      type: 'tpl',
+                      tpl: '内容',
+                      inline: false
+                    }
+                  ]
                 },
                 items: [
                   getSchemaTpl('title', {
@@ -282,7 +284,7 @@ export class TabsPlugin extends BasePlugin {
                   label: '标题区位置',
                   name: 'sidePosition',
                   pipeIn: defaultValue('left'),
-                  visibleOn: 'data.tabsMode === "sidebar"',
+                  visibleOn: 'this.tabsMode === "sidebar"',
                   clearValueOnHidden: true
                 })
               ]
@@ -308,7 +310,7 @@ export class TabsPlugin extends BasePlugin {
                 getSchemaTpl('className', {
                   name: 'showTipClassName',
                   label: '提示',
-                  visibleOn: 'data.showTip',
+                  visibleOn: 'this.showTip',
                   clearValueOnHidden: true
                 })
               ]
@@ -369,7 +371,7 @@ export class TabsPlugin extends BasePlugin {
                         label: '位置',
                         name: 'iconPosition',
                         pipeIn: defaultValue('left'),
-                        visibleOn: 'data.icon',
+                        visibleOn: 'this.icon',
                         clearValueOnHidden: true
                       })
                     ]

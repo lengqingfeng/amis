@@ -31,6 +31,10 @@ export interface EditorProps extends PluginEventListener {
   $schemaUrl?: string;
   schemas?: Array<any>;
   theme?: string;
+  /** 工具栏模式 */
+  toolbarMode?: 'default' | 'mini';
+  /** 是否需要弹框 */
+  noDialog?: boolean;
   /** 应用语言类型 */
   appLocale?: string;
   /** 是否开启多语言 */
@@ -40,6 +44,7 @@ export interface EditorProps extends PluginEventListener {
   superEditorData?: any;
   withSuperDataSchema?: boolean;
   /** 当前 Editor 为 SubEditor 时触发的宿主节点 */
+  hostManager?: EditorManager;
   hostNode?: EditorNodeType;
   dataBindingChange?: (
     value: string,
@@ -154,6 +159,7 @@ export default class Editor extends Component<EditorProps> {
       onChange,
       showCustomRenderersPanel,
       superEditorData,
+      hostManager,
       ...rest
     } = props;
 
@@ -164,6 +170,8 @@ export default class Editor extends Component<EditorProps> {
       {
         isMobile: props.isMobile,
         theme: props.theme,
+        toolbarMode: props.toolbarMode || 'default',
+        noDialog: props.noDialog,
         isSubEditor,
         amisDocHost: props.amisDocHost,
         superEditorData,
@@ -179,7 +187,7 @@ export default class Editor extends Component<EditorProps> {
       this.store.setShowCustomRenderersPanel(showCustomRenderersPanel);
     }
 
-    this.manager = new EditorManager(config, this.store);
+    this.manager = new EditorManager(config, this.store, hostManager);
 
     // 子编辑器不再重新设置 editorStore
     if (!(props.isSubEditor && (window as any).editorStore)) {
@@ -419,6 +427,7 @@ export default class Editor extends Component<EditorProps> {
   // 右键菜单
   @autobind
   async handleContextMenu(e: React.MouseEvent<HTMLElement>) {
+    e.persist();
     await closeContextMenus();
     let targetId: string = '';
     let region = '';
@@ -589,7 +598,13 @@ export default class Editor extends Component<EditorProps> {
 
           <div className="ae-Main">
             {!preview && (
-              <Breadcrumb store={this.store} manager={this.manager} />
+              <div className="ae-Header">
+                <Breadcrumb store={this.store} manager={this.manager} />
+                <div
+                  id="aeHeaderRightContainer"
+                  className="ae-Header-Right-Container"
+                ></div>
+              </div>
             )}
             <Preview
               {...previewProps}

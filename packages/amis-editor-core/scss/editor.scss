@@ -80,6 +80,7 @@
   min-height: 450px;
   min-width: 980px;
   overflow: hidden;
+  user-select: none;
 
   // 覆盖amis默认top值，避免导致未垂直居中
   .ae-Editor-toolbar svg.icon {
@@ -135,6 +136,10 @@
   flex-direction: column;
   z-index: 0;
 
+  overflow: hidden;
+  transform: scale(1); // 此后内部元素的fixed会相对此dom定位
+  transform-origin: center top;
+
   .ant-back-top {
     bottom: 96px;
     right: 39px;
@@ -155,10 +160,8 @@
 .ae-Preview {
   position: relative;
   flex-grow: 1;
+  min-height: 0;
   background-color: $default-bg-color;
-  overflow: hidden;
-  transform: scale(1); // 此后内部元素的fixed会相对此dom定位
-  transform-origin: center top;
 
   .ae-Preview-body {
     position: relative;
@@ -175,7 +178,7 @@
     &:before {
       content: '';
       display: block;
-      height: 24px;
+      height: 16px;
     }
 
     @include minScrollBar();
@@ -256,15 +259,15 @@
 
     &.is-mobile {
       position: relative;
-      border-width: 24px 22px 36px;
-      border-color: #ddd;
+      border-width: 10px;
+      border-color: #222;
       border-style: solid;
-      border-radius: 40px;
-      width: 419px;
-      height: 798px;
+      border-radius: 30px;
+      width: 375px;
+      height: 96%;
+      max-height: 812px;
       flex-grow: unset;
       min-height: unset;
-      margin: 40px auto;
       min-width: unset;
       padding: 0;
       overflow: visible;
@@ -275,6 +278,14 @@
       }
 
       > .ae-Preview-inner {
+        border-radius: 20px;
+
+        &::-webkit-scrollbar {
+          display: none;
+        }
+        -ms-overflow-style: none; /* IE and Edge */
+        scrollbar-width: none; /* Firefox */
+
         background: transparent;
         overflow-x: hidden;
         overflow-y: auto;
@@ -288,71 +299,74 @@
           display: none;
         }
 
-        &::before {
-          content: '';
-          height: 40px;
-          position: sticky;
-          top: 0;
-          width: 100%;
-          background: #ddd;
-          flex-shrink: 0;
-          display: block;
-        }
+        // &::before {
+        //   content: '';
+        //   height: 40px;
+        //   position: sticky;
+        //   top: 0;
+        //   width: 100%;
+        //   background: #ddd;
+        //   flex-shrink: 0;
+        //   display: block;
+        // }
       }
 
-      // 移动端预览设备装饰
-      .mobile-sound,
-      .mobile-receiver,
-      .mobile-left-btn,
-      .mobile-right-btn,
-      .mobile-open-btn {
-        position: absolute;
-        background: #cdcdcd;
-        border-radius: 3px;
-        z-index: 100;
-      }
-      // 音响
-      .mobile-sound {
-        top: 5px;
-        left: 142px; // 164px - 22px;
-        width: 58px;
-        height: 6px;
-      }
-      // 听筒
-      .mobile-receiver {
-        top: 3px;
-        left: 224px; // 246px - 22px;
-        width: 10px;
-        height: 10px;
-        border-radius: 5px;
-      }
-      // 左侧按钮
-      .mobile-left-btn {
-        top: 162px; // 226px - 64px;
-        left: -27px; // -5px - 22px;
-        width: 6px;
-        height: 50px;
-      }
-      // 右侧按钮（长条）
-      .mobile-right-btn {
-        top: 61px; // 125px - 64px;
-        right: -27px;
-        width: 6px;
-        height: 100px;
-      }
-      // 开机键
-      .mobile-open-btn {
-        top: 211px; // 275px - 64px;
-        right: -27px;
-        width: 6px;
-        height: 50px;
-      }
+      // // 移动端预览设备装饰
+      // .mobile-sound,
+      // .mobile-receiver,
+      // .mobile-left-btn,
+      // .mobile-right-btn,
+      // .mobile-open-btn {
+      //   position: absolute;
+      //   background: #cdcdcd;
+      //   border-radius: 3px;
+      //   z-index: 100;
+      // }
+      // // 音响
+      // .mobile-sound {
+      //   top: 5px;
+      //   left: 142px; // 164px - 22px;
+      //   width: 58px;
+      //   height: 6px;
+      // }
+      // // 听筒
+      // .mobile-receiver {
+      //   top: 3px;
+      //   left: 224px; // 246px - 22px;
+      //   width: 10px;
+      //   height: 10px;
+      //   border-radius: 5px;
+      // }
+      // // 左侧按钮
+      // .mobile-left-btn {
+      //   top: 162px; // 226px - 64px;
+      //   left: -27px; // -5px - 22px;
+      //   width: 6px;
+      //   height: 50px;
+      // }
+      // // 右侧按钮（长条）
+      // .mobile-right-btn {
+      //   top: 61px; // 125px - 64px;
+      //   right: -27px;
+      //   width: 6px;
+      //   height: 100px;
+      // }
+      // // 开机键
+      // .mobile-open-btn {
+      //   top: 211px; // 275px - 64px;
+      //   right: -27px;
+      //   width: 6px;
+      //   height: 50px;
+      // }
     }
   }
 
   // 移动端需要上下滚动，避免设备背景被遮挡
   &.is-mobile-body {
-    overflow-x: hidden;
+    overflow: visible !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
     &::-webkit-scrollbar {
       background-color: $default-bg-color;
@@ -380,8 +394,9 @@
 .ae-PreviewIFrame {
   pointer-events: all !important;
   border: 0 !important;
-  min-height: calc(100% - 46px);
+  min-height: 100%;
   width: 100%;
+  height: auto !important;
 }
 
 .ae-IFramePreview {
@@ -1186,7 +1201,7 @@
 
 [data-editor-id].ae-is-draging,
 .ae-is-draging {
-  display: none !important;
+  opacity: 0.6;
 }
 
 [data-editor-id][data-visible='false'] {
@@ -1516,6 +1531,34 @@ div.ae-DragImage {
     display: block;
     white-space: nowrap;
     box-shadow: 0 -2px 5px rgba(255, 255, 255, 0.5);
+  }
+}
+
+.ae-PushHighlight-top,
+.ae-PushHighlight-bottom {
+  position: absolute;
+  &::after {
+    content: '';
+    left: 0;
+    right: 0;
+    display: block;
+    background: $Editor-theme-color;
+    position: absolute;
+    height: 2px;
+  }
+}
+
+.ae-PushHighlight-left,
+.ae-PushHighlight-right {
+  position: absolute;
+  &::after {
+    content: '';
+    top: 0;
+    bottom: 0;
+    display: block;
+    background: $Editor-theme-color;
+    position: absolute;
+    width: 2px;
   }
 }
 
@@ -1858,4 +1901,20 @@ div.ae-DragImage {
 // 空表单组样式优化
 div[class*='Form-group']:empty {
   margin-bottom: 0 !important;
+}
+.ae-Header {
+  display: flex;
+  justify-content: space-between;
+  background: #fff;
+  align-items: center;
+  border-bottom: 1px solid $editor-border-color;
+  .ae-Breadcrumb {
+    flex: 1;
+    max-width: 100%;
+    min-width: 0;
+  }
+  &-Right-Container {
+    z-index: 1001;
+    background-color: #fff;
+  }
 }

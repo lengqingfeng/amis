@@ -232,7 +232,7 @@ export interface FormSchemaBase {
   /**
    * 配置表单项默认的展示方式。
    */
-  mode?: 'normal' | 'inline' | 'horizontal';
+  mode?: 'normal' | 'inline' | 'horizontal' | 'flex';
 
   /**
    * 表单项显示为几列
@@ -713,7 +713,7 @@ export default class Form extends React.Component<FormProps, object> {
   async dispatchInited(value: any) {
     const {data, store, dispatchEvent} = this.props;
 
-    if (store.fetching) {
+    if (!isAlive(store) || store.fetching) {
       return value;
     }
 
@@ -994,7 +994,9 @@ export default class Form extends React.Component<FormProps, object> {
       this.flushing = true;
       const hooks = this.hooks['flush'] || [];
       await Promise.all(hooks.map(fn => fn()));
-      await this.lazyEmitChange.flush();
+      if (!this.emitting) {
+        await this.lazyEmitChange.flush();
+      }
     } finally {
       this.flushing = false;
     }
@@ -1049,7 +1051,7 @@ export default class Form extends React.Component<FormProps, object> {
       return;
     }
     store.changeValue(name, value, changePristine);
-    if (!changePristine) {
+    if (!changePristine || typeof value !== 'undefined') {
       (formLazyChange === false ? this.emitChange : this.lazyEmitChange)(
         submit
       );
@@ -1065,46 +1067,54 @@ export default class Form extends React.Component<FormProps, object> {
   }
 
   emittedData: any = null;
-  async emitChange(submit: boolean, skipIfNothingChanges: boolean = false) {
-    const {onChange, store, submitOnChange, dispatchEvent, data} = this.props;
+  emitting = false;
+  async emitChange(submit: boolean, emitedFromWatch: boolean = false) {
+    try {
+      this.emitting = true;
 
-    if (!isAlive(store)) {
-      return;
-    }
+      const {onChange, store, submitOnChange, dispatchEvent, data} = this.props;
 
-    const diff = difference(store.data, store.pristine);
-    if (
-      skipIfNothingChanges &&
-      (!Object.keys(diff).length || isEqual(store.data, this.emittedData))
-    ) {
-      return;
-    }
+      if (!isAlive(store)) {
+        return;
+      }
 
-    this.emittedData = store.data;
-    // 提前准备好 onChange 的参数。
-    // 因为 store.data 会在 await 期间被 WithStore.componentDidUpdate 中的 store.initData 改变。导致数据丢失
-    const changeProps = [store.data, diff, this.props];
-    const dispatcher = await dispatchEvent(
-      'change',
-      createObject(data, store.data)
-    );
-    if (!dispatcher?.prevented) {
-      onChange && onChange.apply(null, changeProps);
-    }
+      const diff = difference(store.data, store.pristine);
+      if (
+        emitedFromWatch &&
+        (!Object.keys(diff).length || isEqual(store.data, this.emittedData))
+      ) {
+        return;
+      }
 
-    store.clearRestError();
-
-    if (submit || (submitOnChange && store.inited)) {
-      await this.handleAction(
-        undefined,
-        {
-          type: 'submit',
-          // 如果这里不跳过，会相互依赖死循环，flush 会 让 emiteChange 立即执行
-          // handleAction 里面又会调用 flush
-          skipFormFlush: true
-        },
-        store.data
+      this.emittedData = store.data;
+      // 提前准备好 onChange 的参数。
+      // 因为 store.data 会在 await 期间被 WithStore.componentDidUpdate 中的 store.initData 改变。导致数据丢失
+      const changeProps = [store.data, diff, this.props];
+      const dispatcher = await dispatchEvent(
+        'change',
+        createObject(data, store.data)
       );
+      if (!dispatcher?.prevented) {
+        onChange && onChange.apply(null, changeProps);
+      }
+
+      store.clearRestError();
+
+      // 只有主动修改表单项触发的 change 才会触发 submit
+      if (!emitedFromWatch && (submit || (submitOnChange && store.inited))) {
+        await this.handleAction(
+          undefined,
+          {
+            type: 'submit',
+            // 如果这里不跳过，会相互依赖死循环，flush 会 让 emiteChange 立即执行
+            // handleAction 里面又会调用 flush
+            skipFormFlush: true
+          },
+          store.data
+        );
+      }
+    } finally {
+      this.emitting = false;
     }
   }
 
@@ -1725,6 +1735,7 @@ export default class Form extends React.Component<FormProps, object> {
     otherProps: Partial<FormProps> = {}
   ): React.ReactNode {
     children = children || [];
+    const {classnames: cx} = this.props;
 
     if (!Array.isArray(children)) {
       children = [children];
@@ -1755,8 +1766,6 @@ export default class Form extends React.Component<FormProps, object> {
         return null;
       }
 
-      const {classnames: cx} = this.props;
-
       return (
         <div className={cx('Form-row')}>
           {children.map((control, key) =>
@@ -1779,6 +1788,63 @@ export default class Form extends React.Component<FormProps, object> {
       );
     }
 
+    if (this.props.mode === 'flex') {
+      let rows: any = [];
+      children.forEach(child => {
+        if (typeof child.row === 'number') {
+          if (rows[child.row]) {
+            rows[child.row].push(child);
+          } else {
+            rows[child.row] = [child];
+          }
+        } else {
+          // 没有 row 的，就单启一行
+          rows.push([child]);
+        }
+      });
+      return (
+        <>
+          {rows.map((children: any, index: number) => {
+            return (
+              <div className={cx('Form-flex')} role="flex-row" key={index}>
+                {children.map((control: any, key: number) => {
+                  const split = control.colSize?.split('/');
+                  const colSize =
+                    split?.[0] && split?.[1]
+                      ? (split[0] / split[1]) * 100 + '%'
+                      : control.colSize;
+                  return ~['hidden', 'formula'].indexOf(
+                    (control as any).type
+                  ) ? (
+                    this.renderChild(control, key, otherProps)
+                  ) : (
+                    <div
+                      key={control.id || key}
+                      className={cx(
+                        `Form-flex-col`,
+                        (control as Schema).columnClassName
+                      )}
+                      style={{
+                        flex:
+                          colSize && !['1', 'auto'].includes(colSize)
+                            ? `0 0 ${colSize}`
+                            : ''
+                      }}
+                      role="flex-col"
+                    >
+                      {this.renderChild(control, '', {
+                        ...otherProps,
+                        mode: 'flex'
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </>
+      );
+    }
     return children.map((control, key) =>
       this.renderChild(control, key, otherProps, region)
     );
@@ -1831,7 +1897,10 @@ export default class Form extends React.Component<FormProps, object> {
       formSubmited: form.submited,
       formMode: mode,
       formHorizontal: horizontal,
-      formLabelAlign: labelAlign !== 'left' ? 'right' : labelAlign,
+      formLabelAlign:
+        !labelAlign || !['left', 'right', 'top'].includes(labelAlign)
+          ? 'right'
+          : labelAlign,
       formLabelWidth: labelWidth,
       controlWidth,
       /**

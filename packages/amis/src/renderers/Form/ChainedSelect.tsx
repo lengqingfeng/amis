@@ -5,7 +5,8 @@ import {
   OptionsControlProps,
   Option,
   FormOptionsControl,
-  resolveEventData
+  resolveEventData,
+  getVariable
 } from 'amis-core';
 import {Select, Spinner} from 'amis-ui';
 import {Api, ApiObject} from 'amis-core';
@@ -89,13 +90,15 @@ export default class ChainedSelectControl extends React.Component<
   }
 
   doAction(action: ActionObject, data: object, throwErrors: boolean) {
-    const {resetValue, onChange} = this.props;
+    const {resetValue, onChange, formStore, store, name} = this.props;
     const actionType = action?.actionType as string;
 
     if (actionType === 'clear') {
       onChange('');
     } else if (actionType === 'reset') {
-      onChange(resetValue ?? '');
+      const pristineVal =
+        getVariable(formStore?.pristine ?? store?.pristine, name) ?? resetValue;
+      onChange(pristineVal ?? '');
     }
   }
 
@@ -238,7 +241,11 @@ export default class ChainedSelectControl extends React.Component<
       ? value.split(delimiter || ',')
       : [];
     arr.splice(index, arr.length - index);
-    arr.push(joinValues ? currentValue.value : currentValue);
+
+    const pushValue = joinValues ? currentValue.value : currentValue;
+    if (pushValue !== undefined) {
+      arr.push(pushValue);
+    }
 
     const valueRes = this.array2value(arr);
 

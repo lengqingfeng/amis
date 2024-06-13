@@ -160,7 +160,7 @@ export class RangeControlPlugin extends BasePlugin {
     {
       actionType: 'reset',
       actionLabel: '重置',
-      description: '将值重置为resetValue，若没有配置resetValue，则清空'
+      description: '将值重置为初始值'
     },
     {
       actionType: 'setValue',
@@ -205,7 +205,7 @@ export class RangeControlPlugin extends BasePlugin {
               {
                 type: 'container',
                 className: 'ae-sub-content',
-                visibleOn: 'data.multiple',
+                visibleOn: 'this.multiple',
                 body: [
                   getSchemaTpl('joinValues', {
                     onChange: (
@@ -233,7 +233,7 @@ export class RangeControlPlugin extends BasePlugin {
                 type: 'ae-input-range-value',
                 name: 'value',
                 label: '默认值',
-                visibleOn: 'data.multiple'
+                visibleOn: 'this.multiple'
               },
 
               getSchemaTpl('valueFormula', {
@@ -243,7 +243,7 @@ export class RangeControlPlugin extends BasePlugin {
                   type: 'input-number'
                 },
                 valueType: 'number', // 期望数值类型
-                visibleOn: '!data.multiple',
+                visibleOn: '!this.multiple',
                 pipeIn: defaultValue(0)
               }),
 
@@ -297,7 +297,7 @@ export class RangeControlPlugin extends BasePlugin {
               {
                 type: 'container',
                 className: 'ae-ExtendMore mb-2',
-                visibleOn: 'data.tooltipVisible === undefined',
+                visibleOn: 'this.tooltipVisible === undefined',
                 body: [
                   {
                     type: 'select',
@@ -325,7 +325,7 @@ export class RangeControlPlugin extends BasePlugin {
                 name: 'clearable',
                 label: '可重置',
                 value: false,
-                visibleOn: '!!data.showInput'
+                visibleOn: '!!this.showInput'
               }),
               getSchemaTpl('autoFillApi')
             ]

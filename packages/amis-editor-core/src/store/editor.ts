@@ -34,7 +34,9 @@ import {
   PanelItem,
   MoveEventContext,
   ScaffoldForm,
-  PopOverForm
+  PopOverForm,
+  DeleteEventContext,
+  BaseEventContext
 } from '../plugin';
 import {
   JSONDuplicate,
@@ -59,6 +61,7 @@ import {matchSorter} from 'match-sorter';
 import debounce from 'lodash/debounce';
 import type {DialogSchema} from '../../../amis/src/renderers/Dialog';
 import type {DrawerSchema} from '../../../amis/src/renderers/Drawer';
+import getLayoutInstance from '../layout';
 
 export interface SchemaHistory {
   versionId: number;
@@ -133,6 +136,10 @@ export type EditorModalBody = (DialogSchema | DrawerSchema) & {
   // 如果是公共弹窗，在 definitions 中的 key
   $$ref?: string;
 
+  // 内嵌弹窗会转成公共弹窗下发给子弹窗，否则子弹窗里面无法选择
+  // 这类会在 definition 里面标记原始位置
+  $$originId?: string;
+
   // 弹出方式
   actionType?: string;
 };
@@ -148,6 +155,8 @@ export const MainStore = types
       label: 'Root'
     }),
     theme: 'cxd', // 主题，默认cxd主题
+    toolbarMode: 'default', // 工具栏模式，默认default，mini模式没有更多、前后插入组件、上下文数据、重复一份、合成一行、右键功能
+    noDialog: false, // 不需要弹框功能
     hoverId: '',
     hoverRegion: '',
     activeId: '',
@@ -548,15 +557,28 @@ export const MainStore = types
           return undefined;
         }
 
+        const isSubEditor = self.isSubEditor;
+        const isHiddenProps = getEnv(self).isHiddenProps;
+
         return JSONPipeOut(
           JSONGetById(self.schema, self.activeId),
-          getEnv(self).isHiddenProps ||
-            ((key, props) =>
+          (key, props) => {
+            if (isSubEditor && key === 'definitions') {
+              return true;
+            }
+
+            if (typeof isHiddenProps === 'function') {
+              return isHiddenProps(key, props);
+            }
+
+            return (
               (key.substring(0, 2) === '$$' &&
                 key !== '$$comments' &&
                 key !== '$$commonSchema') ||
               typeof props === 'function' || // pipeIn 和 pipeOut
-              key.substring(0, 2) === '__')
+              key.substring(0, 2) === '__'
+            );
+          }
         );
       },
 
@@ -1013,18 +1035,9 @@ export const MainStore = types
 
       // 获取弹窗大纲列表
       get modals(): Array<EditorModalBody> {
-        const schema = {...self.schema};
+        const schema = self.schema;
         const modals: Array<DialogSchema | DrawerSchema> = [];
-        Object.keys(schema.definitions || {}).forEach(key => {
-          const definition = schema.definitions[key];
-          if (['dialog', 'drawer'].includes(definition.type)) {
-            modals.push({
-              ...definition,
-              $$ref: key
-            });
-          }
-        });
-        delete schema.definitions;
+
         JSONTraverse(schema, (value: any, key: string, host: any) => {
           if (
             key === 'actionType' &&
@@ -1032,15 +1045,56 @@ export const MainStore = types
           ) {
             const key = value === 'drawer' ? 'drawer' : 'dialog';
             const body = host[key] || host['args'];
-            if (body && !body.$ref) {
+            if (
+              body &&
+              !body.$ref &&
+              !modals.find(item => item.$$id === body.$$id)
+            ) {
               modals.push({
                 ...body,
+                type: key,
                 actionType: value
               });
             }
           }
           return value;
         });
+
+        // 公共组件排在前面
+        Object.keys(schema.definitions || {})
+          .reverse()
+          .forEach(key => {
+            const definition = schema.definitions[key];
+            if (['dialog', 'drawer'].includes(definition.type)) {
+              // 不要把已经内嵌弹窗中的弹窗再放到外面
+              if (
+                definition.$$originId &&
+                modals.find(item => item.$$id === definition.$$originId)
+              ) {
+                return;
+              }
+
+              modals.unshift({
+                ...definition,
+                $$ref: key
+              });
+            }
+          });
+
+        // 子弹窗时，自己就是个弹窗
+        if (['dialog', 'drawer', 'confirmDialog'].includes(schema.type)) {
+          const idx = modals.findIndex(item => item.$$id === schema.$$id);
+          if (~idx) {
+            modals.splice(idx, 1);
+          }
+
+          modals.unshift({
+            ...schema,
+            // 如果还包含这个，子弹窗里面收集弹窗的时候会出现多份内嵌弹窗
+            definitions: undefined
+          });
+        }
+
         return modals;
       },
 
@@ -1133,7 +1187,9 @@ export const MainStore = types
       setSchema(json: any) {
         const newSchema = JSONPipeIn(json || {});
 
-        if (self.schema) {
+        // schema 里面始终有个 $$id
+        // 如果超过一个元素，说明不是个空配置了，就不要直接替换了。
+        if (self.schema && Object.keys(self.schema).length > 1) {
           // 不直接替换，主要是为了不要重新生成 $$id 什么的。
           const changes = diff(
             self.schema,
@@ -1186,6 +1242,11 @@ export const MainStore = types
           // 显然有错误。
           return;
         }
+        const node = self.getNodeById(id, region);
+        const LayoutInstance = getLayoutInstance(self.schema, node!);
+        const {beforeInsert, afterInsert} = LayoutInstance;
+
+        beforeInsert && (event.context = beforeInsert(event.context, self));
 
         const child = JSONPipeIn(event.context.data);
 
@@ -1217,13 +1278,21 @@ export const MainStore = types
           arr.push(child);
         }
 
+        event.context.data = child;
+        event.context.regionList = arr;
+        afterInsert && (event.context = afterInsert(event.context, self));
+
         this.traceableSetSchema(
           JSONUpdate(self.schema, id, {
-            [region]: arr
+            [region]: event.context.regionList
           })
         );
 
-        event.context.data = child;
+        child?.$$id &&
+          setTimeout(() => {
+            this.setActiveId(child.$$id);
+          }, 0);
+
         return child;
       },
 
@@ -1235,11 +1304,16 @@ export const MainStore = types
         if (context.sourceId === context.beforeId) {
           return;
         }
+        const region = context.region;
+
+        const node = self.getNodeById(context.id, region);
+        const LayoutInstance = getLayoutInstance(self.schema, node!);
+        const {beforeMove, afterMove} = LayoutInstance;
+
+        beforeMove && (event.context = beforeMove(event.context, self));
 
         const source = JSONGetById(schema, context.sourceId);
         schema = JSONDelete(schema, context.sourceId, undefined, true);
-
-        const region = context.region;
 
         const json = JSONGetById(schema, context.id);
         let origin = json[region];
@@ -1250,11 +1324,10 @@ export const MainStore = types
           : [];
 
         if (context.beforeId) {
-          const idx = findIndex(
+          let idx = findIndex(
             origin,
             (item: any) => item.$$id === context.beforeId
           );
-
           if (!~idx) {
             throw new Error('位置错误，目标位置没有找到');
           }
@@ -1263,9 +1336,12 @@ export const MainStore = types
           origin.push(source);
         }
 
+        event.context.regionList = origin;
+        afterMove && (event.context = afterMove(event.context, self));
+
         this.traceableSetSchema(
           JSONUpdate(schema, context.id, {
-            [region]: origin
+            [region]: event.context.regionList
           })
         );
       },
@@ -1553,35 +1629,84 @@ export const MainStore = types
         }
       },
 
-      moveUp(id: string) {
-        if (!id) {
+      moveUp(context: BaseEventContext) {
+        const {sourceId, regionNode, region, id} = context;
+        if (!sourceId) {
           return;
         }
+        const schema = JSONMoveUpById(self.schema, sourceId);
+        const LayoutInstance = getLayoutInstance(self.schema, regionNode);
 
-        this.traceableSetSchema(JSONMoveUpById(self.schema, id));
+        if (LayoutInstance.afterMoveUp) {
+          const parent = JSONGetById(schema, id);
+          let regionList = parent[region];
+          context.regionList = regionList;
+          context = LayoutInstance.afterMoveUp(context, self);
+          this.traceableSetSchema(
+            JSONUpdate(schema, id, {
+              [region]: context.regionList
+            })
+          );
+        } else {
+          this.traceableSetSchema(schema);
+        }
       },
-      moveDown(id: string) {
-        if (!id) {
+      moveDown(context: BaseEventContext) {
+        const {sourceId, regionNode, region, id} = context;
+        if (!sourceId) {
           return;
         }
+        const schema = JSONMoveDownById(self.schema, sourceId);
+        const LayoutInstance = getLayoutInstance(self.schema, regionNode);
 
-        this.traceableSetSchema(JSONMoveDownById(self.schema, id));
+        if (LayoutInstance.afterMoveDown) {
+          const parent = JSONGetById(schema, id);
+          let regionList = parent[region];
+          context.regionList = regionList;
+          context = LayoutInstance.afterMoveDown(context, self);
+          this.traceableSetSchema(
+            JSONUpdate(schema, id, {
+              [region]: context.regionList
+            })
+          );
+        } else {
+          this.traceableSetSchema(schema);
+        }
       },
 
-      del(id: string) {
+      del(context: DeleteEventContext) {
+        const id = context.id;
         if (id === self.activeId) {
-          const host = self.getNodeById(id)?.host;
-          this.setActiveId(host ? host.id : '');
+          const node = self.getNodeById(id);
+          this.setActiveId(node?.parentId || '', node?.parentRegion);
         } else if (self.activeId) {
           const active = JSONGetById(self.schema, id);
 
           // 如果当前点选的是要删的节点里面的，则改成选中当前要删的上层
           if (JSONGetById(active, self.activeId)) {
-            const host = self.getNodeById(id)?.host;
-            this.setActiveId(host ? host.id : '');
+            const node = self.getNodeById(id);
+            this.setActiveId(node?.parentId || '', node?.parentRegion);
           }
         }
-        this.traceableSetSchema(JSONDelete(self.schema, id));
+
+        const schema = JSONDelete(self.schema, id);
+
+        const node = self.getNodeById(id);
+        const LayoutInstance = getLayoutInstance(self.schema, node?.parent);
+
+        if (LayoutInstance.afterDelete && node) {
+          const parent = JSONGetById(schema, node.parentId);
+          let regionList = parent[node.parentRegion];
+          context.regionList = regionList;
+          context = LayoutInstance.afterDelete(context, self);
+          this.traceableSetSchema(
+            JSONUpdate(schema, node.parentId, {
+              [node.parentRegion]: context.regionList
+            })
+          );
+        } else {
+          this.traceableSetSchema(schema);
+        }
       },
 
       delMulti(ids: Array<string>) {
@@ -1761,6 +1886,7 @@ export const MainStore = types
           throw new Error('modal not found');
         }
 
+        modal = JSONPipeIn(modal);
         if (definitions && isPlainObject(definitions)) {
           schema = mergeDefinitions(schema, definitions, modal);
         }
@@ -1770,7 +1896,7 @@ export const MainStore = types
             ? 'drawer'
             : 'dialog';
 
-        schema = JSONUpdate(schema, id, modal);
+        schema = JSONUpdate(schema, id, modal, true);
 
         // 如果编辑的是公共弹窗
         if (!parent.actionType) {
@@ -1804,7 +1930,30 @@ export const MainStore = types
             args: undefined,
             dialog: undefined,
             drawer: undefined,
-            [newHostKey]: JSONPipeIn(modal)
+            [newHostKey]: modal
+          });
+        }
+
+        // 如果弹窗里面又弹窗指向自己，那么也要更新
+        let refIds: string[] = [];
+        JSONTraverse(modal, (value: any, key: string, host: any) => {
+          if (key === '$ref' && host.$$originId === id) {
+            refIds.push(host.$$id);
+          }
+        });
+        if (refIds.length) {
+          let refKey = '';
+          [schema, refKey] = addModal(schema, modal);
+          schema = JSONUpdate(schema, parent.$$id, {
+            [newHostKey]: JSONPipeIn({
+              $ref: refKey
+            })
+          });
+          refIds.forEach(refId => {
+            schema = JSONUpdate(schema, refId, {
+              $ref: refKey,
+              $$originId: undefined
+            });
           });
         }
 

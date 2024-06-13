@@ -152,7 +152,8 @@ export default class Breadcrumb extends React.Component<
     }
 
     const scrollLeft = this.toNumber(this.getScrollLeft());
-    const maxScrollLeft = scrollElem.offsetWidth - scrollContainer.offsetWidth;
+    const maxScrollLeft =
+      scrollElem.offsetWidth - scrollContainer.offsetWidth + 32;
 
     if (scrollLeft - 50 > -maxScrollLeft) {
       scrollElem.style.left = `${scrollLeft - 50}px`;
@@ -217,12 +218,14 @@ export default class Breadcrumb extends React.Component<
                 const nearby: Array<EditorNodeType> = (
                   item.parent as EditorNodeType
                 )?.uniqueChildren;
-
+                const region =
+                  item.region ||
+                  item.childRegions.find((i: any) => i.region)?.region;
                 return (
                   <li key={index}>
                     <span
                       data-node-id={item.id}
-                      data-node-region={item.region}
+                      data-node-region={region}
                       onClick={this.handleClick}
                       onMouseEnter={this.handleMouseEnter}
                     >

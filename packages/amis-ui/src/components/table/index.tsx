@@ -43,6 +43,8 @@ import {
   getSortData
 } from './util';
 
+import type {TestIdBuilder} from 'amis-core';
+
 export interface ColumnProps {
   title: string | React.ReactNode | Function;
   name: string;
@@ -176,6 +178,7 @@ export interface TableProps extends ThemeProps, LocaleProps, SpinnerExtraProps {
    */
   autoFillHeight?: boolean | AutoFillHeightObject;
   lazyRenderAfter?: boolean;
+  testIdBuilder?: TestIdBuilder;
 }
 
 export interface ScrollProps {
@@ -682,7 +685,8 @@ export class Table extends React.PureComponent<TableProps, TableState> {
       dataSource,
       onSort,
       onSelectAll,
-      onFilter
+      onFilter,
+      testIdBuilder
     } = this.props;
 
     const rowSelectionKeyField = this.getRowSelectionKeyField();
@@ -751,6 +755,7 @@ export class Table extends React.PureComponent<TableProps, TableState> {
         }}
         onFilter={onFilter}
         onResizeMouseDown={this.onResizeMouseDown.bind(this)}
+        testIdBuilder={testIdBuilder?.getChild('head')}
       ></Head>
     );
   }
@@ -995,7 +1000,8 @@ export class Table extends React.PureComponent<TableProps, TableState> {
       columns,
       lazyRenderAfter,
       classPrefix,
-      classnames: cx
+      classnames: cx,
+      testIdBuilder
     } = this.props;
 
     const rowSelectionKeyField = this.getRowSelectionKeyField();
@@ -1003,6 +1009,7 @@ export class Table extends React.PureComponent<TableProps, TableState> {
       this.state.selectedRowKeys,
       key => key === data[rowSelectionKeyField]
     );
+    const rowTIDBuilder = testIdBuilder?.getChild(`row-${rowIndex}`);
 
     const childrenColumnName = this.getChildrenColumnName();
     // 当前行是否可展开
@@ -1070,6 +1077,7 @@ export class Table extends React.PureComponent<TableProps, TableState> {
         lazyRenderAfter={lazyRenderAfter}
         classnames={cx}
         classPrefix={classPrefix}
+        testIdBuilder={rowTIDBuilder}
         {...checkboxProps}
       />,
       children

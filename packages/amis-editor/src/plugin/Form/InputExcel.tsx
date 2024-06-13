@@ -85,7 +85,7 @@ export class ExcelControlPlugin extends BasePlugin {
     {
       actionType: 'reset',
       actionLabel: '重置',
-      description: '将值重置为resetValue，若没有配置resetValue，则清空'
+      description: '将值重置为初始值'
     },
     {
       actionType: 'setValue',
@@ -125,7 +125,7 @@ export class ExcelControlPlugin extends BasePlugin {
             getSchemaTpl('switch', {
               name: 'includeEmpty',
               label: '是否包含空内容',
-              visibleOn: 'data.parseMode === "array"'
+              visibleOn: 'this.parseMode === "array"'
             })
           ]
         }

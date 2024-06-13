@@ -4,7 +4,12 @@
 import {hasIcon, mapObject, utils} from 'amis';
 import type {PlainObject, Schema, SchemaNode} from 'amis';
 import {getGlobalData} from 'amis-theme-editor-helper';
-import {isExpression, resolveVariableAndFilter} from 'amis-core';
+import {
+  mapTree,
+  isExpression,
+  resolveVariableAndFilter,
+  filterTree
+} from 'amis-core';
 import type {VariableItem} from 'amis-ui';
 import {isObservable, reaction} from 'mobx';
 import DeepDiff, {Diff} from 'deep-diff';
@@ -16,6 +21,7 @@ import isNumber from 'lodash/isNumber';
 import debounce from 'lodash/debounce';
 import merge from 'lodash/merge';
 import {EditorModalBody} from './store/editor';
+import {filter} from 'lodash';
 
 const {
   guid,
@@ -194,7 +200,7 @@ export function JSONPipeOut(
     });
     return flag ? ret : obj;
   }
-  if (!isObject(obj) || isObservable(obj)) {
+  if (!isPlainObject(obj)) {
     return obj;
   }
 
@@ -1326,13 +1332,14 @@ export async function getVariables(that: any) {
   let variablesArr: any[] = [];
 
   const {variables, requiredDataPropsVariables} = that.props;
+  const selfName = that.props?.data?.name;
   if (!variables || requiredDataPropsVariables) {
     // 从amis数据域中取变量数据
     const {node, manager} = that.props.formProps || that.props;
     let vars = await resolveVariablesFromScope(node, manager);
     if (Array.isArray(vars)) {
       if (!that.isUnmount) {
-        variablesArr = vars;
+        variablesArr = filterVariablesOfScope(vars, selfName);
       }
     }
   }
@@ -1361,6 +1368,121 @@ export async function getVariables(that: any) {
   return variablesArr;
 }
 
+function filterVariablesOfScope(options: any[], selfName?: string) {
+  const curOptions = options.find(i => i.label === '组件上下文');
+  const arr = curOptions?.children || [];
+  const variables = mapTree(arr, (item: any) => {
+    // 子表过滤成员那层
+    if (item.type === 'array' && Array.isArray(item.children)) {
+      if (item.children.length === 1) {
+        const child = item.children[0];
+        if (child.type === 'object' && child.disabled) {
+          return {
+            ...item,
+            children: child.children
+          };
+        }
+      }
+    }
+    return item;
+  });
+  const finalVars = filterTree(variables, item => {
+    // 如果是子表 过滤掉当前自己 因为已经在当前层出现了
+    if (item.schemaType && item.type === 'array' && item.children) {
+      const idx = item.children.findIndex(
+        (i: any) => i.value === `${item.value}.${selfName}`
+      );
+      return !~idx;
+    }
+    return true;
+  });
+  return finalVars;
+}
+
+export async function getQuickVariables(that: any, filter?: Function) {
+  const {node, manager} = that.props.formProps || that.props;
+  const {quickVars, data} = that.props;
+  const selfName = data?.name;
+  await manager?.getContextSchemas(node);
+  const options = await manager?.dataSchema?.getDataPropsAsOptions();
+  if (Array.isArray(options)) {
+    const curOptions = filterVariablesOfScope(options);
+    return resolveQuickVariables(curOptions, quickVars, selfName, filter);
+  }
+
+  return [];
+}
+
+export function resolveQuickVariables(
+  options: any,
+  quickVars?: VariableItem[],
+  selfName?: string,
+  filter?: Function
+) {
+  if (!Array.isArray(options)) {
+    return [];
+  }
+  const finalVars = [];
+  const curOption = options[0];
+  const superOption = options[1];
+  const variables = (curOption.children || [])
+    .filter((item: any) => item.value !== selfName && item.schemaType)
+    .map((item: any) => {
+      // 子表过滤成员那层
+      if (item.type === 'array' && Array.isArray(item.children)) {
+        if (item.children.length === 1) {
+          const child = item.children[0];
+          if (child.type === 'object' && child.disabled) {
+            return {
+              ...item,
+              children: child.children
+            };
+          }
+        }
+      }
+      return item;
+    });
+  if (superOption?.children?.length) {
+    const superVars = superOption?.children.filter(
+      (item: any) => item.schemaType && item.type !== 'array'
+    );
+    finalVars.push(...superVars);
+    finalVars.push({
+      label: curOption.label,
+      children: variables
+    });
+  } else {
+    finalVars.push(...variables);
+  }
+
+  const filterVar = filter ? filter(finalVars) : finalVars;
+
+  if (quickVars?.length) {
+    const vars: VariableItem[] = [];
+
+    if (!filterVar.length) {
+      vars.push(...quickVars);
+    } else {
+      vars.push({
+        label: '快捷变量',
+        type: 'quickVars',
+        children: quickVars
+      });
+    }
+
+    if (filterVar.length) {
+      vars.push({
+        label: '表单变量',
+        children: filterVar
+      });
+    }
+
+    return vars;
+  }
+
+  return filterVar;
+}
+
 /**
  * 更新组件上下文中label为带层级说明
  * @param variables 变量列表
@@ -1377,7 +1499,8 @@ export const updateComponentContext = (variables: any[]) => {
         label:
           index === 0
             ? `当前层${child.label ? '(' + child.label + ')' : ''}`
-            : `上${index}层${child.label ? '(' + child.label + ')' : ''}`
+            : child.title ||
+              `上${index}层${child.label ? '(' + child.label + ')' : ''}`
       }))
     });
   }
@@ -1397,7 +1520,12 @@ export const scrollToActive = debounce((selector: string) => {
   }
 }, 200);
 
-export function addModal(schema: any, modal: any, definitions?: any) {
+export function addModal(
+  schema: any,
+  modal: any,
+  definitions?: any,
+  isKeyValid?: (key: string) => boolean
+) {
   schema = {...schema, definitions: {...schema.definitions}};
 
   // 如果有传入definitions，则合并到schema中
@@ -1407,7 +1535,10 @@ export function addModal(schema: any, modal: any, definitions?: any) {
 
   let idx = 1;
   while (true) {
-    if (!schema.definitions[`modal-ref-${idx}`]) {
+    if (
+      !schema.definitions[`modal-ref-${idx}`] &&
+      (!isKeyValid || isKeyValid(`modal-ref-${idx}`))
+    ) {
       break;
     }
     idx++;
@@ -1435,16 +1566,42 @@ export function addModal(schema: any, modal: any, definitions?: any) {
  */
 export function modalsToDefinitions(
   modals: Array<EditorModalBody>,
-  definitions: any = {}
+  definitions: any = {},
+  edtingModal?: EditorModalBody
 ) {
   let schema = {
     definitions
   };
+
   modals.forEach((modal, idx) => {
+    if (
+      edtingModal &&
+      (edtingModal.$$ref
+        ? edtingModal.$$ref === modal.$$ref
+        : edtingModal.$$id === modal.$$id)
+    ) {
+      // 自己不需要转成 definitions
+      return;
+    } else if (
+      !modal.$$ref &&
+      modal.$$id &&
+      (JSONGetById(schema.definitions, modal.$$id) ||
+        (edtingModal && JSONGetById(edtingModal, modal.$$id)))
+    ) {
+      // 内嵌弹窗，已经包含在 definitions 里面了
+      // 不需要转成 definitions
+      return;
+    }
+
     if (modal.$$ref) {
       schema.definitions[modal.$$ref] = JSONPipeIn(modal);
     } else {
-      [schema] = addModal(schema, {...modal, $$originId: modal.$$id});
+      [schema] = addModal(
+        schema,
+        {...modal, $$originId: modal.$$id},
+        undefined,
+        key => !modals.find(m => m.$$ref && m.$$ref === key)
+      );
     }
   });
   return schema.definitions;
@@ -1472,11 +1629,6 @@ export function mergeDefinitions(
 
   let schema = originSchema;
   Object.keys(definitions).forEach(key => {
-    // 弹窗里面用到了才更新
-    if (!refs.includes(key)) {
-      return;
-    }
-
     // 要修改就复制一份，避免污染原始数据
     if (schema === originSchema) {
       schema = {...schema, definitions: {...schema.definitions}};
@@ -1486,27 +1638,95 @@ export function mergeDefinitions(
 
     if ($$originId) {
       const parent = JSONGetParentById(schema, $$originId);
-      if (!parent) {
-        throw new Error('Can not find modal action.');
-      }
 
-      const modalType = def.type === 'drawer' ? 'drawer' : 'dialog';
-      schema = JSONUpdate(schema, parent.$$id, {
-        ...parent,
-        __actionModals: undefined,
-        args: undefined,
-        dialog: undefined,
-        drawer: undefined,
-        actionType: def.actionType ?? modalType,
-        [modalType]: JSONPipeIn({
-          $ref: key
-        })
-      });
-      schema.definitions[key] = JSONPipeIn(def);
-    } else {
+      // 当前更新弹窗里面用到了需要转成 ref
+      if (refs.includes(key)) {
+        if (schema.$$id === $$originId) {
+          schema = JSONUpdate(schema, $$originId, JSONPipeIn(def), true);
+          return;
+        }
+
+        if (!parent) {
+          throw new Error('Can not find modal action.');
+        }
+
+        const modalType = def.type === 'drawer' ? 'drawer' : 'dialog';
+        schema = JSONUpdate(
+          schema,
+          parent.$$id,
+          {
+            ...parent,
+            __actionModals: undefined,
+            args: undefined,
+            dialog: undefined,
+            drawer: undefined,
+            actionType: def.actionType ?? modalType,
+            [modalType]: JSONPipeIn({
+              $ref: key
+            })
+          },
+          true
+        );
+        schema.definitions[key] = JSONPipeIn(def);
+      } else if (parent) {
+        // 没用到，可能修改了弹窗的内容为引用其他弹窗，同样需要更新，但是不会提取为 definitions
+        const modalType = def.type === 'drawer' ? 'drawer' : 'dialog';
+        const origin = parent[modalType] || {};
+
+        // 这样处理是为了不要修改原来的 $$id
+        const changes = diff(origin, def, (path, key) => key === '$$id');
+        if (changes) {
+          const newModal = patchDiff(origin, changes);
+          delete newModal.$$originId;
+          schema = JSONUpdate(
+            schema,
+            parent.$$id,
+            {
+              ...parent,
+              __actionModals: undefined,
+              args: undefined,
+              dialog: undefined,
+              drawer: undefined,
+              actionType: def.actionType ?? modalType,
+              [modalType]: newModal
+            },
+            true
+          );
+        }
+      }
+    } else if (refs.includes(key)) {
       schema.definitions[key] = JSONPipeIn(def);
     }
   });
 
   return schema;
+}
+
+export function setDefaultColSize(
+  regionList: any[],
+  row: number,
+  preRow?: number
+) {
+  const tempList = [...regionList];
+  const preRowNodeLength = filter(tempList, n => n.row === preRow).length;
+  const currentRowNodeLength = filter(tempList, n => n.row === row).length;
+  for (let i = 0; i < tempList.length; i++) {
+    const item = tempList[i];
+    if (item.row === preRow) {
+      item.colSize = preRowNodeLength > 1 ? `1/${preRowNodeLength}` : '1';
+    }
+    if (item.row === row) {
+      item.colSize =
+        currentRowNodeLength > 1 ? `1/${currentRowNodeLength}` : '1';
+    }
+    // 原来的行只有一个节点，且有默认宽度，则设置默认宽度
+    if (
+      ((preRowNodeLength === 1 && item.row === preRow) ||
+        (currentRowNodeLength === 1 && item.row === row)) &&
+      item.$$defaultColSize
+    ) {
+      item.colSize = item.$$defaultColSize;
+    }
+  }
+  return tempList;
 }

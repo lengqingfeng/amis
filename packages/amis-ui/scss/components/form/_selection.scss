@@ -148,6 +148,8 @@
       flex-direction: column;
 
       .#{$ns}Table-content-virtual {
+        min-width: 0;
+        min-height: 0;
         flex: 1;
         position: relative;
       }
@@ -452,6 +454,7 @@
   display: inline-block;
   margin: px2rem(3px);
   vertical-align: middle;
+  max-width: 100%; // 避免超出父级容器显示
 
   &-caret {
     transition: transform var(--animation-duration) ease-out;

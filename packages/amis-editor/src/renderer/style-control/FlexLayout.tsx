@@ -33,8 +33,12 @@ function LayoutItem({
         }}
         onClick={onSelect}
       >
-        {items.map(val => (
-          <div className="ae-FlexLayout-itemColumn" style={{flex: val}}></div>
+        {items.map((val, index) => (
+          <div
+            key={index}
+            className="ae-FlexLayout-itemColumn"
+            style={{flex: val}}
+          />
         ))}
       </div>
     </TooltipWrapper>
@@ -44,11 +48,11 @@ function LayoutItem({
 function FlexLayouts({
   onChange,
   value,
-  flexDirection
+  data
 }: {
   onChange: (value: string) => void;
   value?: string;
-  flexDirection?: React.CSSProperties['flexDirection'];
+  data: any;
 }) {
   const presetLayouts = [
     '1',
@@ -77,6 +81,8 @@ function FlexLayouts({
       }
     }
   }, []);
+
+  const flexDirection = data.style?.flexDirection || 'row';
 
   function onChangeLayout() {
     if (/\d[\d:]+\d$/.test(currentLayout)) {

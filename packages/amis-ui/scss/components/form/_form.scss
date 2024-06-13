@@ -386,6 +386,8 @@
     flex-basis: 0;
     flex-grow: 1;
     flex-shrink: 1;
+    min-width: 0;
+    min-height: 0;
   }
 
   .#{$ns}Form-rowInner {
@@ -402,10 +404,62 @@
     > .#{$ns}Form-control {
       flex-basis: 0;
       flex-grow: 1;
+      min-width: 0;
+      min-height: 0;
 
       // &:not(.#{$ns}Form-control--withSize) {
       //   width: var(--Form-control-widthBase);
       // }
+    }
+  }
+
+  .#{$ns}Form-flex {
+    display: flex;
+    // flex-wrap: wrap;
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .#{$ns}Form-flex-col {
+    flex-basis: 0;
+    flex-grow: 1;
+    flex-shrink: 1;
+    padding: calc(var(--Form-item-gap) / 2);
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .#{$ns}Form-flexInner {
+    display: flex;
+    flex-wrap: nowrap;
+
+    > .#{$ns}Form-label {
+      display: inline-block;
+      vertical-align: top;
+      padding-top: var(--Form-label-paddingTop);
+      margin-right: var(--Form-row-gutterWidth);
+    }
+
+    > .#{$ns}Form-control {
+      flex-basis: 0;
+      flex-grow: 1;
+      min-width: 0;
+    }
+  }
+
+  .#{$ns}Form-flexInner--label-top {
+    flex-direction: column;
+  }
+  .#{$ns}Form-flexInner--label-left {
+    > .#{$ns}Form-label {
+      text-align: left;
+      width: px2rem(76px);
+    }
+  }
+  .#{$ns}Form-flexInner--label-right {
+    > .#{$ns}Form-label {
+      text-align: right;
+      width: px2rem(76px);
     }
   }
 }
@@ -442,6 +496,8 @@
       display: inline-flex;
 
       & > .#{$ns}Form-value {
+        min-width: 0;
+        min-height: 0;
         flex: 1;
 
         /* 如果size设置了full就占满剩余空间 */
@@ -605,6 +661,8 @@
 
     .#{$ns}NumberControl {
       .#{$ns}Number {
+        min-width: 0;
+        min-height: 0;
         flex: 1;
         border: none;
 
@@ -679,8 +737,9 @@
         height: 100%;
 
         .#{$ns}ResultBox-value-wrap {
-          justify-content: flex-end;
-          text-align: right;
+          justify-content: flex-start;
+          text-align: left;
+          flex-wrap: nowrap; // 避免右侧下拉箭头换行
         }
       }
 
@@ -719,6 +778,8 @@
     }
 
     .#{$ns}Form-item-controlBox {
+      min-width: 0;
+      min-height: 0;
       flex: 1;
       max-width: -moz-available;
       max-width: -webkit-fill-available;
@@ -843,6 +904,42 @@
   .#{$ns}Form-groupColumn:nth-last-of-type(1) {
     &::after {
       display: none;
+    }
+  }
+  .#{$ns}Form-flexInner {
+    display: flex;
+    flex-wrap: nowrap;
+    width: 100%;
+
+    > .#{$ns}Form-label {
+      display: inline-block;
+      vertical-align: top;
+      padding-top: var(--Form-label-paddingTop);
+      padding-right: var(--Form-row-gutterWidth);
+      flex: 1;
+      min-width: 0;
+      padding-top: 0;
+    }
+
+    > .#{$ns}Form-control {
+      flex: 1;
+    }
+  }
+
+  .#{$ns}Form-flexInner--label-top {
+    flex-direction: column;
+    > .#{$ns}Form-label {
+      margin-bottom: px2rem(10px);
+    }
+  }
+  .#{$ns}Form-flexInner--label-left {
+    > .#{$ns}Form-label {
+      text-align: left;
+    }
+  }
+  .#{$ns}Form-flexInner--label-right {
+    > .#{$ns}Form-label {
+      text-align: right;
     }
   }
 }

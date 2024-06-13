@@ -254,7 +254,7 @@ order: 32
 
 ## 原生数字组件
 
-原生数字组件将直接使用浏览器的实现，最终展现效果和浏览器有关，并且只支持 `min`、`max` 和 `step` 这几个属性设置。
+原生数字组件将直接使用浏览器的实现，最终展现效果和浏览器有关，并且只支持 `min`、`max` 和 `step` 这几个属性设置，这个功能主要是给移动端浏览器使用的，PC 下不建议使用。
 
 ```schema: scope="body"
 {
@@ -314,3 +314,104 @@ order: 32
 | clear    | -                          | 清空                                                     |
 | reset    | -                          | 将值重置为 `resetValue`，若没有配置 `resetValue`，则清空 |
 | setValue | `value: number` 更新的数值 | 更新数据                                                 |
+
+### clear
+
+```schema: scope="body"
+{
+    "type": "form",
+    "debug": true,
+    "body": [
+        {
+            "type": "input-number",
+            "name": "number",
+            "label": "数字",
+            "id": "clear_text",
+            "value": 1
+        },
+        {
+            "type": "button",
+            "label": "清空",
+            "onEvent": {
+                "click": {
+                    "actions": [
+                        {
+                            "actionType": "clear",
+                            "componentId": "clear_text"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
+```
+
+### reset
+
+如果配置了`resetValue`，则重置时使用`resetValue`的值，否则使用初始值。
+
+```schema: scope="body"
+{
+    "type": "form",
+    "debug": true,
+    "body": [
+        {
+            "type": "input-number",
+            "name": "number",
+            "label": "数字",
+            "id": "reset_text",
+            "value": 1
+        },
+        {
+            "type": "button",
+            "label": "重置",
+            "onEvent": {
+                "click": {
+                    "actions": [
+                        {
+                            "actionType": "reset",
+                            "componentId": "reset_text"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
+```
+
+### setValue
+
+```schema: scope="body"
+{
+    "type": "form",
+    "debug": true,
+    "body": [
+        {
+            "type": "input-number",
+            "name": "number",
+            "label": "数字",
+            "id": "setvalue_text",
+            "value": 1
+        },
+        {
+            "type": "button",
+            "label": "赋值",
+            "onEvent": {
+                "click": {
+                    "actions": [
+                        {
+                            "actionType": "setValue",
+                            "componentId": "setvalue_text",
+                            "args": {
+                                "value": 2
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
+```

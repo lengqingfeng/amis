@@ -19,6 +19,8 @@ export interface AutoFilterFormProps extends RendererProps {
   onToggleExpanded?: () => void;
   query?: any;
 
+  canAccessSuperData?: boolean;
+
   popOverContainer?: any;
   onSearchableFromReset?: any;
   onSearchableFromSubmit?: any;
@@ -40,7 +42,8 @@ export function AutoFilterForm({
   onSearchableFromSubmit,
   onSearchableFromInit,
   popOverContainer,
-  testIdBuilder
+  testIdBuilder,
+  canAccessSuperData
 }: AutoFilterFormProps) {
   const schema = React.useMemo(() => {
     const {columnsNum, showBtnToolbar} =
@@ -163,7 +166,8 @@ export function AutoFilterForm({
           type: 'reset',
           label: __('reset'),
           size: 'sm',
-          className: 'w-18'
+          className: 'w-18',
+          actionType: 'clear-and-submit'
         },
 
         {
@@ -194,13 +198,14 @@ export function AutoFilterForm({
       submitText: __('search'),
       body: body,
       actions: [],
-      canAccessSuperData: false
+      canAccessSuperData: canAccessSuperData
     };
   }, [
     autoGenerateFilter,
     activedSearchableColumns,
     searchableColumns,
     searchFormExpanded,
+    canAccessSuperData,
     __ // 保证语言更新后能重新渲染
   ]);
 

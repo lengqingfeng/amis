@@ -3,7 +3,8 @@ import {
   FormItem,
   FormControlProps,
   FormBaseControl,
-  resolveEventData
+  resolveEventData,
+  getVariable
 } from 'amis-core';
 import cx from 'classnames';
 import {filterDate, parseDuration} from 'amis-core';
@@ -240,15 +241,17 @@ export default class DateRangeControl extends React.Component<DateRangeProps> {
 
   // 动作
   doAction(action: ActionObject, data: object, throwErrors: boolean) {
-    const {resetValue} = this.props;
+    const {resetValue, formStore, store, name} = this.props;
 
     if (action.actionType === 'clear') {
       this.dateRef?.clear();
       return;
     }
 
-    if (action.actionType === 'reset' && resetValue) {
-      this.dateRef?.reset();
+    if (action.actionType === 'reset') {
+      const pristineVal =
+        getVariable(formStore?.pristine ?? store?.pristine, name) ?? resetValue;
+      this.dateRef?.reset(pristineVal);
     }
   }
 
@@ -281,9 +284,11 @@ export default class DateRangeControl extends React.Component<DateRangeProps> {
       'change',
       resolveEventData(this.props, {value: nextValue})
     );
-    if (dispatcher?.prevented) {
-      return;
-    }
+    // 因为前面没有 await，所以这里的 dispatcher.prevented 是不准确的。
+    // 为什么没写 onChange，我估计是不能让 onChange 太慢执行
+    // if (dispatcher?.prevented) {
+    //   return;
+    // }
     this.props.onChange(nextValue);
   }
 

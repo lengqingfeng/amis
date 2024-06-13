@@ -234,7 +234,9 @@ function getAfterRightWidth(
   for (let i = doms.length - 0; i > index; i--) {
     if (columns && columns[i] && isFixedRightColumn(columns[i].fixed)) {
       const dom = doms[i] as HTMLElement;
-      width += dom.offsetWidth;
+      if (dom) {
+        width += dom.offsetWidth;
+      }
     }
   }
   return width;
@@ -251,6 +253,7 @@ export function updateFixedRow(
     const dom = children[i] as HTMLElement;
 
     dom.style.removeProperty('left');
+    dom.style.removeProperty('right');
 
     const fixed = columns[i] ? columns[i].fixed || '' : '';
     if (isFixedLeftColumn(fixed)) {
