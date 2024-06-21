@@ -1369,8 +1369,9 @@ export async function getVariables(that: any) {
 }
 
 function filterVariablesOfScope(options: any[], selfName?: string) {
-  const curOptions = options.find(i => i.label === '组件上下文');
-  const arr = curOptions?.children || [];
+  const idx = options.findIndex(i => i.label === '组件上下文');
+  const arr = options[idx]?.children || [];
+  const restOptions = options.filter((_, i) => i !== idx);
   const variables = mapTree(arr, (item: any) => {
     // 子表过滤成员那层
     if (item.type === 'array' && Array.isArray(item.children)) {
@@ -1396,7 +1397,7 @@ function filterVariablesOfScope(options: any[], selfName?: string) {
     }
     return true;
   });
-  return finalVars;
+  return [...finalVars, ...restOptions];
 }
 
 export async function getQuickVariables(that: any, filter?: Function) {
@@ -1406,7 +1407,10 @@ export async function getQuickVariables(that: any, filter?: Function) {
   await manager?.getContextSchemas(node);
   const options = await manager?.dataSchema?.getDataPropsAsOptions();
   if (Array.isArray(options)) {
-    const curOptions = filterVariablesOfScope(options);
+    const curOptions = mapTree(filterVariablesOfScope(options), item => {
+      delete item.tag;
+      return item;
+    });
     return resolveQuickVariables(curOptions, quickVars, selfName, filter);
   }
 
@@ -1457,6 +1461,20 @@ export function resolveQuickVariables(
 
   const filterVar = filter ? filter(finalVars) : finalVars;
 
+  function sortVars(arr: any[]) {
+    const arrs = [...arr];
+    arrs.sort((obj1, obj2) => {
+      if ('children' in obj1 && !('children' in obj2)) {
+        return 1;
+      } else if (!('children' in obj1) && 'children' in obj2) {
+        return -1;
+      } else {
+        return 0;
+      }
+    });
+    return arrs;
+  }
+
   if (quickVars?.length) {
     const vars: VariableItem[] = [];
 
@@ -1471,16 +1489,13 @@ export function resolveQuickVariables(
     }
 
     if (filterVar.length) {
-      vars.push({
-        label: '表单变量',
-        children: filterVar
-      });
+      vars.push(...filterVar);
     }
 
-    return vars;
+    return sortVars(vars);
   }
 
-  return filterVar;
+  return sortVars(filterVar);
 }
 
 /**

@@ -350,6 +350,7 @@ export default class FormTable extends React.Component<TableProps, TableState> {
     // Form会向FormItem下发disabled属性，disbaled 属性值也需要同步到
     if (
       prevProps.disabled !== props.disabled ||
+      prevProps.static !== props.static ||
       props.$schema.disabled !== prevProps.$schema.disabled ||
       props.$schema.static !== prevProps.$schema.static
     ) {
@@ -369,7 +370,7 @@ export default class FormTable extends React.Component<TableProps, TableState> {
       };
     }
 
-    if (props.value !== prevProps.value) {
+    if (props.value !== prevProps.value && props.value !== this.emittedValue) {
       toUpdate = {
         ...toUpdate,
         items: Array.isArray(props.value) ? props.value.concat() : [],
@@ -494,12 +495,17 @@ export default class FormTable extends React.Component<TableProps, TableState> {
     return msg;
   }
 
+  emittedValue: any = null;
   async emitValue(value?: any[]) {
     const items =
       value ?? this.state.items.filter(item => !item.__isPlaceholder);
     const {onChange} = this.props;
     const isPrevented = await this.dispatchEvent('change');
-    isPrevented || onChange?.(items);
+    if (!isPrevented) {
+      this.emittedValue = items;
+      onChange?.(items);
+    }
+
     return isPrevented;
   }
 
@@ -1023,18 +1029,25 @@ export default class FormTable extends React.Component<TableProps, TableState> {
     newValue = spliceTree(newValue, indexes, 1);
     this.reUseRowId(newValue, originItems, indexes);
 
-    // change value
-    const prevented = await this.emitValue(newValue);
-    if (prevented) {
-      return;
-    }
+    this.setState(
+      {
+        items: newValue
+      },
+      async () => {
+        // change value
+        const prevented = await this.emitValue(newValue);
+        if (prevented) {
+          return;
+        }
 
-    this.dispatchEvent('deleteSuccess', {
-      value: newValue,
-      index: indexes[indexes.length - 1],
-      indexPath: indexes.join('.'),
-      item
-    });
+        this.dispatchEvent('deleteSuccess', {
+          value: newValue,
+          index: indexes[indexes.length - 1],
+          indexPath: indexes.join('.'),
+          item
+        });
+      }
+    );
   }
 
   rowPathPlusOffset(path: string, offset = 0) {
@@ -1268,7 +1281,7 @@ export default class FormTable extends React.Component<TableProps, TableState> {
                       saveImmediately: true,
                       mode: 'inline',
                       disabled,
-                      static: isStatic
+                      static: isStatic || column.static
                     }
                   })
             };

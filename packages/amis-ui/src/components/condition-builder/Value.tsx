@@ -14,6 +14,7 @@ import {SelectWithRemoteOptions as Select} from '../Select';
 import Switch from '../Switch';
 import {FormulaPicker, FormulaPickerProps} from '../formula/Picker';
 import type {OperatorType} from 'amis-core';
+import omit from 'lodash/omit';
 
 export interface ValueProps extends ThemeProps, LocaleProps {
   value: any;
@@ -184,17 +185,33 @@ export class Value extends React.Component<ValueProps> {
       );
     } else if (field.type === 'boolean') {
       input = (
-        <Switch
-          value={value ?? field.defaultValue}
-          onChange={onChange}
-          disabled={disabled}
-        />
+        <div className={cx(`SwitchControl`)}>
+          <Switch
+            value={value ?? field.defaultValue}
+            onChange={onChange}
+            disabled={disabled}
+          />
+        </div>
       );
     } else if (field.type === 'custom') {
       input = this.renderCustomValue({
         value: value ?? field.defaultValue,
         onChange,
         inputSettings: field
+      });
+    } else {
+      // 不支持的也转给自定义组件处理
+      input = this.renderCustomValue({
+        value: value ?? (field as any).defaultValue,
+        onChange,
+        inputSettings: {
+          value: omit(field, [
+            'label',
+            'operators',
+            'defaultOp',
+            'defaultValue'
+          ])
+        }
       });
     }
 
