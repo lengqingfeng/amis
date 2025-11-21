@@ -5,18 +5,26 @@ import {
   autobind,
   resolveEventData,
   isPureVariable,
-  resolveVariableAndFilter
+  resolveVariableAndFilter,
+  setThemeClassName,
+  CustomStyle,
+  AMISSchemaCollection,
+  AMISSchemaBase
 } from 'amis-core';
-import {BaseSchema, SchemaCollection, SchemaObject} from '../Schema';
+import {BaseSchema, SchemaObject} from '../Schema';
 import {CollapseGroup} from 'amis-ui';
+import cx from 'classnames';
 
 /**
  * CollapseGroup 折叠渲染器，格式说明。
  * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/collapse
  */
-export interface CollapseGroupSchema extends BaseSchema {
+/**
+ * 折叠面板组组件，用于管理多个折叠面板。支持手风琴模式。
+ */
+export interface AMISCollapseGroupSchema extends AMISSchemaBase {
   /**
-   * 指定为折叠器类型
+   * 指定为 collapse-group 组件
    */
   type: 'collapse-group';
 
@@ -43,16 +51,16 @@ export interface CollapseGroupSchema extends BaseSchema {
   /**
    * 内容区域
    */
-  body?: SchemaCollection;
+  body?: AMISSchemaCollection;
 
   /**
-   * 当Collapse作为Form组件的子元素时，开启该属性后组件样式设置为FieldSet组件的样式，默认开启
+   * 当Collapse作为Form组件的子元素时，开启该属性后组件样式设置为FieldSet组件的样式
    */
   enableFieldSetStyle?: boolean;
 }
 export interface CollapseGroupProps
   extends RendererProps,
-    Omit<CollapseGroupSchema, 'type' | 'className'> {
+    Omit<AMISCollapseGroupSchema, 'type' | 'className'> {
   children?: JSX.Element | ((props?: any) => JSX.Element);
 }
 
@@ -75,7 +83,7 @@ export class CollapseGroupRender extends React.Component<
     collapseId: string | number,
     collapsed: boolean
   ) {
-    const {dispatchEvent, onCollapse} = this.props;
+    const {dispatchEvent} = this.props;
     const renderEvent = await dispatchEvent(
       'change',
       resolveEventData(this.props, {
@@ -87,7 +95,6 @@ export class CollapseGroupRender extends React.Component<
     if (renderEvent?.prevented) {
       return;
     }
-    onCollapse?.(activeKeys, collapseId, collapsed);
   }
 
   render() {
@@ -101,7 +108,11 @@ export class CollapseGroupRender extends React.Component<
       style,
       render,
       mobileUI,
-      data
+      data,
+      id,
+      themeCss,
+      wrapperCustomStyle,
+      env
     } = this.props;
     let enableFieldSetStyle = this.props.enableFieldSetStyle;
 
@@ -114,18 +125,48 @@ export class CollapseGroupRender extends React.Component<
     }
 
     return (
-      <CollapseGroup
-        defaultActiveKey={defaultActiveKey}
-        accordion={accordion}
-        expandIcon={expandIcon}
-        expandIconPosition={expandIconPosition}
-        className={className}
-        style={style}
-        mobileUI={mobileUI}
-        onCollapseChange={this.handleCollapseChange}
-      >
-        {render('body', body || '', {enableFieldSetStyle})}
-      </CollapseGroup>
+      <>
+        <CollapseGroup
+          defaultActiveKey={defaultActiveKey}
+          accordion={accordion}
+          expandIcon={expandIcon}
+          expandIconPosition={expandIconPosition}
+          className={cx(
+            className,
+            setThemeClassName({
+              ...this.props,
+              name: 'className',
+              id,
+              themeCss
+            }),
+            setThemeClassName({
+              ...this.props,
+              name: 'wrapperCustomStyle',
+              id,
+              themeCss: wrapperCustomStyle
+            })
+          )}
+          style={style}
+          mobileUI={mobileUI}
+          onCollapseChange={this.handleCollapseChange}
+        >
+          {render('body', body || '', {enableFieldSetStyle})}
+        </CollapseGroup>
+        <CustomStyle
+          {...this.props}
+          config={{
+            wrapperCustomStyle,
+            id,
+            themeCss,
+            classNames: [
+              {
+                key: 'className'
+              }
+            ]
+          }}
+          env={env}
+        />
+      </>
     );
   }
 }

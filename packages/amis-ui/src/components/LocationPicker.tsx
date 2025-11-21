@@ -30,6 +30,7 @@ export interface LocationProps extends ThemeProps, LocaleProps {
   popOverContainer?: any;
   autoSelectCurrentLoc?: boolean;
   onlySelectCurrentLoc?: boolean;
+  hideViewControl?: boolean; // 隐藏地图控件，默认为false，即显示控件
 }
 
 export interface LocationState {
@@ -167,7 +168,8 @@ export class LocationPicker extends React.Component<
       ak,
       mobileUI,
       autoSelectCurrentLoc,
-      onlySelectCurrentLoc
+      onlySelectCurrentLoc,
+      hideViewControl = false
     } = this.props;
     const __ = this.props.translate;
     const {isFocused, isOpened} = this.state;
@@ -179,10 +181,12 @@ export class LocationPicker extends React.Component<
             <BaiduMapPicker
               ak={ak}
               value={value}
+              placeholder={__('MapPicker.searchPlaceholder')}
               coordinatesType={coordinatesType}
               autoSelectCurrentLoc={autoSelectCurrentLoc}
               onlySelectCurrentLoc={onlySelectCurrentLoc}
               onChange={this.handleChange}
+              hideViewControl={hideViewControl}
             />
           );
         case 'gaode':
@@ -250,10 +254,12 @@ export class LocationPicker extends React.Component<
                 <BaiduMapPicker
                   ak={ak}
                   value={value}
+                  placeholder={__('MapPicker.searchPlaceholder')}
                   coordinatesType={coordinatesType}
                   autoSelectCurrentLoc={autoSelectCurrentLoc}
                   onlySelectCurrentLoc={onlySelectCurrentLoc}
                   onChange={this.handleTempChange}
+                  hideViewControl={hideViewControl}
                 />
               ) : (
                 <Alert2>{__('{{vendor}} 地图控件不支持', {vendor})}</Alert2>
@@ -278,10 +284,12 @@ export class LocationPicker extends React.Component<
                 <BaiduMapPicker
                   ak={ak}
                   value={value}
+                  placeholder={__('MapPicker.searchPlaceholder')}
                   coordinatesType={coordinatesType}
                   autoSelectCurrentLoc={autoSelectCurrentLoc}
                   onlySelectCurrentLoc={onlySelectCurrentLoc}
                   onChange={this.handleChange}
+                  hideViewControl={hideViewControl}
                 />
               ) : (
                 <Alert2>{__('{{vendor}} 地图控件不支持', {vendor})}</Alert2>

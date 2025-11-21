@@ -10,13 +10,16 @@ import {
   EditorNodeType
 } from 'amis-editor-core';
 import {ValidatorTag} from '../../validator';
-import {getEventControlConfig} from '../../renderer/event-control/helper';
+import {
+  getEventControlConfig,
+  getActionCommonProps
+} from '../../renderer/event-control/helper';
 
 export class MatrixControlPlugin extends BasePlugin {
   static id = 'MatrixControlPlugin';
   // 关联渲染器名字
   rendererName = 'matrix-checkboxes';
-  $schema = '/schemas/MatrixControlSchema.json';
+  $schema = '/schemas/AMISMatrixCheckboxesSchema.json';
 
   // 组件名称
   name = '矩阵开关';
@@ -95,22 +98,26 @@ export class MatrixControlPlugin extends BasePlugin {
     {
       actionType: 'clear',
       actionLabel: '清空',
-      description: '清除选中值'
+      description: '清除选中值',
+      ...getActionCommonProps('clear')
     },
     {
       actionType: 'reset',
       actionLabel: '重置',
-      description: '重置为默认值'
+      description: '重置为默认值',
+      ...getActionCommonProps('reset')
     },
     {
       actionType: 'reload',
       actionLabel: '重新加载',
-      description: '触发组件数据刷新并重新渲染'
+      description: '触发组件数据刷新并重新渲染',
+      ...getActionCommonProps('reload')
     },
     {
       actionType: 'setValue',
       actionLabel: '赋值',
-      description: '触发组件数据更新'
+      description: '触发组件数据更新',
+      ...getActionCommonProps('setValue')
     }
   ];
 
@@ -217,7 +224,7 @@ export class MatrixControlPlugin extends BasePlugin {
         title: '外观',
         body: [
           getSchemaTpl('collapseGroup', [
-            getSchemaTpl('style:formItem', {renderer: context.info.renderer}),
+            getSchemaTpl('theme:formItem'),
             getSchemaTpl('style:classNames'),
             {
               label: tipedLabel('对齐方式', '默认当开启全选后居左排列'),

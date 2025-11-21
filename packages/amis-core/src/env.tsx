@@ -20,6 +20,7 @@ import type {IScopedContext} from './Scoped';
 import type {RendererEvent} from './utils/renderer-event';
 import type {ListenerContext} from './actions/Action';
 import type {ICmptAction} from './actions/CmptAction';
+import {AMISPageMeta} from './schema';
 
 export interface WsObject {
   url: string;
@@ -163,6 +164,18 @@ export interface RendererEnv {
     action: ICmptAction,
     event: RendererEvent<any, any>
   ) => Promise<void | boolean>;
+
+  /**
+   * 渲染器包裹组件可以外部指定
+   */
+  SchemaRenderer?: React.ComponentType<any>;
+
+  pageMetaEffect?: (meta: AMISPageMeta) => void;
+
+  /**
+   * 获取当前页面标识
+   */
+  getPageId?: () => string;
 }
 
 export const EnvContext = React.createContext<RendererEnv | void>(undefined);
@@ -183,7 +196,7 @@ export function withRendererEnv<
 
   const result = hoistNonReactStatic(
     class extends React.Component<OuterProps> {
-      static displayName = `WithEnv(${
+      static displayName: string = `WithEnv(${
         ComposedComponent.displayName || ComposedComponent.name
       })`;
       static contextType = EnvContext;

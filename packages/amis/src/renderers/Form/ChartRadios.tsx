@@ -7,12 +7,16 @@ import {
 import {autobind} from 'amis-core';
 import {FormOptionsSchema} from '../../Schema';
 import {supportStatic} from './StaticHoc';
+import {AMISFormItemWithOptions} from 'amis-core';
 
 /**
  * 图表 Radio 单选框。
  * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/chart-radios
  */
-export interface ChartRadiosControlSchema extends FormOptionsSchema {
+export interface AMISChartRadiosSchema extends AMISFormItemWithOptions {
+  /**
+   * 指定为 chart-radios 组件
+   */
   type: 'chart-radios';
   config: any;
   showTooltipOnHighlight?: boolean;

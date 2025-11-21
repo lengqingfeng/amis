@@ -713,6 +713,7 @@ export class Transfer<
       checkAll,
       checkAllLabel,
       onlyChildren,
+      autoCheckChildren,
       testIdBuilder
     } = props;
     const {isTreeDeferLoad, searchResult, inputValue} = this.state;
@@ -764,9 +765,10 @@ export class Transfer<
         labelField={labelField}
         valueField={valueField}
         virtualThreshold={virtualThreshold}
-        itemHeight={itemHeight}
+        // itemHeight={itemHeight}
         checkAllLabel={checkAllLabel}
         checkAll={checkAll}
+        autoCheckChildren={autoCheckChildren}
       />
     ) : mode === 'chained' ? (
       <ChainedSelection
@@ -880,7 +882,7 @@ export class Transfer<
         labelField={labelField}
         valueField={valueField}
         virtualThreshold={virtualThreshold}
-        itemHeight={itemHeight}
+        // itemHeight={itemHeight}
         loadingConfig={loadingConfig}
         checkAllLabel={checkAllLabel}
         checkAll={checkAll}

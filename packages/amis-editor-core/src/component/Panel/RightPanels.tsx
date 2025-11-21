@@ -1,21 +1,22 @@
 import {observer} from 'mobx-react';
 import React from 'react';
-import {Tab, Tabs} from 'amis';
+import {Tab, Tabs, toast} from 'amis';
 import cx from 'classnames';
 import {EditorManager} from '../../manager';
 import {EditorStoreType} from '../../store/editor';
 import {Icon} from '../../icons/index';
 import {autobind, isHasPluginIcon} from '../../util';
-import {findDOMNode} from 'react-dom';
+import {findDomCompat as findDOMNode} from 'amis-core';
 import {PanelItem} from '../../plugin';
 import {WidthDraggableBtn} from '../base/WidthDraggableBtn';
 
-interface RightPanelsProps {
+export interface RightPanelsProps {
   store: EditorStoreType;
   manager: EditorManager;
   theme?: string;
   appLocale?: string;
   amisEnv?: any;
+  readonly?: boolean;
 }
 
 interface RightPanelsStates {
@@ -62,8 +63,17 @@ export class RightPanels extends React.Component<
     return findDOMNode(this) as HTMLElement;
   }
 
+  @autobind
+  handlePanelChangeValue(
+    ...arg: Parameters<typeof this.props.manager.panelChangeValue>
+  ) {
+    const {manager} = this.props;
+
+    manager.panelChangeValue(...arg);
+  }
+
   render() {
-    const {store, manager, theme} = this.props;
+    const {store, manager, theme, readonly} = this.props;
     const {isOpenStatus, isFixedStatus} = this.state;
     const panels = store.getPanels();
     const id = store.activeId;
@@ -77,10 +87,11 @@ export class RightPanels extends React.Component<
           path: node?.path,
           node: node,
           value: store.value,
-          onChange: manager.panelChangeValue,
+          onChange: this.handlePanelChangeValue,
           store: store,
           manager: manager,
-          popOverContainer: this.getPopOverContainer
+          popOverContainer: this.getPopOverContainer,
+          readonly
         })
       ) : panel.component ? (
         <panel.component
@@ -90,10 +101,11 @@ export class RightPanels extends React.Component<
           info={node?.info}
           path={node?.path}
           value={store.value}
-          onChange={manager.panelChangeValue}
+          onChange={this.handlePanelChangeValue}
           store={store}
           manager={manager}
           popOverContainer={this.getPopOverContainer}
+          readonly={readonly}
         />
       ) : null;
     };
@@ -153,7 +165,9 @@ export class RightPanels extends React.Component<
                             className="pluginIcon"
                           />
                         )}
-                        {!usePluginIcon && <i className={`fa ${panel.icon}`} />}
+                        {!usePluginIcon && (
+                          <Icon icon={panel.icon} className="fa" />
+                        )}
                       </span>
                     }
                     className={`editorPanel-tabs-pane ae-Editor-${panel.key}Pane`}

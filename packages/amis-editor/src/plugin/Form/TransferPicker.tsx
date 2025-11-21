@@ -1,4 +1,4 @@
-import {registerEditorPlugin} from 'amis-editor-core';
+import {registerEditorPlugin, RendererPluginEvent} from 'amis-editor-core';
 
 import {TransferPlugin} from './Transfer';
 
@@ -6,7 +6,7 @@ export class TransferPickerPlugin extends TransferPlugin {
   static id = 'TransferPickerPlugin';
   // 关联渲染器名字
   rendererName = 'transfer-picker';
-  $schema = '/schemas/TransferPickerControlSchema.json';
+  $schema = '/schemas/AMISTransferPickerSchema.json';
 
   // 组件名称
   name = '穿梭选择器';
@@ -44,6 +44,58 @@ export class TransferPickerPlugin extends TransferPlugin {
       }
     ]
   };
+
+  events: RendererPluginEvent[] = [
+    ...this.events,
+    {
+      eventName: 'itemClick',
+      eventLabel: '点击选项',
+      description: '选项被点击时触发',
+      dataSchema: [
+        {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              title: '数据',
+              properties: {
+                item: {
+                  type: 'object',
+                  title: '当前选项'
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      eventName: 'staticItemClick',
+      eventLabel: '静态展示节点点击',
+      description: '静态展示时节点点击时触发',
+      dataSchema: [
+        {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              title: '数据',
+              properties: {
+                item: {
+                  type: 'object',
+                  title: '当前选项'
+                },
+                index: {
+                  type: 'number',
+                  title: '当前选项索引'
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ];
 
   notRenderFormZone = true;
 }

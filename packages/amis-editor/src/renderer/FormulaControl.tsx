@@ -3,10 +3,6 @@
  */
 
 import React from 'react';
-import isNumber from 'lodash/isNumber';
-import isBoolean from 'lodash/isBoolean';
-import isPlainObject from 'lodash/isPlainObject';
-import isArray from 'lodash/isArray';
 import isString from 'lodash/isString';
 import omit from 'lodash/omit';
 import cx from 'classnames';
@@ -27,10 +23,11 @@ import {FormulaPlugin, editorFactory} from './textarea-formula/plugin';
 import {JSONPipeOut, autobind, translateSchema} from 'amis-editor-core';
 import {EditorManager} from 'amis-editor-core';
 import {reaction} from 'mobx';
-import {getVariables, getQuickVariables} from 'amis-editor-core';
+import {getVariables, getQuickVariables, utils} from 'amis-editor-core';
 
 import type {BaseEventContext} from 'amis-editor-core';
 import type {VariableItem, FuncGroup} from 'amis-ui';
+import {SchemaType} from 'amis/lib/Schema';
 
 export enum FormulaDateType {
   NotDate, // 不是时间类
@@ -43,8 +40,14 @@ export enum FormulaDateType {
  * @param item
  * @returns
  */
-export function renderFormulaValue(item: any) {
+export function renderFormulaValue(
+  item: any,
+  filterHtml?: (html: string) => string
+) {
   const html = {__html: typeof item === 'string' ? item : item?.html};
+  if (typeof filterHtml === 'function' && html.__html) {
+    html.__html = filterHtml(html.__html);
+  }
   // bca-disable-next-line
   return <span dangerouslySetInnerHTML={html}></span>;
 }
@@ -252,19 +255,20 @@ export default class FormulaControl extends React.Component<
     const rendererSchema = FormulaControl.getRendererSchemaFromProps(
       this.props
     );
+    const rawType =
+      utils.RAW_TYPE_MAP[rendererSchema?.type as SchemaType] || 'string';
     const filterVars = variables
       .map(item => {
         if (item.children && item.type !== 'quickVars') {
           item.children = item.children.filter(
-            (i: any) => i.schemaType === rendererSchema.type
+            (i: any) => i.rawType === rawType
           );
         }
         return item;
       })
       .filter(
         item =>
-          item.schemaType === rendererSchema.type ||
-          (item.children && item.children?.length)
+          item.rawType === rawType || (item.children && item.children?.length)
       );
     return filterVars;
   }
@@ -408,6 +412,9 @@ export default class FormulaControl extends React.Component<
     this.props?.onChange?.(val);
 
     this.closeFormulaPicker();
+    requestAnimationFrame(() => {
+      this.editorPlugin?.autoMark?.();
+    });
   }
 
   /**
@@ -521,7 +528,8 @@ export default class FormulaControl extends React.Component<
         'validateApi',
         'themeCss',
         'onEvent',
-        'embed'
+        'embed',
+        'extraName'
       ];
 
       // 当前组件要剔除的字段

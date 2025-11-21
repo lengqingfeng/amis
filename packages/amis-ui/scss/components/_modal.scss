@@ -64,6 +64,12 @@
       animation-name: modalOut;
     }
   }
+  &-fullScreen {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    margin: auto;
+  }
 
   &-draggable > &-header {
     cursor: move;
@@ -97,6 +103,10 @@
     border-bottom: var(--Modal-body-borderTop);
     border-top-left-radius: var(--Modal-content-borderRadius);
     border-top-right-radius: var(--Modal-content-borderRadius);
+    &-icons {
+      position: absolute;
+      right: 24px;
+    }
   }
 
   &-title {
@@ -137,6 +147,9 @@
         }
       }
     }
+  }
+  &-screen {
+    margin-right: #{px2rem(16px)};
   }
 
   &-content > &-close {
@@ -223,6 +236,8 @@
 .#{$ns}Dialog-error {
   color: var(--danger);
   white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .#{$ns}Modal--full {
@@ -256,6 +271,7 @@
         min-height: 0;
         flex: 1;
         height: px2rem(44px);
+        font-size: var(--fontSizeMd);
 
         &:first-child {
           margin-left: 0;

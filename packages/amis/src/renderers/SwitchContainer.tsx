@@ -6,13 +6,12 @@ import {
   buildStyle,
   CustomStyle,
   isVisible,
-  setThemeClassName
+  setThemeClassName,
+  AMISSchemaBase,
+  AMISSchemaCollection
 } from 'amis-core';
-import {DndContainer as DndWrapper} from 'amis-ui';
-import {BaseSchema, SchemaCollection} from '../Schema';
-import {JSONSchema} from '../types';
 
-export interface StateSchema extends Omit<BaseSchema, 'type'> {
+export interface AMISStatusSchemaBase extends AMISSchemaBase {
   /**
    * 状态标题
    */
@@ -21,7 +20,7 @@ export interface StateSchema extends Omit<BaseSchema, 'type'> {
   /**
    * 内容
    */
-  body?: SchemaCollection;
+  body?: AMISSchemaCollection;
 
   /**
    * 显示条件
@@ -33,7 +32,10 @@ export interface StateSchema extends Omit<BaseSchema, 'type'> {
  * SwitchContainer 状态容器渲染器。
  * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/state-container
  */
-export interface SwitchContainerSchema extends BaseSchema {
+/**
+ * 开关容器组件，根据条件切换渲染不同内容区域。
+ */
+export interface AMISSwitchContainerSchema extends AMISSchemaBase {
   /**
    * 指定为 container 类型
    */
@@ -42,7 +44,7 @@ export interface SwitchContainerSchema extends BaseSchema {
   /**
    * 状态项列表
    */
-  items: Array<StateSchema>;
+  items: Array<AMISStatusSchemaBase>;
 
   /**
    * 自定义样式
@@ -54,7 +56,7 @@ export interface SwitchContainerSchema extends BaseSchema {
 
 export interface SwitchContainerProps
   extends RendererProps,
-    Omit<SwitchContainerSchema, 'type' | 'className' | 'style'> {
+    Omit<AMISSwitchContainerSchema, 'type' | 'className' | 'style'> {
   children?: (props: any) => React.ReactNode;
 }
 
@@ -106,7 +108,7 @@ export default class SwitchContainer extends React.Component<
   }
 
   @autobind
-  renderBody(item: JSONSchema): JSX.Element | null {
+  renderBody(item: AMISStatusSchemaBase): JSX.Element | null {
     const {children, render, disabled} = this.props;
     const body = item?.body;
 
@@ -144,7 +146,7 @@ export default class SwitchContainer extends React.Component<
 
     const activeItem =
       items[this.state.activeIndex] ??
-      items.find((item: JSONSchema) => isVisible(item, data));
+      items.find((item: AMISStatusSchemaBase) => isVisible(item, data));
 
     const contentDom = (
       <div
@@ -168,6 +170,7 @@ export default class SwitchContainer extends React.Component<
         onMouseEnter={this.handleMouseEnter}
         onMouseLeave={this.handleMouseLeave}
         style={buildStyle(style, data)}
+        data-role="container"
       >
         {activeItem && this.renderBody(activeItem)}
 

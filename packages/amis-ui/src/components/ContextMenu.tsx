@@ -27,12 +27,13 @@ interface ContextMenuProps {
 
 export type MenuItem = {
   id?: string;
-  label: string;
+  label: string | React.ReactNode;
   icon?: string;
   disabled?: boolean;
   children?: Array<MenuItem | MenuDivider>;
   data?: any;
   className?: string;
+  selected?: boolean;
   onSelect?: (data: any) => void;
   onHighlight?: (isHiglight: boolean, data: any) => void;
 };
@@ -270,10 +271,17 @@ export class ContextMenu extends React.Component<
 
   @autobind
   autoCalculatePosition(menu: HTMLElement) {
+    const lastChild = menu.lastChild as HTMLElement;
+
+    // 因为 debounce 的原因，可能menu 已经被卸载了。
+    if (!lastChild?.offsetWidth) {
+      return;
+    }
+
     // 智能定位，选择一个合适的对齐方式。
     const info = calculatePosition(
       'asContextMenu',
-      menu.lastChild,
+      lastChild,
       menu.children[1] as HTMLElement,
       menu.children[0]
     );
@@ -307,7 +315,8 @@ export class ContextMenu extends React.Component<
           key={`${item.label}-${index}`}
           className={cx('ContextMenu-item', item.className, {
             'has-child': hasChildren,
-            'is-disabled': item.disabled
+            'is-disabled': item.disabled,
+            'is-active': item.selected
           })}
         >
           <a
@@ -319,6 +328,8 @@ export class ContextMenu extends React.Component<
               <span className={cx('ContextMenu-itemIcon', item.icon)} />
             ) : null}
             {item.label}
+            {hasChildren ? <i className="fas fa-chevron-right" /> : null}
+            {item.selected ? <i className="fas fa-check" /> : null}
           </a>
           {hasChildren ? (
             <ul className={cx('ContextMenu-subList')}>

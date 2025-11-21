@@ -6,7 +6,8 @@ import {
   RendererProps,
   runActions,
   CustomStyle,
-  setThemeClassName
+  setThemeClassName,
+  AMISSchemaBase
 } from 'amis-core';
 import {filter} from 'amis-core';
 import {autobind, createObject} from 'amis-core';
@@ -20,23 +21,16 @@ import {dataMapping, resolveVariableAndFilter} from 'amis-core';
  * IFrame 渲染器
  * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/iframe
  */
-export interface IFrameSchema extends BaseSchema {
+/**
+ * IFrame 组件，用于嵌入外部页面。支持高度/边框/沙箱设置。
+ */
+export interface AMISIFrameSchema extends AMISSchemaBase {
   type: 'iframe';
 
   /**
    * 页面地址
    */
   src: SchemaUrlPath;
-
-  /**
-   * 事件相应，配置后当 iframe 通过 postMessage 发送事件时，可以触发 AMIS 内部的动作。
-   */
-  events?: {
-    [eventName: string]: ActionSchema;
-  };
-
-  // 事件动作
-  onEvent?: OnEventProps['onEvent'];
 
   width?: number | string;
   height?: number | string;
@@ -60,7 +54,9 @@ export interface IFrameSchema extends BaseSchema {
 
 export interface IFrameProps
   extends RendererProps,
-    Omit<IFrameSchema, 'type' | 'className'> {}
+    Omit<AMISIFrameSchema, 'type' | 'className'> {
+  inDragging?: boolean;
+}
 
 export default class IFrame extends React.Component<IFrameProps, object> {
   IFrameRef: React.RefObject<HTMLIFrameElement> = React.createRef();
@@ -229,6 +225,7 @@ export default class IFrame extends React.Component<IFrameProps, object> {
       env,
       themeCss,
       baseControlClassName,
+      inDragging,
       classnames: cx
     } = this.props;
 
@@ -241,7 +238,12 @@ export default class IFrame extends React.Component<IFrameProps, object> {
       ...tempStyle,
       ...style
     };
-
+    if (inDragging) {
+      style = {
+        ...style,
+        pointerEvents: 'none'
+      };
+    }
     const finalSrc = src
       ? resolveVariableAndFilter(src, data, '| raw')
       : undefined;

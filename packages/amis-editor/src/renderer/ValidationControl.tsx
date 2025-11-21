@@ -5,12 +5,14 @@
 import React, {ReactNode} from 'react';
 import groupBy from 'lodash/groupBy';
 import remove from 'lodash/remove';
+import omit from 'lodash/omit';
 import cx from 'classnames';
 import {ConditionBuilderFields, FormItem, flattenTree} from 'amis';
 
 import {
+  JSONPipeOut,
   autobind,
-  getQuickVariables,
+  getConditionVariables,
   isObjectShallowModified
 } from 'amis-editor-core';
 import ValidationItem, {ValidatorData} from './ValidationItem';
@@ -87,30 +89,15 @@ export default class ValidationControl extends React.Component<
 
   @autobind
   async buildFieldsData() {
-    const variablesArr = await getQuickVariables(this);
-    // 自身字段
-    const selfName = this.props.data.name;
+    const variablesArr = await getConditionVariables(this);
 
-    const arr: ConditionBuilderFields = flattenTree(
-      variablesArr,
-      (item: any) => {
-        if (item.value && item.type !== 'array' && !item.isMember) {
-          let obj: any = {
-            label: item.label,
-            value: item.value
-          };
-
-          if (selfName === item.value) {
-            obj = {
-              ...obj,
-              label: item.label + '（self）',
-              disabled: true
-            };
-          }
-          return obj;
-        }
-      }
-    )?.filter(item => item);
+    const arr = flattenTree(variablesArr, (item: any) => {
+      let obj: any = {
+        label: item.label,
+        value: item.value
+      };
+      return obj;
+    });
 
     return arr;
   }
@@ -129,7 +116,7 @@ export default class ValidationControl extends React.Component<
       validators.push({
         name: 'required',
         value: true,
-        message: validationErrors?.required
+        message: validationErrors?.isRequired
       });
     }
 
@@ -170,6 +157,7 @@ export default class ValidationControl extends React.Component<
       const {name, value, message} = data;
       if (name === 'required') {
         required = value;
+        message && (validationErrors['isRequired'] = message);
         return;
       }
       if (value != null) {
@@ -230,7 +218,7 @@ export default class ValidationControl extends React.Component<
   handleRemoveRule(valid: string) {
     const validators = this.transformValid(this.props.data);
 
-    remove(validators, v => v.name === valid);
+    remove(validators as any, v => v.name === valid);
     this.updateValidation(validators);
   }
 
@@ -295,6 +283,7 @@ export default class ValidationControl extends React.Component<
             closeOnOutside: true,
             hideCaret: true,
             disabled: buttons.length === 0,
+            popOverContainer: () => document.body,
             buttons
           },
           {
@@ -310,6 +299,10 @@ export default class ValidationControl extends React.Component<
    * 规则列表
    */
   renderValidaton() {
+    const _rendererSchema = ValidationControl.getRendererSchemaFromProps(
+      this.props
+    );
+    const rendererSchema = this.filterCustomRendererProps(_rendererSchema);
     const classPrefix = this.props?.env?.theme?.classPrefix;
     let {
       avaliableValids: {defaultValidators, moreValidators, builtInValidators},
@@ -320,9 +313,10 @@ export default class ValidationControl extends React.Component<
     validators = validators.concat();
     // 优先渲染默认的顺序
     Object.keys(defaultValidators).forEach((validName: string) => {
-      const data = remove(validators, v => v.name === validName);
+      const data = remove(validators as any, v => v.name === validName);
       rules.push(
         <ValidationItem
+          rendererSchema={rendererSchema}
           fields={fields}
           key={validName}
           validator={defaultValidators[validName]}
@@ -337,9 +331,10 @@ export default class ValidationControl extends React.Component<
     });
 
     Object.keys(builtInValidators).forEach((validName: string) => {
-      const data = remove(validators, v => v.name === validName);
+      const data = remove(validators as any, v => v.name === validName);
       rules.push(
         <ValidationItem
+          rendererSchema={rendererSchema}
           fields={fields}
           key={validName}
           validator={builtInValidators[validName]}
@@ -367,6 +362,7 @@ export default class ValidationControl extends React.Component<
         }
         rules.push(
           <ValidationItem
+            rendererSchema={rendererSchema}
             fields={fields}
             key={valid.name}
             data={valid}
@@ -388,6 +384,94 @@ export default class ValidationControl extends React.Component<
     );
   }
 
+  // 剔除掉一些用不上的属性
+  @autobind
+  filterCustomRendererProps(rendererSchema: any) {
+    const {
+      data,
+      name,
+      placeholder,
+      rendererSchema: _rendererSchema
+    } = this.props;
+
+    let curRendererSchema: any = rendererSchema;
+    if (rendererSchema && typeof _rendererSchema === 'function') {
+      curRendererSchema = Object.assign({}, rendererSchema, {
+        type: rendererSchema.type ?? data.type,
+        popOverContainer: () => document.body,
+        name: 'value'
+      });
+
+      // 默认要剔除的字段
+      const deleteProps = [
+        'id',
+        '$$id',
+        'className',
+        'style',
+        'readOnly',
+        'horizontal',
+        'size',
+        'remark',
+        'labelRemark',
+        'static',
+        'staticOn',
+        'hidden',
+        'hiddenOn',
+        'visible',
+        'visibleOn',
+        'disabled',
+        'disabledOn',
+        'required',
+        'requiredOn',
+        'className',
+        'labelClassName',
+        'labelAlign',
+        'inputClassName',
+        'description',
+        'autoUpdate',
+        'prefix',
+        'suffix',
+        'unitOptions',
+        'keyboard',
+        'kilobitSeparator',
+        'value',
+        'inputControlClassName',
+        'css',
+        'validateApi',
+        'validations',
+        'themeCss',
+        'onEvent',
+        'embed'
+      ];
+
+      curRendererSchema = omit(curRendererSchema, deleteProps);
+      // 设置可清空
+      curRendererSchema.clearable = true;
+
+      if (placeholder) {
+        curRendererSchema.placeholder = placeholder;
+      }
+    }
+
+    JSONPipeOut(curRendererSchema);
+
+    return curRendererSchema;
+  }
+
+  /**
+   * 获取rendererSchema的值
+   */
+  static getRendererSchemaFromProps(props: ValidationControlProps) {
+    let rendererSchema = props.rendererSchema;
+
+    if (typeof rendererSchema === 'function') {
+      const schema = props.data ? {...props.data} : undefined;
+      return rendererSchema(schema);
+    } else {
+      return rendererSchema;
+    }
+  }
+
   render() {
     const {className} = this.props;
 
@@ -407,6 +491,15 @@ export default class ValidationControl extends React.Component<
 @FormItem({
   type: 'ae-validationControl',
   renderLabel: false,
-  strictMode: false
+  strictMode: false,
+  shouldComponentUpdate: (
+    props: ValidationControlProps,
+    nextProps: ValidationControlProps
+  ) => {
+    const rendererSchema = ValidationControl.getRendererSchemaFromProps(props);
+    const newRendererSchema =
+      ValidationControl.getRendererSchemaFromProps(nextProps);
+    return isObjectShallowModified(rendererSchema, newRendererSchema);
+  }
 })
 export class ValidationControlRenderer extends ValidationControl {}

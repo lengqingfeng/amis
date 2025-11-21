@@ -2,9 +2,15 @@ import {ClassNamesFn} from 'amis-core';
 import {observer} from 'mobx-react';
 import React from 'react';
 import {EditorStoreType} from '../../store/editor';
-import {JSONGetById, modalsToDefinitions, translateSchema} from '../../util';
+import {
+  JSONGetById,
+  modalsToDefinitions,
+  reGenerateID,
+  translateSchema
+} from '../../util';
 import {Button, Icon, ListMenu, PopOverContainer, confirm} from 'amis';
 import {EditorManager} from '../../manager';
+import cloneDeep from 'lodash/cloneDeep';
 
 export interface DialogListProps {
   classnames: ClassNamesFn;
@@ -17,7 +23,8 @@ export default observer(function DialogList({
   store,
   manager
 }: DialogListProps) {
-  const modals = store.modals.filter(item => !item.disabled);
+  const modals = store.modals;
+  const usedRefs = store.usedRefs;
 
   const handleAddDialog = React.useCallback(() => {
     const modal = {
@@ -35,8 +42,9 @@ export default observer(function DialogList({
     manager.openSubEditor({
       title: '编辑弹窗',
       value: modal,
-      onChange: ({definitions, ...modal}: any, diff: any) => {
+      onDefinitionsChange: (definitions, originDefinitions, modal) => {
         store.addModal(modal, definitions);
+        return false;
       }
     });
   }, []);
@@ -52,8 +60,9 @@ export default observer(function DialogList({
         ...(modal as any),
         definitions: modalsToDefinitions(store.modals, {}, modal)
       },
-      onChange: ({definitions, ...modal}: any, diff: any) => {
+      onDefinitionsChange: (definitions, originDefinitions, modal) => {
         store.updateModal(modalId, modal, definitions);
+        return false;
       }
     });
   }, []);
@@ -94,7 +103,9 @@ export default observer(function DialogList({
       event.currentTarget.closest('[data-index]')!.getAttribute('data-index')!,
       10
     );
-    const dialog = store.modals[index];
+    let dialog = cloneDeep(store.modals[index]);
+    dialog = reGenerateID(dialog);
+
     store.addModal({
       ...dialog,
       title: `${dialog.title} - 复制`,
@@ -114,28 +125,31 @@ export default observer(function DialogList({
       </Button>
       {modals.length ? (
         <ul className="ae-DialogList">
-          {modals.map((modal, index) => (
-            <li
-              className="ae-DialogList-item"
-              data-index={index}
-              key={modal.$$id || index}
-              onClick={handleEditDialog}
-            >
-              <span>
-                {`${
-                  modal.editorSetting?.displayName ||
-                  modal.title ||
-                  '未命名弹窗'
-                }`}
-              </span>
-              <a onClick={handleCopyDialog} className="ae-DialogList-iconBtn">
-                <Icon className="icon" icon="copy" />
-              </a>
-              <a onClick={handleDelDialog} className="ae-DialogList-iconBtn">
-                <Icon className="icon" icon="trash" />
-              </a>
-            </li>
-          ))}
+          {modals.map((modal, index) => {
+            const unused = modal.$$ref && !usedRefs.includes(modal.$$ref);
+            return (
+              <li
+                className={`ae-DialogList-item ${unused ? 'is-unused' : ''}`}
+                data-index={index}
+                key={modal.$$id || index}
+                onClick={handleEditDialog}
+              >
+                <span>
+                  {`${
+                    modal.editorSetting?.displayName ||
+                    modal.title ||
+                    '未命名弹窗'
+                  }${unused ? ' (未使用)' : ''}`}
+                </span>
+                <a onClick={handleCopyDialog} className="ae-DialogList-iconBtn">
+                  <Icon className="icon" icon="copy" />
+                </a>
+                <a onClick={handleDelDialog} className="ae-DialogList-iconBtn">
+                  <Icon className="icon" icon="trash" />
+                </a>
+              </li>
+            );
+          })}
         </ul>
       ) : (
         <div className="ae-DialogList-placeholder">暂无弹窗</div>

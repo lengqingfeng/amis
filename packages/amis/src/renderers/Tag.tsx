@@ -2,22 +2,32 @@
  * @file Tag
  */
 import React from 'react';
-import {autobind, createObject, Renderer, RendererProps} from 'amis-core';
-import {BaseSchema, SchemaClassName, SchemaIcon} from '../Schema';
+import {
+  autobind,
+  createObject,
+  labelToString,
+  Renderer,
+  RendererProps
+} from 'amis-core';
+import {BaseSchema, AMISClassName, SchemaIcon} from '../Schema';
 import {getPropValue} from 'amis-core';
 import {isPureVariable, resolveVariableAndFilter} from 'amis-core';
 
 import {Tag} from 'amis-ui';
+import {AMISSchemaBase} from 'amis-core';
 
 /**
  * Tag
  */
-export interface TagSchema extends BaseSchema {
+/**
+ * 标签组件，用于展示标记或状态。支持多色彩与关闭操作。
+ */
+export interface AMISTagSchema extends AMISSchemaBase {
   type: 'tag';
   /**
    * 类名
    */
-  className?: SchemaClassName;
+  className?: AMISClassName;
 
   /**
    * 自定义样式
@@ -76,7 +86,7 @@ export interface TagSchema extends BaseSchema {
 
 export interface TagProps
   extends RendererProps,
-    Omit<TagSchema, 'type' | 'className'> {
+    Omit<AMISTagSchema, 'type' | 'className'> {
   onClick?: (params: {[propName: string]: any}) => void;
   onClose?: (params: {[propName: string]: any}) => void;
 }
@@ -137,7 +147,7 @@ export class TagField extends React.Component<TagProps, object> {
       style = {}
     } = this.props;
 
-    const label = this.resolveLabel();
+    const label = labelToString(this.resolveLabel());
 
     if (isPureVariable(icon)) {
       icon = resolveVariableAndFilter(icon, data);

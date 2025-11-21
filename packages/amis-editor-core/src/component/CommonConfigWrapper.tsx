@@ -1,4 +1,4 @@
-import {findDOMNode} from 'react-dom';
+import {findDomCompat as findDOMNode} from 'amis-core';
 import {JSONPipeOut} from '../util';
 import React from 'react';
 import {NodeWrapper} from './NodeWrapper';
@@ -13,7 +13,9 @@ export class CommonConfigWrapper extends NodeWrapper {
     }
 
     const info = this.props.$$editor;
-    let dom = info.wrapperResolve ? info.wrapperResolve(root) : root;
+    let dom = info.wrapperResolve
+      ? info.wrapperResolve(root, this.props)
+      : root;
 
     (Array.isArray(dom) ? dom : dom ? [dom] : []).forEach(dom => {
       dom.classList.remove('ae-Editor-common-config');
@@ -29,7 +31,9 @@ export class CommonConfigWrapper extends NodeWrapper {
 
     const info = this.props.$$editor;
 
-    let dom = info.wrapperResolve ? info.wrapperResolve(root) : root;
+    let dom = info.wrapperResolve
+      ? info.wrapperResolve(root, this.props)
+      : root;
     const schema = this.props.$$commonSchema;
     schema &&
       (Array.isArray(dom) ? dom : dom ? [dom] : []).forEach(dom => {
@@ -63,9 +67,10 @@ export class CommonConfigWrapper extends NodeWrapper {
         $$editor
       );
     }
+    const Component = renderer.component!;
 
     return (
-      <renderer.component
+      <Component
         {...rest}
         store={store}
         $schema={$schema}

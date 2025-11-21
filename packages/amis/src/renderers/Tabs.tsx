@@ -1,6 +1,15 @@
 import React from 'react';
-import {Renderer, RendererProps, resolveEventData} from 'amis-core';
-import {ActionObject, Schema, SchemaNode} from 'amis-core';
+import {
+  AMISExpression,
+  AMISSchemaBase,
+  AMISTokenizeableString,
+  CustomStyle,
+  Renderer,
+  RendererProps,
+  resolveEventData,
+  setThemeClassName
+} from 'amis-core';
+import {ActionObject, isGlobalVarExpression} from 'amis-core';
 import find from 'lodash/find';
 import {
   isVisible,
@@ -9,83 +18,88 @@ import {
   isObject,
   createObject,
   getVariable,
-  isObjectShallowModified
+  isObjectShallowModified,
+  BaseSchemaWithoutType,
+  AMISSchemaCollection
 } from 'amis-core';
 import findIndex from 'lodash/findIndex';
 import {Tabs as CTabs, Tab} from 'amis-ui';
-import {ClassNamesFn} from 'amis-core';
 import {
   BaseSchema,
-  SchemaClassName,
-  SchemaCollection,
+  AMISClassName,
   SchemaIcon,
   SchemaExpression,
   SchemaObject
 } from '../Schema';
 import {ActionSchema} from './Action';
 import {filter} from 'amis-core';
-import {resolveVariable, tokenize, resolveVariableAndFilter} from 'amis-core';
+import {resolveVariableAndFilter} from 'amis-core';
 import {FormHorizontal} from 'amis-core';
 import {str2AsyncFunction} from 'amis-core';
 import {ScopedContext, IScopedContext} from 'amis-core';
 import type {TabsMode} from 'amis-ui/lib/components/Tabs';
 import isNaN from 'lodash/isNaN';
+import debounce from 'lodash/debounce';
 
-export interface TabSchema extends Omit<BaseSchema, 'type'> {
+export interface TabSchema extends AMISSchemaBase {
   /**
-   * Tab 标题
+   * Tab 标签页标题
    */
   title?: string | SchemaObject;
 
   /**
-   * 内容
-   * @deprecated 用 body 属性
+   * Tab 内容区域（已废弃）
+   * @deprecated 建议使用 body 属性
    */
-  tab?: SchemaCollection;
+  tab?: AMISSchemaCollection;
 
   /**
-   * 内容
+   * Tab 内容区域
    */
-  body?: SchemaCollection;
+  body?: AMISSchemaCollection;
 
   /**
-   * 徽标
+   * 徽标数字
    */
   badge?: number;
 
   /**
-   * 设置以后将跟url的hash对应
+   * URL hash 对应
    */
   hash?: string;
 
   /**
-   * 按钮图标
+   * Tab 标签页图标
    */
   icon?: SchemaIcon;
 
+  /**
+   * 图标位置
+   */
   iconPosition?: 'left' | 'right';
 
   /**
-   * 设置以后内容每次都会重新渲染
+   * 是否每次切换都重新渲染
    */
   reload?: boolean;
 
   /**
-   * 点开时才加载卡片内容
+   * 是否在首次进入时才加载
    */
   mountOnEnter?: boolean;
 
   /**
-   * 卡片隐藏就销毁卡片节点。
+   * 是否在隐藏时销毁内容节点
    */
   unmountOnExit?: boolean;
 
   /**
-   * 配置子表单项默认的展示方式。
+   * 子表单项展示方式
    */
   mode?: 'normal' | 'inline' | 'horizontal';
+
   /**
-   * 如果是水平排版，这个属性可以细化水平排版的左右宽度占比。
+   * 水平排版时的左右宽度占比配置
    */
   horizontal?: FormHorizontal;
   /**
@@ -99,10 +113,12 @@ export interface TabSchema extends Omit<BaseSchema, 'type'> {
 }
 
 /**
- * 选项卡控件。
- * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/tabs
+ * 选项卡组件，用于分隔内容区域。支持多 Tab 切换、可关闭、可拖拽等能力。
  */
-export interface TabsSchema extends BaseSchema {
+export interface AMISTabsSchema extends AMISSchemaBase {
+  /**
+   * 指定为 tabs 组件
+   */
   type: 'tabs';
 
   /**
@@ -123,12 +139,12 @@ export interface TabsSchema extends BaseSchema {
   /**
    * 内容类名
    */
-  contentClassName?: SchemaClassName;
+  contentClassName?: AMISClassName;
 
   /**
    * 链接外层类名
    */
-  linksClassName?: SchemaClassName;
+  linksClassName?: AMISClassName;
 
   /**
    * 卡片是否只有在点开的时候加载？
@@ -193,12 +209,12 @@ export interface TabsSchema extends BaseSchema {
   /**
    * 初始化激活的选项卡，hash值或索引值，支持使用表达式
    */
-  defaultKey?: SchemaExpression | number;
+  defaultKey?: AMISTokenizeableString | number;
 
   /**
    * 激活的选项卡，hash值或索引值，支持使用表达式
    */
-  activeKey?: SchemaExpression | number;
+  activeKey?: AMISTokenizeableString | number;
 
   /**
    * 超过多少个时折叠按钮
@@ -217,7 +233,7 @@ export interface TabsSchema extends BaseSchema {
 
 export interface TabsProps
   extends RendererProps,
-    Omit<TabsSchema, 'className' | 'contentClassName' | 'activeKey'> {
+    Omit<AMISTabsSchema, 'className' | 'contentClassName' | 'activeKey'> {
   activeKey?: string | number;
   defaultKey?: string | number;
   location?: any;
@@ -226,6 +242,7 @@ export interface TabsProps
 
 interface TabSource extends TabSchema {
   data?: any;
+  themeCss?: string;
 }
 
 export interface TabsState {
@@ -236,7 +253,7 @@ export interface TabsState {
 }
 
 export type TabsRendererEvent = 'change';
-export type TabsRendererAction = 'changeActiveKey';
+export type TabsRendererAction = 'changeActiveKey' | 'deleteTab';
 
 export default class Tabs extends React.Component<TabsProps, TabsState> {
   static defaultProps: Partial<TabsProps> = {
@@ -249,6 +266,11 @@ export default class Tabs extends React.Component<TabsProps, TabsState> {
   renderTab?: (tab: TabSchema, props: TabsProps, index: number) => JSX.Element;
   activeKey: any;
   newTabDefaultId: number = 3;
+
+  lazySwitchTo = debounce(this.switchTo.bind(this), 250, {
+    leading: true,
+    trailing: false
+  });
 
   constructor(props: TabsProps) {
     super(props);
@@ -271,10 +293,10 @@ export default class Tabs extends React.Component<TabsProps, TabsState> {
             ? resolveVariableAndFilter(props.defaultKey, props.data)
             : props.defaultKey;
       } else if (props.defaultActiveKey) {
-        activeKey = resolveVariableAndFilter(
-          props.defaultActiveKey,
-          props.data
-        );
+        activeKey =
+          typeof props.defaultActiveKey === 'string'
+            ? resolveVariableAndFilter(props.defaultActiveKey, props.data)
+            : props.defaultActiveKey;
       }
 
       activeKey = activeKey || (tabs[0] && tabs[0].hash) || 0;
@@ -494,6 +516,10 @@ export default class Tabs extends React.Component<TabsProps, TabsState> {
     }
   }
 
+  componentWillUnmount(): void {
+    this.lazySwitchTo.cancel();
+  }
+
   resolveTabByKey(key: any) {
     const localTabs = this.state.localTabs;
 
@@ -582,10 +608,29 @@ export default class Tabs extends React.Component<TabsProps, TabsState> {
   }
 
   @autobind
-  handleClose(index: number, key: string | number) {
+  async handleClose(key: any, isHash?: boolean) {
     const originTabs = this.state.localTabs.concat();
 
-    originTabs.splice(index, 1);
+    // 获取删除元素项下标
+    const tabIndex = originTabs?.findIndex(
+      (item, index) => key === (isHash ? item.hash : item.hash ?? index)
+    );
+
+    if (tabIndex === -1) {
+      return;
+    }
+
+    originTabs.splice(tabIndex, 1);
+    const {dispatchEvent} = this.props;
+    const rendererEvent = await dispatchEvent(
+      'delete',
+      resolveEventData(this.props, {
+        value: key
+      })
+    );
+    if (rendererEvent?.prevented) {
+      return;
+    }
 
     this.setState({
       localTabs: originTabs
@@ -687,22 +732,29 @@ export default class Tabs extends React.Component<TabsProps, TabsState> {
     const tmpKey = Number(args?.activeKey);
     let activeKey = isNaN(tmpKey) ? args?.activeKey : tmpKey;
 
+    const deleteHash = args?.deleteHash;
+
     if (actionType === 'changeActiveKey') {
       this.handleSelect(
         typeof activeKey === 'number' ? activeKey - 1 : activeKey
       );
+    } else if (actionType === 'deleteTab') {
+      this.handleClose(deleteHash, true);
     }
   }
 
   @autobind
-  switchTo(index: number) {
+  switchTo(index: number, callback?: () => void) {
     const localTabs = this.state.localTabs;
 
     Array.isArray(localTabs) &&
       localTabs[index] &&
-      this.setState({
-        activeKey: (this.activeKey = localTabs[index].hash || index)
-      });
+      this.setState(
+        {
+          activeKey: (this.activeKey = localTabs[index].hash || index)
+        },
+        callback
+      );
   }
 
   @autobind
@@ -717,6 +769,24 @@ export default class Tabs extends React.Component<TabsProps, TabsState> {
             : index === this.state.activeKey
         )
       : -1;
+  }
+
+  @autobind
+  async dispatchEvent(
+    e: React.MouseEvent<any> | string,
+    data: any,
+    renderer?: React.Component<RendererProps>, // for didmount
+    scoped?: IScopedContext
+  ) {
+    // 当有表单项校验出错时，要切到对应的tab
+    if (e === 'formItemValidateError') {
+      const tabIndex = renderer?.props.tabIndex;
+      if (typeof tabIndex === 'number') {
+        this.lazySwitchTo(tabIndex);
+      }
+    }
+
+    return this.props.dispatchEvent(e, data, renderer, scoped);
   }
 
   // 渲染tabs的title
@@ -734,10 +804,28 @@ export default class Tabs extends React.Component<TabsProps, TabsState> {
   }
 
   renderToolbar() {
-    const {toolbar, render, classnames: cx, toolbarClassName} = this.props;
+    const {
+      toolbar,
+      render,
+      classnames: cx,
+      toolbarClassName,
+      id,
+      themeCss
+    } = this.props;
 
     return toolbar ? (
-      <div className={cx(`Tabs-toolbar`, toolbarClassName)}>
+      <div
+        className={cx(
+          `Tabs-toolbar`,
+          toolbarClassName,
+          setThemeClassName({
+            ...this.props,
+            name: 'toolbarControlClassName',
+            id,
+            themeCss
+          })
+        )}
+      >
         {render('toolbar', toolbar)}
       </div>
     ) : null;
@@ -777,7 +865,11 @@ export default class Tabs extends React.Component<TabsProps, TabsState> {
       disabled,
       mobileUI,
       swipeable,
-      testIdBuilder
+      testIdBuilder,
+      id,
+      wrapperCustomStyle,
+      themeCss,
+      env
     } = this.props;
 
     const mode = tabsMode || dMode;
@@ -791,6 +883,7 @@ export default class Tabs extends React.Component<TabsProps, TabsState> {
 
     const {localTabs: tabs, isFromSource} = this.state;
     let children: Array<JSX.Element | null> = [];
+    let childrenCustomStyle: Array<JSX.Element | null> = [];
 
     // 是否从 source 数据中生成
     if (isFromSource) {
@@ -826,11 +919,22 @@ export default class Tabs extends React.Component<TabsProps, TabsState> {
             testIdBuilder={testIdBuilder?.getChild(
               `tab-${typeof tab.title === 'string' ? tab.title : index}`
             )}
+            className={cx(
+              tab.className,
+              setThemeClassName({
+                ...tab,
+                name: 'panelControlClassName',
+                id: tab.id,
+                themeCss: tab.themeCss
+              })
+            )}
           >
             {render(
               `item/${index}`,
               (tab as any)?.type ? (tab as any) : tab.tab || tab.body,
               {
+                tabIndex: index,
+                dispatchEvent: this.dispatchEvent,
                 disabled: disabled || isDisabled(tab, ctx) || undefined, // 下发个 undefined，让子表单项自己判断
                 data: ctx,
                 formMode: tab.mode || subFormMode || formMode,
@@ -839,6 +943,29 @@ export default class Tabs extends React.Component<TabsProps, TabsState> {
               }
             )}
           </Tab>
+        ) : null;
+      });
+
+      childrenCustomStyle = tabs.map((tab: TabSource, index: number) => {
+        const ctx = createObject(
+          data,
+          isObject(tab.data) ? {index, ...tab.data} : {item: tab.data, index}
+        );
+        return isVisible(tab, ctx) ? (
+          <CustomStyle
+            {...tab}
+            config={{
+              id: tab.id,
+              themeCss: tab.themeCss,
+              classNames: [
+                {
+                  key: 'panelControlClassName'
+                }
+              ]
+            }}
+            env={this.props.env}
+            key={`customstyle_${index}`}
+          />
         ) : null;
       });
     } else {
@@ -870,6 +997,15 @@ export default class Tabs extends React.Component<TabsProps, TabsState> {
             testIdBuilder={testIdBuilder?.getChild(
               `tab-${typeof tab.title === 'string' ? tab.title : index}`
             )}
+            className={cx(
+              tab.className,
+              setThemeClassName({
+                ...tab,
+                name: 'panelControlClassName',
+                id: tab.id,
+                themeCss: tab.themeCss
+              })
+            )}
           >
             {this.renderTab
               ? this.renderTab(tab, this.props, index)
@@ -879,6 +1015,8 @@ export default class Tabs extends React.Component<TabsProps, TabsState> {
                   `tab/${index}`,
                   (tab as any)?.type ? (tab as any) : tab.tab || tab.body,
                   {
+                    tabIndex: index,
+                    dispatchEvent: this.dispatchEvent,
                     disabled: disabled || isDisabled(tab, data) || undefined, // 下发个 undefined，让子表单项自己判断,
                     formMode: tab.mode || subFormMode || formMode,
                     formHorizontal:
@@ -888,39 +1026,134 @@ export default class Tabs extends React.Component<TabsProps, TabsState> {
           </Tab>
         ) : null
       );
+
+      childrenCustomStyle = tabs.map((tab, index) =>
+        isVisible(tab, data) ? (
+          <CustomStyle
+            config={{
+              id: tab.id,
+              themeCss: tab.themeCss,
+              classNames: [
+                {
+                  key: 'panelControlClassName'
+                }
+              ]
+            }}
+            env={this.props.env}
+            key={`customstyle_${index}`}
+          />
+        ) : null
+      );
     }
 
     return (
-      <CTabs
-        addBtnText={__(addBtnText || 'add')}
-        classPrefix={ns}
-        classnames={cx}
-        mode={mode}
-        closable={closable}
-        className={className}
-        style={style}
-        contentClassName={contentClassName}
-        linksClassName={linksClassName}
-        onSelect={this.handleSelect}
-        activeKey={this.state.activeKey}
-        toolbar={this.renderToolbar()}
-        addable={addable}
-        onAdd={this.handleAdd}
-        onClose={this.handleClose}
-        draggable={draggable}
-        onDragChange={this.handleDragChange}
-        showTip={showTip}
-        showTipClassName={showTipClassName}
-        editable={editable}
-        onEdit={this.handleEdit}
-        sidePosition={sidePosition}
-        collapseOnExceed={collapseOnExceed}
-        collapseBtnLabel={collapseBtnLabel}
-        mobileUI={mobileUI}
-        testIdBuilder={testIdBuilder}
-      >
-        {children}
-      </CTabs>
+      <>
+        <CTabs
+          addBtnText={__(addBtnText || 'add')}
+          classPrefix={ns}
+          classnames={cx}
+          mode={mode}
+          closable={closable}
+          className={cx(
+            className,
+            setThemeClassName({
+              ...this.props,
+              name: 'wrapperCustomStyle',
+              id,
+              themeCss: wrapperCustomStyle
+            })
+          )}
+          style={style}
+          contentClassName={cx(
+            contentClassName,
+            setThemeClassName({
+              ...this.props,
+              name: 'contentControlClassName',
+              id,
+              themeCss
+            })
+          )}
+          linksClassName={linksClassName}
+          titleClassName={cx(
+            setThemeClassName({
+              ...this.props,
+              name: 'titleControlClassName',
+              id,
+              themeCss
+            })
+          )}
+          onSelect={this.handleSelect}
+          activeKey={this.state.activeKey}
+          toolbar={this.renderToolbar()}
+          addable={addable}
+          onAdd={this.handleAdd}
+          onClose={this.handleClose}
+          draggable={draggable}
+          onDragChange={this.handleDragChange}
+          showTip={showTip}
+          showTipClassName={showTipClassName}
+          editable={editable}
+          onEdit={this.handleEdit}
+          sidePosition={sidePosition}
+          collapseOnExceed={collapseOnExceed}
+          collapseBtnLabel={collapseBtnLabel}
+          mobileUI={mobileUI}
+          testIdBuilder={testIdBuilder}
+        >
+          {children}
+        </CTabs>
+        {childrenCustomStyle}
+        <CustomStyle
+          {...this.props}
+          config={{
+            wrapperCustomStyle,
+            id,
+            themeCss,
+            classNames: [
+              {
+                key: 'titleControlClassName',
+                weights: {
+                  default: {
+                    important: true,
+                    inner: '> a'
+                  },
+                  focused: {
+                    important: true,
+                    suf: '.is-active',
+                    inner: '> a'
+                  },
+                  hover: {
+                    important: true,
+                    inner: '> a'
+                  },
+                  disabled: {
+                    important: true,
+                    suf: '.is-disabled',
+                    inner: '> a'
+                  }
+                }
+              },
+              {
+                key: 'toolbarControlClassName',
+                weights: {
+                  default: {
+                    important: true
+                  }
+                }
+              },
+              {
+                key: 'contentControlClassName',
+                weights: {
+                  default: {
+                    important: true
+                  }
+                }
+              }
+            ]
+          }}
+          env={env}
+        />
+      </>
     );
   }
 

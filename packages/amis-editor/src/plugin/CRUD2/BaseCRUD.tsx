@@ -30,9 +30,11 @@ import {
 } from '../../builder';
 import {
   getEventControlConfig,
-  getArgsWrapper
+  getArgsWrapper,
+  getActionCommonProps,
+  buildLinkActionDesc
 } from '../../renderer/event-control/helper';
-import {CRUD2Schema} from 'amis/lib/renderers/CRUD2';
+import {CRUD2Schema} from 'amis';
 import {deepRemove, findObj, findSchema} from './utils';
 import {
   ToolsConfig,
@@ -84,7 +86,7 @@ export class BaseCRUDPlugin extends BasePlugin {
 
   order = -1000;
 
-  $schema = '/schemas/CRUD2Schema.json';
+  $schema = '/schemas/AMISCRUD2Schema.json';
 
   docLink = '/amis/zh-CN/components/table2';
 
@@ -113,11 +115,12 @@ export class BaseCRUDPlugin extends BasePlugin {
           actionType: 'search',
           actionLabel: '数据查询',
           description: '使用指定条件完成列表数据查询',
-          descDetail: (info: any) => {
+          descDetail: (info: any, context: any, props: any) => {
             return (
-              <div>
-                <span className="variable-right">{info?.__rendererLabel}</span>
-                触发数据查询
+              <div className="action-desc">
+                触发
+                {buildLinkActionDesc(props.manager, info)}
+                数据查询
               </div>
             );
           },
@@ -134,11 +137,12 @@ export class BaseCRUDPlugin extends BasePlugin {
           actionType: 'loadMore',
           actionLabel: '加载更多',
           description: '加载更多条数据到列表容器',
-          descDetail: (info: any) => {
+          descDetail: (info: any, context: any, props: any) => {
             return (
-              <div>
-                <span className="variable-right">{info?.__rendererLabel}</span>
-                加载更多数据
+              <div className="action-desc">
+                加载
+                {buildLinkActionDesc(props.manager, info)}
+                更多数据
               </div>
             );
           }
@@ -152,6 +156,12 @@ export class BaseCRUDPlugin extends BasePlugin {
           actionType: 'stopAutoRefresh',
           actionLabel: '停止自动刷新',
           description: '停止自动刷新'
+        },
+        {
+          actionType: 'reload',
+          actionLabel: '重新加载',
+          description: '触发组件数据刷新并重新渲染',
+          ...getActionCommonProps('reload')
         },
         ...(actions || [])
       ],
@@ -478,7 +488,7 @@ export class BaseCRUDPlugin extends BasePlugin {
   baseCRUDPanelBody = (context: BuildPanelEventContext) => {
     return getSchemaTpl('tabs', [
       this.renderPropsTab(context),
-      this.renderStylesTab(context),
+      // this.renderStylesTab(context),
       this.renderEventTab(context)
     ]);
   };
@@ -626,12 +636,7 @@ export class BaseCRUDPlugin extends BasePlugin {
             })
           ]
         },
-        {
-          name: 'placeholder',
-          pipeIn: defaultValue('暂无数据'),
-          type: 'input-text',
-          label: '占位内容'
-        },
+        getSchemaTpl('tablePlaceholder'),
         getSchemaTpl('switch', {
           name: 'syncLocation',
           label: tipedLabel(
@@ -776,6 +781,8 @@ export class BaseCRUDPlugin extends BasePlugin {
                       layout: ['total', 'perPage', 'pager'],
                       perPageAvailable: [10, 20, 50, 100]
                     }
+                  : schema.pullRefresh.disabled
+                  ? null
                   : {
                       type: 'button',
                       behavior: 'loadMore',
@@ -794,13 +801,167 @@ export class BaseCRUDPlugin extends BasePlugin {
                       }
                     };
 
-              this.addFeatToToolbar(schema, newCompSchema, 'footer', 'right');
+              newCompSchema &&
+                this.addFeatToToolbar(schema, newCompSchema, 'footer', 'right');
             }
             form.setValues({
+              perPage: value !== 'more' ? undefined : schema.perPage,
               footerToolbar: schema.footerToolbar,
               headerToolbar: schema.headerToolbar
             });
           }
+        },
+        {
+          type: 'container',
+          visibleOn: 'this.loadType === "more"',
+          body: [
+            {
+              type: 'switch',
+              name: 'pullRefresh.disabled',
+              label: '禁用加载更多',
+              pipeIn: (value: any) => !!value,
+              pipeOut: (value: boolean) => value,
+              onChange: (
+                value: string,
+                oldValue: any,
+                model: any,
+                form: any
+              ) => {
+                const schema = cloneDeep(form.data);
+                if (value) {
+                  deepRemove(schema, item => {
+                    return item.behavior === 'loadMore';
+                  });
+                } else {
+                  this.addFeatToToolbar(
+                    schema,
+                    {
+                      type: 'button',
+                      behavior: 'loadMore',
+                      label: '加载更多',
+                      onEvent: {
+                        click: {
+                          actions: [
+                            {
+                              componentId: schema.id,
+                              groupType: 'component',
+                              actionType: 'loadMore'
+                            }
+                          ],
+                          weight: 0
+                        }
+                      }
+                    },
+                    'footer',
+                    'right'
+                  );
+                }
+
+                form.setValues({
+                  footerToolbar: schema.footerToolbar
+                });
+              }
+            },
+            {
+              type: 'switch',
+              name: 'pullRefresh.showIcon',
+              label: '显示图标',
+              value: true,
+              visibleOn: '!data.pullRefresh?.disabled'
+            },
+            {
+              type: 'switch',
+              name: 'pullRefresh.showText',
+              label: '显示文本',
+              value: true,
+              visibleOn: '!data.pullRefresh?.disabled'
+            },
+            getSchemaTpl('icon', {
+              name: 'pullRefresh.iconType',
+              label: tipedLabel(
+                '图标类型',
+                '支持 fontawesome v4 图标、iconfont 图标。如需使用 fontawesome v5/v6 版本,需设置 vendor 为空字符串。默认为 loading-outline'
+              ),
+              placeholder: '默认为loading-outline',
+              visibleOn:
+                '!data.pullRefresh?.disabled && data.pullRefresh?.showIcon'
+            }),
+            getSchemaTpl('theme:colorPicker', {
+              name: 'pullRefresh.color',
+              label: '文字和图标颜色',
+              placeholder: '默认为#777777',
+              visibleOn: '!data.pullRefresh?.disabled'
+            }),
+            {
+              type: 'select',
+              name: 'pullRefresh.dataAppendTo',
+              label: '新数据追加位置',
+              options: [
+                {label: '底部', value: 'bottom'},
+                {label: '顶部', value: 'top'}
+              ],
+              value: 'bottom',
+              visibleOn: '!data.pullRefresh?.disabled'
+            },
+            {
+              type: 'input-number',
+              name: 'pullRefresh.minLoadingTime',
+              label: '最短加载时间(ms)',
+              min: 0,
+              step: 100,
+              visibleOn: '!data.pullRefresh?.disabled'
+            },
+            {
+              type: 'select',
+              name: 'pullRefresh.gestureDirection',
+              label: '手势方向',
+              options: [
+                {label: '向上', value: 'up'},
+                {label: '向下', value: 'down'}
+              ],
+              value: 'up',
+              visibleOn: '!data.pullRefresh?.disabled'
+            },
+            {
+              type: 'fieldset',
+              title: '移动端下拉刷新文案配置',
+              size: 'base',
+              visibleOn:
+                '!data.pullRefresh?.disabled && data.pullRefresh?.showText',
+              body: [
+                {
+                  type: 'input-text',
+                  name: 'pullRefresh.contentText.normalText',
+                  label: '默认文字'
+                },
+                {
+                  type: 'input-text',
+                  name: 'pullRefresh.contentText.pullingText',
+                  label: '下拉过程文字'
+                },
+                {
+                  type: 'input-text',
+                  name: 'pullRefresh.contentText.loosingText',
+                  label: '释放刷新文字'
+                },
+                {
+                  type: 'input-text',
+                  name: 'pullRefresh.contentText.loadingText',
+                  label: '加载中文字'
+                },
+                {
+                  type: 'input-text',
+                  name: 'pullRefresh.contentText.successText',
+                  label: '加载成功文字'
+                },
+                {
+                  type: 'input-text',
+                  name: 'pullRefresh.contentText.completedText',
+                  label: '加载完成文字'
+                }
+              ]
+            }
+          ]
         },
         getSchemaTpl('switch', {
           name: 'loadDataOnce',

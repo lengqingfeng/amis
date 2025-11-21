@@ -1,11 +1,11 @@
 import React from 'react';
-import {Renderer, isVisible, ClassNamesFn} from 'amis-core';
+import {Renderer, isVisible, ClassNamesFn, AMISSchemaBase} from 'amis-core';
 import {Checkbox} from 'amis-ui';
 
 import ColumnToggler, {ColumnTogglerProps} from '../Table/ColumnToggler';
 import {BaseSchema} from '../../Schema';
 
-export interface ColumnTogglerSchema extends BaseSchema {
+export interface ColumnTogglerSchema extends AMISSchemaBase {
   label?: string;
   tooltip?: string;
   size?: string;
@@ -97,7 +97,7 @@ export class ColumnTogglerRenderer extends React.Component<ColumnTogglerRenderer
                 )
               }
             >
-              {__('Checkboxes.selectAll')}
+              {__('Select.checkAll')}
             </Checkbox>
           </li>
         ) : null}
@@ -105,9 +105,9 @@ export class ColumnTogglerRenderer extends React.Component<ColumnTogglerRenderer
         {toggableColumns?.map((column: any, index: number) => (
           <li
             className={cx('ColumnToggler-menuItem')}
-            key={'item' + (column.index || index)}
+            key={'item' + (column.id || index)}
             onClick={() => {
-              toggleToggle && toggleToggle(index);
+              toggleToggle && toggleToggle(column.id);
             }}
           >
             <Checkbox

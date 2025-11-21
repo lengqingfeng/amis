@@ -17,7 +17,7 @@ import {
 } from 'amis-editor-core';
 import {defaultValue, tipedLabel} from 'amis-editor-core';
 
-import type {FormControlProps} from 'amis-core';
+import type {AMISExpression, FormControlProps} from 'amis-core';
 import type {SchemaExpression} from 'amis';
 
 export interface BadgeControlProps extends FormControlProps {
@@ -54,7 +54,7 @@ export interface BadgeControlProps extends FormControlProps {
   /**
    * 动态控制是否显示
    */
-  visibleOn?: SchemaExpression;
+  visibleOn?: AMISExpression;
 
   /**
    * 是否显示动画
@@ -142,8 +142,8 @@ export default class BadgeControl extends React.Component<
   }
 
   transformBadgeValue(): BadgeForm {
-    const {data: ctx, node} = this.props;
-    let badge = ctx?.badge ?? {};
+    const {data: ctx, node, name} = this.props;
+    let badge = ctx?.[name || 'badge'] ?? {};
     // 避免获取到上层的size
     let size = ctx?.badge?.size;
     if (node.type === 'button-group-select') {
@@ -185,10 +185,10 @@ export default class BadgeControl extends React.Component<
   }
 
   handleSubmit(form: BadgeForm, action: any): void {
-    const {onBulkChange} = this.props;
+    const {onBulkChange, name} = this.props;
 
     if (action?.type === 'submit') {
-      onBulkChange?.({badge: this.normalizeBadgeValue(form)});
+      onBulkChange?.({[name || 'badge']: this.normalizeBadgeValue(form)});
     }
   }
 

@@ -17,6 +17,7 @@ exports[`Tree: basic & disabled children & default check children 1`] = `
         >
           <div
             class="cxd-Panel cxd-Panel--default cxd-Panel--form"
+            data-role="container"
           >
             <div
               class="cxd-Panel-heading"
@@ -25,7 +26,7 @@ exports[`Tree: basic & disabled children & default check children 1`] = `
                 class="cxd-Panel-title"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   <span>
                     表单
@@ -46,6 +47,7 @@ exports[`Tree: basic & disabled children & default check children 1`] = `
                 />
                 <div
                   class="cxd-Form-item cxd-Form-item--normal"
+                  data-amis-name="tree"
                   data-role="form-item"
                 >
                   <label
@@ -53,7 +55,7 @@ exports[`Tree: basic & disabled children & default check children 1`] = `
                   >
                     <span>
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           Tree
@@ -72,6 +74,7 @@ exports[`Tree: basic & disabled children & default check children 1`] = `
                       >
                         <li
                           class="cxd-Tree-item "
+                          style="--Tree-depth: 0;"
                         >
                           <div
                             class="cxd-Tree-itemLabel"
@@ -109,6 +112,7 @@ exports[`Tree: basic & disabled children & default check children 1`] = `
                         </li>
                         <li
                           class="cxd-Tree-item  cxd-Tree-item--isLeaf is-child"
+                          style="--Tree-depth: 1;"
                         >
                           <div
                             class="cxd-Tree-itemLabel"
@@ -141,6 +145,7 @@ exports[`Tree: basic & disabled children & default check children 1`] = `
                         </li>
                         <li
                           class="cxd-Tree-item  is-child"
+                          style="--Tree-depth: 1;"
                         >
                           <div
                             class="cxd-Tree-itemLabel"
@@ -178,6 +183,7 @@ exports[`Tree: basic & disabled children & default check children 1`] = `
                         </li>
                         <li
                           class="cxd-Tree-item  cxd-Tree-item--isLeaf is-child"
+                          style="--Tree-depth: 2;"
                         >
                           <div
                             class="cxd-Tree-itemLabel"
@@ -210,6 +216,7 @@ exports[`Tree: basic & disabled children & default check children 1`] = `
                         </li>
                         <li
                           class="cxd-Tree-item  cxd-Tree-item--isLeaf is-child"
+                          style="--Tree-depth: 2;"
                         >
                           <div
                             class="cxd-Tree-itemLabel"
@@ -242,6 +249,7 @@ exports[`Tree: basic & disabled children & default check children 1`] = `
                         </li>
                         <li
                           class="cxd-Tree-item  cxd-Tree-item--isLeaf"
+                          style="--Tree-depth: 0;"
                         >
                           <div
                             class="cxd-Tree-itemLabel"
@@ -274,6 +282,7 @@ exports[`Tree: basic & disabled children & default check children 1`] = `
                         </li>
                         <li
                           class="cxd-Tree-item  cxd-Tree-item--isLeaf"
+                          style="--Tree-depth: 0;"
                         >
                           <div
                             class="cxd-Tree-itemLabel"
@@ -351,6 +360,7 @@ exports[`Tree: showOutline 1`] = `
         >
           <div
             class="cxd-Panel cxd-Panel--default cxd-Panel--form"
+            data-role="container"
           >
             <div
               class="cxd-Panel-heading"
@@ -359,7 +369,7 @@ exports[`Tree: showOutline 1`] = `
                 class="cxd-Panel-title"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   <span>
                     表单
@@ -380,6 +390,7 @@ exports[`Tree: showOutline 1`] = `
                 />
                 <div
                   class="cxd-Form-item cxd-Form-item--normal"
+                  data-amis-name="tree"
                   data-role="form-item"
                 >
                   <label
@@ -387,7 +398,7 @@ exports[`Tree: showOutline 1`] = `
                   >
                     <span>
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           Tree
@@ -406,6 +417,7 @@ exports[`Tree: showOutline 1`] = `
                       >
                         <li
                           class="cxd-Tree-item "
+                          style="--Tree-depth: 0;"
                         >
                           <div
                             class="cxd-Tree-itemLabel"
@@ -443,6 +455,7 @@ exports[`Tree: showOutline 1`] = `
                         </li>
                         <li
                           class="cxd-Tree-item  cxd-Tree-item--isLeaf is-child"
+                          style="--Tree-depth: 1;"
                         >
                           <div
                             class="cxd-Tree-itemLabel"
@@ -475,6 +488,7 @@ exports[`Tree: showOutline 1`] = `
                         </li>
                         <li
                           class="cxd-Tree-item  is-child"
+                          style="--Tree-depth: 1;"
                         >
                           <div
                             class="cxd-Tree-itemLabel"
@@ -512,6 +526,7 @@ exports[`Tree: showOutline 1`] = `
                         </li>
                         <li
                           class="cxd-Tree-item  cxd-Tree-item--isLeaf is-child"
+                          style="--Tree-depth: 2;"
                         >
                           <div
                             class="cxd-Tree-itemLabel"
@@ -544,6 +559,7 @@ exports[`Tree: showOutline 1`] = `
                         </li>
                         <li
                           class="cxd-Tree-item  cxd-Tree-item--isLeaf is-child"
+                          style="--Tree-depth: 2;"
                         >
                           <div
                             class="cxd-Tree-itemLabel"
@@ -576,6 +592,7 @@ exports[`Tree: showOutline 1`] = `
                         </li>
                         <li
                           class="cxd-Tree-item  cxd-Tree-item--isLeaf"
+                          style="--Tree-depth: 0;"
                         >
                           <div
                             class="cxd-Tree-itemLabel"
@@ -608,6 +625,7 @@ exports[`Tree: showOutline 1`] = `
                         </li>
                         <li
                           class="cxd-Tree-item  cxd-Tree-item--isLeaf"
+                          style="--Tree-depth: 0;"
                         >
                           <div
                             class="cxd-Tree-itemLabel"

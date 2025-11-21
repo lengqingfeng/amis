@@ -270,7 +270,7 @@ export class Modal extends React.Component<ModalProps, ModalState> {
   @autobind
   handleRootMouseDownCapture(e: MouseEvent) {
     const target = e.target as HTMLElement;
-    const {closeOnOutside, classPrefix: ns} = this.props;
+    const {closeOnOutside, classPrefix: ns, mobileUI} = this.props;
     const isLeftButton =
       (e.button === 1 && window.event !== null) || e.button === 0;
 
@@ -279,7 +279,9 @@ export class Modal extends React.Component<ModalProps, ModalState> {
       closeOnOutside &&
       target &&
       this.modalDom &&
-      ((!this.modalDom.contains(target) && !target.closest('[role=dialog]')) ||
+      ((!mobileUI &&
+        !this.modalDom.contains(target) &&
+        !target.closest('[role=dialog]')) ||
         (target.matches(`.${ns}Modal`) && target === this.modalDom))
     ); // 干脆过滤掉来自弹框里面的点击
   }
@@ -406,7 +408,6 @@ export class Modal extends React.Component<ModalProps, ModalState> {
       width: style?.width ? style?.width : width,
       height: style?.height ? style?.height : height
     };
-
     return (
       <Transition
         mountOnEnter
@@ -445,6 +446,7 @@ export class Modal extends React.Component<ModalProps, ModalState> {
                 onStart={this.handleDragStart}
                 onDrag={this.handleDrag}
                 onStop={this.handleDragStop}
+                cancel="Icon, svg, a, svg *"
                 handle={`.${classPrefix}Modal-header`}
               >
                 <div

@@ -2,12 +2,13 @@ import {RendererProps, isObject} from 'amis-core';
 import {observer} from 'mobx-react';
 import {isAlive} from 'mobx-state-tree';
 import React from 'react';
-import {findDOMNode} from 'react-dom';
+import {findDomCompat as findDOMNode} from 'amis-core';
 import merge from 'lodash/merge';
 import omit from 'lodash/omit';
 import {RendererInfo} from '../plugin';
 import {EditorNodeType} from '../store/node';
 import {autobind, isEmpty} from '../util';
+import {filter} from 'amis-core';
 
 export interface NodeWrapperProps extends RendererProps {
   $$editor: RendererInfo; // 当前节点信息（info）
@@ -55,14 +56,35 @@ export class NodeWrapper extends React.Component<NodeWrapperProps> {
     }
 
     const info = this.props.$$editor;
-    const visible =
+    let visible =
       this.props.$$visible !== false && this.props.$$hidden !== true;
-    let dom = info.wrapperResolve ? info.wrapperResolve(root) : root;
+
+    if (visible) {
+      const schema = this.props.$schema;
+      const data = this.props.data;
+      const id = filter(schema.id, data);
+      const name = filter(schema.name, data);
+      const states = (this.props.statusStore as any).raw.visibleState as any;
+
+      if ((states[id] ?? states[name]) === false) {
+        visible = false;
+      }
+    }
+
+    let dom = info.wrapperResolve
+      ? info.wrapperResolve(root, this.props)
+      : root;
     (Array.isArray(dom) ? dom : dom ? [dom] : []).forEach(dom => {
       dom.setAttribute('data-editor-id', id);
       dom.setAttribute('name', this.props.id);
       dom.setAttribute('data-visible', visible ? '' : 'false');
       dom.setAttribute('data-hide-text', visible ? '' : '<隐藏状态>');
+
+      if (info.regions) {
+        dom.setAttribute('data-container', '');
+      } else {
+        dom.removeAttribute('data-container');
+      }
     });
     info.plugin?.markDom?.(dom, this.props);
   }
@@ -97,13 +119,14 @@ export class NodeWrapper extends React.Component<NodeWrapperProps> {
         $$editor
       );
     }
+    const Component = renderer.component!;
 
     const supportRef =
-      renderer.component.prototype?.isReactComponent ||
-      (renderer.component as any).$$typeof === Symbol.for('react.forward_ref');
+      Component.prototype?.isReactComponent ||
+      (Component as any).$$typeof === Symbol.for('react.forward_ref');
 
     return (
-      <renderer.component
+      <Component
         {...rest}
         store={store}
         {...$$node?.state}

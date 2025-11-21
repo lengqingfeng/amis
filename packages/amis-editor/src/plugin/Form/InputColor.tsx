@@ -47,7 +47,7 @@ const presetColors = [
   '#9013fe'
 ];
 
-const colorFormat = ['hex', 'rgb', 'rgba', 'hsl'];
+const colorFormat = ['hex', 'hexa', 'rgb', 'rgba', 'hsl'];
 const presetColorsByFormat = colorFormat.reduce<{
   [propsName: string]: string[];
 }>((res, fmt) => {
@@ -59,7 +59,7 @@ export class ColorControlPlugin extends BasePlugin {
   static scene = ['layout'];
   // 关联渲染器名字
   rendererName = 'input-color';
-  $schema = '/schemas/ColorControlSchema.json';
+  $schema = '/schemas/AMISInputColorSchema.json';
 
   // 组件名称
   name = '颜色框';
@@ -67,7 +67,7 @@ export class ColorControlPlugin extends BasePlugin {
   icon = 'fa fa-eyedropper';
   pluginIcon = 'input-color-plugin';
   description =
-    '支持<code>hex、hls、rgb、rgba</code>格式，默认为<code>hex</code>格式';
+    '支持<code>hex、hexa、hls、rgb、rgba</code>格式，默认为<code>hex</code>格式';
   searchKeywords = '颜色选择器';
   docLink = '/amis/zh-CN/components/form/input-color';
   tags = ['表单项'];
@@ -259,7 +259,7 @@ export class ColorControlPlugin extends BasePlugin {
         body: getSchemaTpl(
           'collapseGroup',
           [
-            getSchemaTpl('style:formItem', {renderer}),
+            getSchemaTpl('theme:formItem'),
             getSchemaTpl('style:classNames', {
               schema: [
                 getSchemaTpl('className', {

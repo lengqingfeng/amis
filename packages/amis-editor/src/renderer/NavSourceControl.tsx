@@ -14,11 +14,10 @@ import {render as renderAmis} from 'amis-core';
 import {FormItem, Button, InputBox, Icon, Modal, toast} from 'amis';
 import {TooltipWrapper} from 'amis-ui';
 
-import {getSchemaTpl} from 'amis-editor';
-
-import {autobind} from 'amis-editor-core';
+import {autobind, getI18nEnabled, getSchemaTpl} from 'amis-editor-core';
 import type {FormControlProps} from 'amis-core';
 import type {SchemaApi} from 'amis';
+import {getOwnValue} from '../util';
 
 export type SourceType = 'custom' | 'api' | '';
 
@@ -60,10 +59,12 @@ export class NavSourceControl extends React.Component<
   constructor(props: NavControlProps) {
     super(props);
 
+    const source = getOwnValue(props.data, 'source');
+
     this.state = {
       links: this.transformOptions(props),
-      api: props.data.source,
-      source: this.transformSource(props.data.source),
+      api: source,
+      source: this.transformSource(source),
       showDialog: false,
       isEdit: false,
       modalName: '',
@@ -87,8 +88,8 @@ export class NavSourceControl extends React.Component<
   }
 
   transformOptions(props: NavControlProps) {
-    const {data} = props;
-    return Array.isArray(data.links) ? data.links : [];
+    const links = getOwnValue(props.data, 'links');
+    return Array.isArray(links) ? links : [];
   }
 
   /**
@@ -618,6 +619,7 @@ export class NavSourceControl extends React.Component<
       isEdit
     } = this.state;
     const treeData = cloneDeep(links);
+    const i18nEnabled = getI18nEnabled();
     this.handleFilterTreeData(treeData);
     return renderAmis(
       {
@@ -631,7 +633,7 @@ export class NavSourceControl extends React.Component<
           actions: [],
           body: [
             {
-              type: 'input-text',
+              type: i18nEnabled ? 'input-text-i18n' : 'input-text',
               label: '菜单名称',
               name: 'modalName',
               placeholder: '请输入菜单名称',

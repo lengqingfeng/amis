@@ -1,6 +1,6 @@
 import React from 'react';
 import xor from 'lodash/xor';
-import {findDOMNode} from 'react-dom';
+import {findDomCompat as findDOMNode} from 'amis-core';
 import {
   Overlay,
   PopOver,
@@ -419,6 +419,7 @@ export class HeadCellFilterDropDown extends React.Component<
                             option.visible && (
                               <li key={index}>
                                 <Checkbox
+                                  size="sm"
                                   classPrefix={ns}
                                   onChange={this.handleCheck.bind(
                                     this,

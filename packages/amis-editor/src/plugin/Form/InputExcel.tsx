@@ -1,23 +1,24 @@
 /**
  * @file input-excel 组件的素项目部
  */
-import {defaultValue, getSchemaTpl, valuePipeOut} from 'amis-editor-core';
-import {registerEditorPlugin} from 'amis-editor-core';
 import {
   BasePlugin,
   BaseEventContext,
-  BasicSubRenderInfo,
-  RendererEventContext,
-  SubRendererInfo
+  RendererPluginAction,
+  RendererPluginEvent,
+  defaultValue,
+  getSchemaTpl,
+  registerEditorPlugin,
+  tipedLabel
 } from 'amis-editor-core';
 import {formItemControl} from '../../component/BaseControl';
-import {RendererPluginAction, RendererPluginEvent} from 'amis-editor-core';
+import {getActionCommonProps} from '../../renderer/event-control/helper';
 
 export class ExcelControlPlugin extends BasePlugin {
   static id = 'ExcelControlPlugin';
   // 关联渲染器名字
   rendererName = 'input-excel';
-  $schema = '/schemas/ExcelControlSchema.json';
+  $schema = '/schemas/AMISInputExcelSchema.json';
 
   // 组件名称
   name = '上传 Excel';
@@ -80,17 +81,20 @@ export class ExcelControlPlugin extends BasePlugin {
     {
       actionType: 'clear',
       actionLabel: '清空',
-      description: '清除选中值'
+      description: '清除选中值',
+      ...getActionCommonProps('clear')
     },
     {
       actionType: 'reset',
       actionLabel: '重置',
-      description: '将值重置为初始值'
+      description: '将值重置为初始值',
+      ...getActionCommonProps('reset')
     },
     {
       actionType: 'setValue',
       actionLabel: '赋值',
-      description: '触发组件数据更新'
+      description: '触发组件数据更新',
+      ...getActionCommonProps('setValue')
     }
   ];
   panelBodyCreator = (context: BaseEventContext) => {
@@ -111,6 +115,20 @@ export class ExcelControlPlugin extends BasePlugin {
                 {label: '数组', value: 'array'}
               ]
             },
+
+            getSchemaTpl('multiple', {
+              replace: true,
+              body: [
+                {
+                  type: 'input-number',
+                  name: 'maxLength',
+                  label: tipedLabel(
+                    '最大数量',
+                    '默认没有限制，当设置后，一次只允许上传解析指定数量文件。'
+                  )
+                }
+              ]
+            }),
             getSchemaTpl('switch', {
               name: 'allSheets',
               label: '是否解析所有 Sheet'

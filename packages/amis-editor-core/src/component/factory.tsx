@@ -13,14 +13,15 @@ import {EditorManager} from '../manager';
 import flatten from 'lodash/flatten';
 import {render as reactRender, unmountComponentAtNode} from 'react-dom';
 import {autobind, JSONGetById, JSONUpdate, appTranslate} from '../util';
-import {ErrorBoundary} from 'amis-core';
+import {ErrorBoundary, LazyComponent} from 'amis-core';
 import {CommonConfigWrapper} from './CommonConfigWrapper';
 import type {Schema} from 'amis';
 import type {DataScope} from 'amis-core';
 import type {RendererConfig} from 'amis-core';
 import type {SchemaCollection} from 'amis';
-import {SchemaFrom} from './base/SchemaForm';
+import {SchemaForm} from './base/SchemaForm';
 import memoize from 'lodash/memoize';
+import {FormConfigWrapper} from './FormConfigWrapper';
 
 // 创建 Node Store 并构建成树
 export function makeWrapper(
@@ -32,7 +33,7 @@ export function makeWrapper(
     $$id: string;
   };
   const store = manager.store;
-  const renderer = rendererConfig.component;
+  const renderer = rendererConfig.component!;
 
   @observer
   class Wrapper extends React.Component<Props> {
@@ -56,6 +57,7 @@ export function makeWrapper(
         type: info.type,
         label: info.name,
         isCommonConfig: !!this.props.$$commonSchema,
+        isFormConfig: !!this.props.$$formSchema,
         path: this.props.$path,
         schemaPath: info.schemaPath,
         dialogTitle: info.dialogTitle,
@@ -98,7 +100,7 @@ export function makeWrapper(
           const nodeSchema = manager.store.getNodeById(info.id)?.schema;
           const tag = appTranslate(nodeSchema?.title ?? nodeSchema?.name);
           manager.dataSchema.current.tag = `${info.name}${
-            tag ? ` : ${tag}` : ''
+            tag && typeof tag === 'string' ? ` : ${tag}` : ''
           }`;
           manager.dataSchema.current.group = '组件上下文';
         }
@@ -114,6 +116,10 @@ export function makeWrapper(
       ) {
         this.editorNode.updateIsCommonConfig(!!this.props.$$commonSchema);
       }
+
+      if (this.editorNode && props.$$formSchema !== prevProps.$$formSchema) {
+        this.editorNode.updateIsFormConfig(!!this.props.$$formSchema);
+      }
     }
 
     componentWillUnmount() {
@@ -128,9 +134,21 @@ export function makeWrapper(
     }
 
     @autobind
-    wrapperRef(ref: any) {
+    wrapperRef(raw: any) {
+      let ref = raw;
       while (ref?.getWrappedInstance) {
         ref = ref.getWrappedInstance();
+      }
+
+      if (ref && !ref.props) {
+        Object.defineProperty(ref, 'props', {
+          get: () => this.props
+        });
+      } else if (!ref && raw) {
+        ref = {};
+        Object.defineProperty(ref, 'props', {
+          get: () => this.props
+        });
       }
 
       if (this.editorNode && isAlive(this.editorNode)) {
@@ -169,6 +187,8 @@ export function makeWrapper(
        */
       const Wrapper = /*info.wrapper || (*/ this.props.$$commonSchema
         ? CommonConfigWrapper
+        : this.props.$$formSchema
+        ? FormConfigWrapper
         : info.regions
         ? ContainerWrapper
         : NodeWrapper; /*)*/
@@ -187,13 +207,25 @@ export function makeWrapper(
               );
             }}
           >
-            <Wrapper
-              {...rest}
-              render={this.renderChild}
-              $$editor={info}
-              $$node={this.editorNode}
-              ref={this.wrapperRef}
-            />
+            {info.useLazyRender ? (
+              <LazyComponent placeholder={<span />}>
+                <Wrapper
+                  {...rest}
+                  render={this.renderChild}
+                  $$editor={info}
+                  $$node={this.editorNode}
+                  ref={this.wrapperRef}
+                />
+              </LazyComponent>
+            ) : (
+              <Wrapper
+                {...rest}
+                render={this.renderChild}
+                $$editor={info}
+                $$node={this.editorNode}
+                ref={this.wrapperRef}
+              />
+            )}
           </ErrorBoundary>
         </EditorNodeContext.Provider>
       );
@@ -242,7 +274,15 @@ export function makeSchemaFormRender(
     body ? flatten(Array.isArray(body) ? body : [body]) : undefined
   );
 
-  return ({value, onChange, popOverContainer, id, store, node}: PanelProps) => {
+  return ({
+    value,
+    onChange,
+    popOverContainer,
+    id,
+    store,
+    node,
+    readonly
+  }: PanelProps) => {
     const ctx = {...manager.store.ctx};
 
     if (schema?.panelById && schema?.panelById !== node?.id) {
@@ -268,7 +308,7 @@ export function makeSchemaFormRender(
     const controls = filterBody(schema.controls);
 
     return (
-      <SchemaFrom
+      <SchemaForm
         key={curFormKey}
         propKey={curFormKey}
         api={schema.api}
@@ -286,6 +326,7 @@ export function makeSchemaFormRender(
         node={node}
         manager={manager}
         justify={schema.justify}
+        readonly={readonly}
       />
     );
   };
@@ -339,7 +380,7 @@ export function hackIn(
 
             if (
               info &&
-              !this.props.$$commonSchema &&
+              (!this.props.$$commonSchema || !this.props.$$formSchema) &&
               Array.isArray(info.regions) &&
               regions.every(region =>
                 find(info.regions!, c => c.key === region.key)
@@ -603,56 +644,13 @@ export function mapReactElement(
   return mapped;
 }
 
-const thumbHost = document.createElement('div');
 export function renderThumbToGhost(
   ghost: HTMLElement,
   region: EditorNodeType,
   schema: any,
   manager: EditorManager
 ) {
+  // 换成简单的线条即可， 目前也只有form 的 flex 模式拖拽会用到
   // bca-disable-next-line
-  ghost.innerHTML = '';
-  let path = '';
-  const host = region.host!;
-  const component = host.getComponent()!;
-  const isForm = component?.renderControl && region.region === 'body';
-
-  try {
-    reactRender(
-      render(
-        {
-          children: ({render}: any) => {
-            return isForm
-              ? render('', {
-                  type: 'form',
-                  wrapWithPanel: false,
-                  mode: component.props.mode,
-                  body: [schema]
-                })
-              : render(region.region, schema);
-          }
-        } as any,
-        {},
-        {
-          ...manager.env,
-          theme: component?.props.theme || manager.env.theme,
-          session: 'ghost-thumb'
-        },
-        path
-      ),
-      thumbHost
-    );
-  } catch (e) {}
-
-  /* bca-disable */
-  const html =
-    thumbHost.innerHTML ||
-    '<div class="wrapper-sm b-a b-light m-b-sm">拖入占位</div>';
-  // bca-disable-line
-  ghost.innerHTML = html;
-  /* bca-enable */
-
-  unmountComponentAtNode(thumbHost);
-  // bca-disable-next-line
-  thumbHost.innerHTML = '';
+  ghost.innerHTML = '<div class="ae-DragGhost-line"></div>';
 }

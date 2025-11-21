@@ -8,7 +8,14 @@ import {
   loadScript,
   buildStyle,
   CustomStyle,
-  setThemeClassName
+  setThemeClassName,
+  str2function,
+  AMISExpression,
+  AMISLegacyActionSchema,
+  AMISApi,
+  AMISLocalSource,
+  AMISFunction,
+  AMISTokenizeableString
 } from 'amis-core';
 import {ServiceStore, IServiceStore} from 'amis-core';
 
@@ -38,6 +45,8 @@ import debounce from 'lodash/debounce';
 import pick from 'lodash/pick';
 import isString from 'lodash/isString';
 import {ApiObject} from 'amis-core';
+import {AMISSchemaBase} from 'amis-core';
+import {AMISVariableName} from 'amis-core';
 
 const DEFAULT_EVENT_PARAMS = [
   'componentType',
@@ -56,9 +65,12 @@ const DEFAULT_EVENT_PARAMS = [
  * Chart 图表渲染器。
  * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/chart
  */
-export interface ChartSchema extends BaseSchema {
+/**
+ * 图表组件，用于可视化数据展示。支持多图表类型与异步数据源。
+ */
+export interface AMISChartSchema extends AMISSchemaBase {
   /**
-   * 指定为 chart 类型
+   * 指定为 chart 组件
    */
   type: 'chart';
 
@@ -73,26 +85,24 @@ export interface ChartSchema extends BaseSchema {
   api?: SchemaApi;
 
   /**
-   * 是否初始加载。
-   * @deprecated 建议直接配置 api 的 sendOn
+   * 是否初始加载
    */
   initFetch?: boolean;
 
   /**
    * 是否初始加载用表达式来配置
-   * @deprecated 建议用 api.sendOn 属性。
    */
-  initFetchOn?: SchemaExpression;
+  initFetchOn?: AMISExpression;
 
   /**
-   * 配置echart的config，支持数据映射。如果用了数据映射，为了同步更新，请设置 trackExpression
+   * 配置echart的config，支持数据映射
    */
   config?: any;
 
   /**
    * 跟踪表达式，如果这个表达式的运行结果发生变化了，则会更新 Echart，当 config 中用了数据映射时有用。
    */
-  trackExpression?: string;
+  trackExpression?: AMISTokenizeableString;
 
   /**
    * 宽度设置
@@ -109,7 +119,7 @@ export interface ChartSchema extends BaseSchema {
    */
   interval?: number;
 
-  name?: SchemaName;
+  name?: AMISVariableName;
 
   /**
    * style样式
@@ -118,9 +128,9 @@ export interface ChartSchema extends BaseSchema {
     [propName: string]: any;
   };
 
-  dataFilter?: SchemaFunction;
+  dataFilter?: AMISFunction;
 
-  source?: SchemaTokenizeableString;
+  source?: AMISLocalSource;
 
   /**
    * 默认开启 Config 中的数据映射，如果想关闭，请开启此功能。
@@ -130,7 +140,7 @@ export interface ChartSchema extends BaseSchema {
   /**
    * 点击行为配置，可以用来满足下钻操作等。
    */
-  clickAction?: ActionSchema;
+  clickAction?: AMISLegacyActionSchema;
 
   /**
    * 默认配置时追加的，如果更新配置想完全替换配置请配置为 true.
@@ -145,7 +155,7 @@ export interface ChartSchema extends BaseSchema {
   /**
    * 获取 geo json 文件的地址
    */
-  mapURL?: SchemaApi;
+  mapURL?: AMISApi;
 
   /**
    * 地图名称
@@ -203,7 +213,7 @@ function recoverFunctionType(config: object) {
 
 export interface ChartProps
   extends RendererProps,
-    Omit<ChartSchema, 'type' | 'className'> {
+    Omit<AMISChartSchema, 'type' | 'className'> {
   chartRef?: (echart: any) => void;
   onDataFilter?: (config: any, echarts: any, data?: any) => any;
   onChartWillMount?: (echarts: any) => void | Promise<void>;
@@ -427,7 +437,7 @@ export class Chart extends React.Component<ChartProps> {
         this.echarts = (echarts as any).init(ref, theme);
 
         if (typeof onChartMount === 'string') {
-          onChartMount = new Function('chart', 'echarts') as any;
+          onChartMount = str2function(onChartMount, 'chart', 'echarts') as any;
         }
 
         onChartMount?.(this.echarts, echarts);
@@ -467,7 +477,7 @@ export class Chart extends React.Component<ChartProps> {
     });
   }
 
-  reload(
+  async reload(
     subpath?: string,
     query?: any,
     ctx?: any,
@@ -491,60 +501,61 @@ export class Chart extends React.Component<ChartProps> {
     this.echarts?.showLoading();
 
     store.markFetching(true);
-    env
-      .fetcher(api, store.data, {
+    try {
+      const result = await env.fetcher(api, store.data, {
         cancelExecutor: (executor: Function) => (this.reloadCancel = executor)
-      })
-      .then(result => {
-        isAlive(store) && store.markFetching(false);
-
-        if (!result.ok) {
-          !(api as ApiObject)?.silent &&
-            env.notify(
-              'error',
-              (api as ApiObject)?.messages?.failed ??
-                (result.msg || __('fetchFailed')),
-              result.msgTimeout !== undefined
-                ? {
-                    closeButton: true,
-                    timeout: result.msgTimeout
-                  }
-                : undefined
-            );
-          return;
-        }
-        delete this.reloadCancel;
-
-        const data = normalizeApiResponseData(result.data);
-        // 说明返回的是数据接口。
-        if (!data.series && this.props.config) {
-          const ctx = createObject(this.props.data, data);
-          this.renderChart(this.props.config, ctx);
-        } else {
-          this.renderChart(result.data || {});
-        }
-
-        this.echarts?.hideLoading();
-
-        let curInterval = this.props.interval;
-
-        if (curInterval && isString(curInterval)) {
-          curInterval = Number.parseInt(curInterval);
-        }
-
-        curInterval &&
-          this.mounted &&
-          (this.timer = setTimeout(this.reload, Math.max(curInterval, 1000)));
-      })
-      .catch(reason => {
-        if (env.isCancel(reason)) {
-          return;
-        }
-
-        isAlive(store) && store.markFetching(false);
-        !(api as ApiObject)?.silent && env.notify('error', reason);
-        this.echarts?.hideLoading();
       });
+
+      isAlive(store) && store.markFetching(false);
+
+      if (!result.ok) {
+        !(api as ApiObject)?.silent &&
+          env.notify(
+            'error',
+            (api as ApiObject)?.messages?.failed ??
+              (result.msg || __('fetchFailed')),
+            result.msgTimeout !== undefined
+              ? {
+                  closeButton: true,
+                  timeout: result.msgTimeout
+                }
+              : undefined
+          );
+        return;
+      }
+      delete this.reloadCancel;
+
+      const data = normalizeApiResponseData(result.data);
+      // 说明返回的是数据接口。
+      if (!data.series && this.props.config) {
+        const ctx = createObject(this.props.data, data);
+        this.renderChart(this.props.config, ctx);
+      } else {
+        this.renderChart(result.data || {});
+      }
+
+      this.echarts?.hideLoading();
+
+      let curInterval = this.props.interval;
+
+      if (curInterval && isString(curInterval)) {
+        curInterval = Number.parseInt(curInterval);
+      }
+
+      curInterval &&
+        this.mounted &&
+        (this.timer = setTimeout(this.reload, Math.max(curInterval, 1000)));
+
+      return store.data;
+    } catch (reason) {
+      if (env.isCancel(reason)) {
+        return;
+      }
+
+      isAlive(store) && store.markFetching(false);
+      !(api as ApiObject)?.silent && env.notify('error', reason);
+      this.echarts?.hideLoading();
+    }
   }
 
   receive(data: object, subPath?: string, replace?: boolean) {
@@ -617,6 +628,29 @@ export class Chart extends React.Component<ChartProps> {
 
   reloadEcharts(config: any) {
     this.echarts?.setOption(config!, this.props.replaceChartOption);
+    this.echarts.on('finished', async () => {
+      const {data, dispatchEvent} = this.props;
+
+      const rendererEvent = await dispatchEvent(
+        'finished',
+        createObject(
+          data,
+          {},
+          {
+            echarts: {
+              value: this.echarts,
+              enumerable: false,
+              configurable: true,
+              writable: true
+            }
+          }
+        )
+      );
+
+      if (rendererEvent?.prevented) {
+        return;
+      }
+    });
   }
 
   render() {

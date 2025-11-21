@@ -14,15 +14,17 @@ import {escapeHtml} from 'amis-core';
 import {BaseSchema, SchemaTpl} from '../Schema';
 import {BadgeObject, withBadge} from 'amis-ui';
 import {buildStyle} from 'amis-core';
+import {AMISSchemaBase} from 'amis-core';
 
 /**
  * tpl 渲染器
  */
-export interface TplSchema extends BaseSchema {
+/**
+ * 模板组件，用于渲染 HTML/文本模板。支持变量插值与表达式。
+ */
+export interface AMISTplSchema extends AMISSchemaBase {
   /**
-   * 指定为模板渲染器。
-   *
-   * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/docs/concepts/template
+   * 指定为 tpl 组件
    */
   type: 'tpl' | 'html';
 
@@ -32,7 +34,7 @@ export interface TplSchema extends BaseSchema {
   raw?: string;
 
   /**
-   * 是否内联显示？
+   * 是否内联显示
    */
   inline?: boolean;
 
@@ -56,7 +58,7 @@ export interface TplSchema extends BaseSchema {
   testidBuilder?: TestIdBuilder;
 }
 
-export interface TplProps extends RendererProps, TplSchema {
+export interface TplProps extends RendererProps, AMISTplSchema {
   className?: string;
   value?: string;
 }
@@ -73,6 +75,7 @@ export class Tpl extends React.Component<TplProps, TplState> {
 
   dom: any;
   mounted: boolean;
+  sn: number = 0;
 
   constructor(props: TplProps) {
     super(props);
@@ -85,8 +88,8 @@ export class Tpl extends React.Component<TplProps, TplState> {
   componentDidUpdate(prevProps: Readonly<TplProps>): void {
     const checkProps = ['tpl', 'html', 'text', 'raw', 'data', 'placeholder'];
     if (
-      checkProps.some(key => prevProps[key] !== this.props[key]) ||
-      getPropValue(prevProps) !== getPropValue(this.props)
+      checkProps.some(key => !Object.is(prevProps[key], this.props[key])) ||
+      !Object.is(getPropValue(prevProps), getPropValue(this.props))
     ) {
       this.updateContent();
     }
@@ -102,7 +105,13 @@ export class Tpl extends React.Component<TplProps, TplState> {
 
   @autobind
   async updateContent() {
+    let sn = ++this.sn;
     const content = await this.getAsyncContent();
+
+    // 解决异步时序问题，防止较早的运算覆盖较晚的运算结果
+    if (sn !== this.sn) {
+      return;
+    }
     this.mounted && this.setState({content});
   }
 
@@ -219,7 +228,7 @@ export class Tpl extends React.Component<TplProps, TplState> {
     return (
       <Component
         className={cx(
-          'TplField',
+          'TplField fr-view',
           className,
           setThemeClassName({
             ...this.props,
@@ -266,7 +275,8 @@ export class Tpl extends React.Component<TplProps, TplState> {
 }
 
 @Renderer({
-  test: /(^|\/)(?:tpl|html)$/,
+  type: 'tpl',
+  alias: ['html'],
   name: 'tpl'
 })
 // @ts-ignore 类型没搞定

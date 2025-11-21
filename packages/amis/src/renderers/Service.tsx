@@ -27,16 +27,20 @@ import {
 import {
   BaseSchema,
   SchemaApi,
-  SchemaCollection,
   SchemaExpression,
   SchemaMessage,
   SchemaName
 } from '../Schema';
 import {IIRendererStore} from 'amis-core';
 
-import type {ListenerAction} from 'amis-core';
+import type {
+  AMISSchemaCollection,
+  AMISExpression,
+  ListenerAction
+} from 'amis-core';
 import type {ScopedComponentType} from 'amis-core';
 import isPlainObject from 'lodash/isPlainObject';
+import {isAlive} from 'mobx-state-tree';
 
 export const eventTypes = [
   /* 初始化时执行，默认 */
@@ -55,101 +59,104 @@ export type DataProviderCollection = Partial<
   Record<ProviderEventType, DataProvider>
 >;
 
-export type DataProvider = string | Function;
+export type DataProvider = string;
 
 export type ComposedDataProvider = DataProvider | DataProviderCollection;
 
 /**
- * Service 服务类控件。
- * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/service
+ * 服务组件，用于数据获取和处理。支持 API 调用、数据转换、条件渲染等。
  */
-export interface ServiceSchema extends BaseSchema, SpinnerExtraProps {
-  /**
-   * 指定为 Service 数据拉取控件。
-   */
+export interface AMISServiceSchema extends BaseSchema, SpinnerExtraProps {
   type: 'service';
 
   /**
-   * 页面初始化的时候，可以设置一个 API 让其取拉取，发送数据会携带当前 data 数据（包含地址栏参数），获取得数据会合并到 data 中，供组件内使用。
+   * API 接口配置
    */
   api?: SchemaApi;
 
   /**
-   * WebScocket 地址，用于实时获取数据
+   * WebSocket 地址
    */
   ws?: string;
 
   /**
-   * 通过调用外部函数来获取数据
+   * 数据提供者函数
    */
   dataProvider?: ComposedDataProvider;
 
   /**
-   * 内容区域
+   * 内容区域配置
    */
-  body?: SchemaCollection;
+  body?: AMISSchemaCollection;
 
   /**
-   * @deprecated 改成 api 的 sendOn。
+   * 数据拉取条件表达式
+   * @deprecated 建议使用 api 的 sendOn 属性
    */
-  fetchOn?: SchemaExpression;
+  fetchOn?: AMISExpression;
 
   /**
-   * 是否默认就拉取？
+   * 是否在组件初始化时自动拉取数据
    */
   initFetch?: boolean;
 
   /**
-   * 是否默认就拉取？通过表达式来决定.
-   *
-   * @deprecated 改成 api 的 sendOn。
+   * 通过表达式控制是否在初始化时拉取数据
+   * @deprecated 建议使用 api 的 sendOn 属性
    */
-  initFetchOn?: SchemaExpression;
+  initFetchOn?: AMISExpression;
 
   /**
-   * 用来获取远程 Schema 的 api
+   * 用于获取远程 Schema 的 API 配置
    */
   schemaApi?: SchemaApi;
 
   /**
-   * 是否默认加载 schemaApi
+   * 是否在组件初始化时自动加载 schemaApi
    */
   initFetchSchema?: boolean;
 
   /**
-   * 用表达式来配置。
-   * @deprecated 改成 api 的 sendOn。
+   * 通过表达式控制是否加载 schemaApi
+   * @deprecated 建议使用 api 的 sendOn 属性
    */
-  initFetchSchemaOn?: SchemaExpression;
+  initFetchSchemaOn?: AMISExpression;
 
   /**
-   * 是否轮询拉取
+   * 轮询间隔时间（毫秒），设置为 0 时停止轮询
    */
   interval?: number;
 
   /**
-   * 是否静默拉取
+   * 是否静默轮询，不显示加载状态
    */
   silentPolling?: boolean;
 
   /**
-   * 关闭轮询的条件。
+   * 停止自动刷新的条件表达式
    */
-  stopAutoRefreshWhen?: SchemaExpression;
+  stopAutoRefreshWhen?: AMISExpression;
 
+  /**
+   * 消息配置，用于显示成功或失败提示
+   */
   messages?: SchemaMessage;
 
+  /**
+   * 组件名称，用于组件通信和数据绑定
+   */
   name?: SchemaName;
 
   /**
-   * 是否以Alert的形式显示api接口响应的错误信息，默认展示
+   * 是否以 Alert 形式显示 API 接口响应的错误信息
+   * @default true
    */
   showErrorMsg?: boolean;
 }
 
 export interface ServiceProps
   extends RendererProps,
-    Omit<ServiceSchema, 'type' | 'className'> {
+    Omit<AMISServiceSchema, 'type' | 'className'> {
   store: IServiceStore;
   messages: SchemaMessage;
   testIdBuilder?: TestIdBuilder;
@@ -424,7 +431,7 @@ export default class Service extends React.Component<ServiceProps> {
     const dataProviders = this.dataProviders;
 
     if (dataProviders && ~eventTypes.indexOf(event)) {
-      const fn = dataProviders[event];
+      const fn = dataProviders[event] as any;
 
       if (fn && typeof fn === 'function') {
         const unsubscribe = await fn(
@@ -529,6 +536,9 @@ export default class Service extends React.Component<ServiceProps> {
     // 保存 ajax 请求的时候返回时数据部分。
     const data = result?.hasOwnProperty('ok') ? result.data ?? {} : result;
     const {onBulkChange, dispatchEvent, store, formStore} = this.props;
+    if (!isAlive(store)) {
+      return;
+    }
 
     dispatchEvent?.(
       'fetchInited',
@@ -543,7 +553,9 @@ export default class Service extends React.Component<ServiceProps> {
     );
 
     if (!isEmpty(data) && onBulkChange && formStore) {
-      onBulkChange(data);
+      onBulkChange(data, false, {
+        type: 'api'
+      });
     }
 
     result?.ok && this.initInterval(data);
@@ -584,13 +596,13 @@ export default class Service extends React.Component<ServiceProps> {
     return value;
   }
 
-  reload(
+  async reload(
     subpath?: string,
     query?: any,
     ctx?: RendererData,
     silent?: boolean,
     replace?: boolean
-  ) {
+  ): Promise<any> {
     if (query) {
       return this.receive(query, undefined, replace);
     }
@@ -609,44 +621,40 @@ export default class Service extends React.Component<ServiceProps> {
     clearTimeout(this.timer);
 
     if (isEffectiveApi(schemaApi, store.data)) {
-      store
-        .fetchSchema(schemaApi, store.data, {
-          successMessage: fetchSuccess,
-          errorMessage: fetchFailed
-        })
-        .then(res => {
-          this.runDataProvider('onApiFetched');
-          this.afterSchemaFetch(res);
-        });
+      const res = await store.fetchSchema(schemaApi, store.data, {
+        successMessage: fetchSuccess,
+        errorMessage: fetchFailed
+      });
+      await this.runDataProvider('onApiFetched');
+      this.afterSchemaFetch(res);
     }
 
     if (isEffectiveApi(api, store.data)) {
-      store
-        .fetchData(api, store.data, {
-          silent,
-          successMessage: fetchSuccess,
-          errorMessage: fetchFailed
-        })
-        .then(res => {
-          this.runDataProvider('onSchemaApiFetched');
-          this.afterDataFetch(res);
-        });
+      const res = await store.fetchData(api, store.data, {
+        silent,
+        successMessage: fetchSuccess,
+        errorMessage: fetchFailed
+      });
+      await this.runDataProvider('onSchemaApiFetched');
+      this.afterDataFetch(res);
     }
 
     if (dataProvider) {
-      this.runDataProvider('inited');
+      await this.runDataProvider('inited');
     }
+
+    return store.data;
   }
 
   silentReload(target?: string, query?: any) {
     this.reload(target, query, undefined, true);
   }
 
-  receive(values: object, subPath?: string, replace?: boolean) {
+  async receive(values: object, subPath?: string, replace?: boolean) {
     const {store} = this.props;
 
     store.updateData(values, undefined, replace);
-    this.reload();
+    return this.reload();
   }
 
   handleQuery(query: any) {
@@ -735,7 +743,7 @@ export default class Service extends React.Component<ServiceProps> {
 
     if (api && action.actionType === 'ajax') {
       store.setCurrentAction(action, this.props.resolveDefinitions);
-      store
+      return store
         .saveRemote(action.api as string, data, {
           successMessage: __(action.messages && action.messages.success),
           errorMessage: __(action.messages && action.messages.failed)
@@ -762,7 +770,7 @@ export default class Service extends React.Component<ServiceProps> {
           }
         });
     } else {
-      onAction(e, action, data, throwErrors, delegate || this.context);
+      return onAction(e, action, data, throwErrors, delegate || this.context);
     }
   }
 
@@ -843,8 +851,7 @@ export default class Service extends React.Component<ServiceProps> {
           // 单独给 feedback 服务的，handleAction 里面先不要处理弹窗
           'modal',
           {
-            ...((store.action as ActionObject) &&
-              ((store.action as ActionObject).dialog as object)),
+            ...store.dialogSchema,
             type: 'dialog'
           },
           {
@@ -876,7 +883,7 @@ export class ServiceRenderer extends Service {
     scoped.registerComponent(this as ScopedComponentType);
   }
 
-  reload(
+  async reload(
     subpath?: string,
     query?: any,
     ctx?: any,
@@ -894,7 +901,7 @@ export class ServiceRenderer extends Service {
     return super.reload(subpath, query, ctx, silent, replace);
   }
 
-  receive(values: any, subPath?: string, replace?: boolean) {
+  async receive(values: any, subPath?: string, replace?: boolean) {
     const scoped = this.context as IScopedContext;
     if (subPath) {
       return scoped.send(subPath, values);

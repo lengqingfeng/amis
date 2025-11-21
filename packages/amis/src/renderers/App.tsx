@@ -13,78 +13,76 @@ import {
   RendererProps,
   envOverwrite,
   filter,
-  replaceText
+  replaceText,
+  AMISSchemaBase
 } from 'amis-core';
-import {
-  BaseSchema,
-  SchemaApi,
-  SchemaClassName,
-  SchemaCollection
-} from '../Schema';
+import {BaseSchema, SchemaApi, AMISClassName} from '../Schema';
 import {IScopedContext, ScopedContext} from 'amis-core';
 import {AppStore, IAppStore} from 'amis-core';
 import {isApiOutdated, isEffectiveApi} from 'amis-core';
 import {autobind} from 'amis-core';
+import type {AMISApi, AMISSchemaCollection} from 'amis-core';
+import {AMISDefinitions} from 'amis-core';
 
-export interface AppPage extends SpinnerExtraProps {
+export interface AMISAppPage extends SpinnerExtraProps {
   /**
    * 菜单文字
    */
   label?: string;
 
   /**
-   * 菜单图标，比如： fa fa-file
+   * 菜单图标
    */
   icon?: string;
 
   /**
-   * 路由规则。比如：/banner/:id。当地址以 / 打头，则不继承上层的路径，否则将集成父级页面的路径。
+   * 路由规则
    */
   url?: string;
 
   /**
-   * 当match url 时跳转到目标地址.没有配置 schema 和 shcemaApi  时有效.
+   * 当match url 时跳转到目标地址
    */
   redirect?: string;
 
   /**
-   * 当match url 转成渲染目标地址的页面.没有配置 schema 和 shcemaApi  时有效.
+   * 当match url 转成渲染目标地址的页面
    */
   rewrite?: string;
 
   /**
-   * 不要出现多个，如果出现多个只有第一个有用。在路由找不到的时候作为默认页面。
+   * 不要出现多个，如果出现多个只有第一个有用。在路由找不到的时候作为默认页面
    */
   isDefaultPage?: boolean;
 
   /**
-   * 二选一，如果配置了 url 一定要配置。否则不知道如何渲染。
+   * 二选一，如果配置了 url 一定要配置。否则不知道如何渲染
    */
   schema?: any;
   schemaApi?: any;
 
   /**
-   * 单纯的地址。可以设置外部链接。
+   * 单纯的地址。设置外部链接
    */
   link?: string;
 
   /**
-   * 支持多层级。
+   * 支持多层级
    */
-  children?: Array<AppPage>;
+  children?: Array<AMISAppPage>;
 
   /**
    * 菜单上的类名
    */
-  className?: SchemaClassName;
+  className?: AMISClassName;
 
   /**
-   * 是否在导航中可见，适合于那种需要携带参数才显示的页面。比如具体某个数据的编辑页面。
+   * 是否在导航中可见
    */
   visible?: boolean;
 
   /**
-   * 默认是自动，即：自己选中或者有孩子节点选中则展开。
+   * 默认为自动，即：自己选中或者有孩子节点选中则展开。
    * 如果配置成 always 或者配置成 true 则永远展开。
    * 如果配置成 false 则永远不展开。
    */
@@ -95,13 +93,16 @@ export interface AppPage extends SpinnerExtraProps {
  * App 渲染器，适合 JSSDK 用来做多页渲染。
  * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/app
  */
-export interface AppSchema extends BaseSchema, SpinnerExtraProps {
+/**
+ * 应用容器组件，提供全局配置与布局。用于承载多页面/路由场景。
+ */
+export interface AMISAppSchema extends AMISSchemaBase, SpinnerExtraProps {
   /**
-   * 指定为 app 类型。
+   * 指定为 app 组件
    */
   type: 'app';
 
-  api?: SchemaApi;
+  api?: AMISApi;
 
   /**
    * 系统名称
@@ -116,32 +117,32 @@ export interface AppSchema extends BaseSchema, SpinnerExtraProps {
   /**
    * 顶部区域
    */
-  header?: SchemaCollection;
+  header?: AMISSchemaCollection;
 
   /**
    * 边栏菜单前面的区域
    */
-  asideBefore?: SchemaCollection;
+  asideBefore?: AMISSchemaCollection;
 
   /**
    * 边栏菜单后面的区域
    */
-  asideAfter?: SchemaCollection;
+  asideAfter?: AMISSchemaCollection;
 
   /**
    * 页面集合。
    */
-  pages?: Array<AppPage> | AppPage;
+  pages?: Array<AMISAppPage> | AMISAppPage;
 
   /**
    * 底部区域。
    */
-  footer?: SchemaCollection;
+  footer?: AMISSchemaCollection;
 
   /**
-   * css 类名。
+   * CSS 类名。
    */
-  className?: SchemaClassName;
+  className?: AMISClassName;
   /**
    * 显示面包屑路径。
    */
@@ -154,16 +155,22 @@ export interface AppSchema extends BaseSchema, SpinnerExtraProps {
    * 显示面包屑首页路径。
    */
   showBreadcrumbHomePath?: boolean;
+
+  /**
+   * 类似 json-schema 的定义，可以被其他组件引用
+   * 目前只有顶级组件可以定义，其他组件不能定义。
+   */
+  definitions?: AMISDefinitions;
 }
 
 export interface AppProps
   extends RendererProps,
-    Omit<AppSchema, 'type' | 'className'> {
+    Omit<AMISAppSchema, 'type' | 'className'> {
   children?: JSX.Element | ((props?: any) => JSX.Element);
   store: IAppStore;
 }
 
-export default class App extends React.Component<AppProps, object> {
+export class App extends React.Component<AppProps, object> {
   static propsList: Array<string> = [
     'brandName',
     'logo',
@@ -240,7 +247,7 @@ export default class App extends React.Component<AppProps, object> {
     ctx?: any,
     silent?: boolean,
     replace?: boolean
-  ) {
+  ): Promise<any> {
     if (query) {
       return this.receive(query, undefined, replace);
     }
@@ -277,13 +284,15 @@ export default class App extends React.Component<AppProps, object> {
         );
       }
     }
+
+    return store.data;
   }
 
-  receive(values: object, subPath?: string, replace?: boolean) {
+  async receive(values: object, subPath?: string, replace?: boolean) {
     const {store} = this.props;
 
     store.updateData(values, undefined, replace);
-    this.reload();
+    return this.reload();
   }
 
   /**
@@ -303,8 +312,10 @@ export default class App extends React.Component<AppProps, object> {
   handleNavClick(e: React.MouseEvent) {
     e.preventDefault();
 
+    const store = this.props.store;
     const env = this.props.env;
     const link = e.currentTarget.getAttribute('href')!;
+    store.updateOffScreen(false);
     env.jumpTo(link, undefined, this.props.data);
   }
 
@@ -335,11 +346,7 @@ export default class App extends React.Component<AppProps, object> {
 
           <div className={cx('Layout-brand')}>
             {logo && ~logo.indexOf('<svg') ? (
-              <Html
-                className={cx('AppLogo-html')}
-                html={logo}
-                filterHtml={env.filterHtml}
-              />
+              <Html className={cx('AppLogo-html')} html={logo} />
             ) : logo ? (
               <img className={cx('AppLogo')} src={logo} />
             ) : (
@@ -549,7 +556,7 @@ export default class App extends React.Component<AppProps, object> {
   type: 'app',
   storeType: AppStore.name
 })
-export class AppRenderer extends App {
+export default class AppRenderer extends App {
   static contextType = ScopedContext;
   constructor(props: AppProps, context: IScopedContext) {
     super(props);

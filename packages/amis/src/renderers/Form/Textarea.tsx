@@ -4,20 +4,26 @@ import {
   FormControlProps,
   resolveEventData,
   autobind,
-  getVariable
+  getVariable,
+  CustomStyle,
+  setThemeClassName
 } from 'amis-core';
 import {Textarea} from 'amis-ui';
-import type {ListenerAction} from 'amis-core';
+import type {AMISFormItem, ListenerAction} from 'amis-core';
 import {FormBaseControlSchema} from '../../Schema';
 import {supportStatic} from './StaticHoc';
+import cx from 'classnames';
 
 /**
  * TextArea 多行文本输入框。
  * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/textarea
  */
-export interface TextareaControlSchema extends FormBaseControlSchema {
+/**
+ * TextArea 多行文本输入框组件，支持最大/最小行数、只读、边框模式、最大长度、字符统计和清除等功能。
+ */
+export interface AMISTextareaSchema extends AMISFormItem {
   /**
-   * 指定为多行文本输入框
+   * 指定为 textarea 组件
    */
   type: 'textarea';
 
@@ -37,27 +43,27 @@ export interface TextareaControlSchema extends FormBaseControlSchema {
   readOnly?: boolean;
 
   /**
-   * 边框模式，全边框，还是半边框，或者没边框。
+   * 边框模式
    */
   borderMode?: 'full' | 'half' | 'none';
 
   /**
-   * 限制文字个数
+   * 最大长度
    */
   maxLength?: number;
 
   /**
-   * 是否显示计数
+   * 是否显示字符计数
    */
   showCounter?: boolean;
 
   /**
-   * 输入内容是否可清除
+   * 是否显示清除按钮
    */
   clearable?: boolean;
 
   /**
-   * 重置值
+   * 重置时的默认值
    */
   resetValue?: string;
 }
@@ -193,14 +199,55 @@ export default class TextAreaControl extends React.Component<
   @supportStatic()
   render() {
     const {...rest} = this.props;
+    const {id, themeCss, env, className, classPrefix: ns} = this.props;
     return (
-      <Textarea
-        {...rest}
-        forwardRef={this.inputRef}
-        onFocus={this.handleFocus}
-        onBlur={this.handleBlur}
-        onChange={this.handleChange}
-      />
+      <>
+        <Textarea
+          {...rest}
+          forwardRef={this.inputRef}
+          onFocus={this.handleFocus}
+          onBlur={this.handleBlur}
+          onChange={this.handleChange}
+          className={cx(
+            className,
+            setThemeClassName({
+              ...this.props,
+              name: 'inputControlClassName',
+              id,
+              themeCss: themeCss
+            })
+          )}
+        />
+        <CustomStyle
+          {...this.props}
+          config={{
+            themeCss: themeCss,
+            classNames: [
+              {
+                key: 'inputControlClassName',
+                weights: {
+                  default: {
+                    inner: `.${ns}TextareaControl-input`
+                  },
+                  hover: {
+                    inner: `.${ns}TextareaControl-input`
+                  },
+                  focused: {
+                    suf: '.is-focused',
+                    inner: `.${ns}TextareaControl-input`
+                  },
+                  disabled: {
+                    suf: '.is-disabled',
+                    inner: `.${ns}TextareaControl-input`
+                  }
+                }
+              }
+            ],
+            id: id
+          }}
+          env={env}
+        />
+      </>
     );
   }
 }

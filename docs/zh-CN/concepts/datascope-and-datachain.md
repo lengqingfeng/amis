@@ -203,7 +203,7 @@ page
 - Dialog
 - Drawer
 - List
-- Page
+- Form
 - PaginationWrapper
 - Service
 - Wizard
@@ -405,7 +405,7 @@ page
 目前 amis 中，具备数据域的组件，默认会检测两层节点的数据是否发生变化（上层数据域和上上层数据域），来决定当前层的数据要不要更新。存在两个问题：
 
 1. 当前组件也许并不关心上层数据是否变化，没必要进行这些刷新操作
-2. 当前组件关系上上层的数据变化，但是在此拿不到最新的。（比如：放在 service 中的 crud，crud 中 filter 用了 service 的接口返回数据，但是拿不到最新的）
+2. 当前组件关心上上层的数据变化，但是在此拿不到最新的。（比如：放在 service 中的 crud，crud 中 filter 用了 service 的接口返回数据，但是拿不到最新的）
 
 amis 从 3.2.0 版本开始针对[具备数据域的组件](#具备数据域的组件)新增了 `trackExpression` 属性，用来主动配置当前组件需要关心的上层数据。
 
@@ -454,5 +454,80 @@ url 中的参数会进入顶层数据域，比如下面的例子，可以点击[
 {
   "type": "page",
   "body": "${word}"
+}
+```
+
+## 隐藏数据
+
+数据中还有以下字段不会被枚举到，但是可以读取：
+
+- `__prev` 修改前的值
+- `__changeReason` 修改原因
+- `__changeReason.type` 修改原因类型
+  - `input` 用户输入
+  - `api` api 接口返回触发
+  - `formula` 公式计算触发
+  - `hide` 隐藏属性变化触发
+  - `init` 表单项初始化触发
+  - `action` 事件动作触发
+- `__super` 数据链的上一级
+
+> `__changeReason` 字段在 amis 6.9.0 版本开始支持
+
+```schema
+{
+  "data": {
+    "name": "amis"
+  },
+  "type": "form",
+  id: "form_data",
+  "actions": [
+    {
+      type: "button",
+      label: "接口获取",
+      actionType: "ajax",
+      api: {
+        "method": "get",
+        url: "/api/mock2/form/saveForm",
+        mockResponse: {
+          status: 200,
+          data: {
+            name: "amis-demo"
+          }
+        }
+      }
+    },
+
+    {
+      type: "button",
+      label: "设置值",
+      onEvent: {
+        click: {
+          actions: [
+            {
+              "actionType": "setValue",
+              "componentId": "form_data",
+              "args": {
+                "value": {
+                  "name": "amis-demo2"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+  ],
+  "body": [
+    {
+      type: "input-text",
+      name: "name",
+      label: "姓名"
+    },
+    {
+      type: "tpl",
+      tpl: "当前值：${name}<br />修改前的值：${__prev.name}<br />变化原因：${__changeReason|json}"
+    }
+  ]
 }
 ```

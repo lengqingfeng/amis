@@ -12,13 +12,14 @@ import {
 } from './Action';
 
 export interface IAjaxAction extends ListenerAction {
-  action: 'ajax';
+  actionType: 'ajax' | 'download';
   api: Api;
   messages?: {
     success: string;
     failed: string;
   };
   options?: Record<string, any>;
+
   [propName: string]: any;
 }
 
@@ -31,6 +32,7 @@ export interface IAjaxAction extends ListenerAction {
  */
 export class AjaxAction implements RendererAction {
   fetcherType: string;
+
   constructor(fetcherType: string = 'ajax') {
     this.fetcherType = fetcherType;
   }
@@ -59,7 +61,7 @@ export class AjaxAction implements RendererAction {
     const messages = (action?.api as ApiObject)?.messages;
     let api = normalizeApi(action.api);
 
-    if (api.sendOn !== undefined) {
+    if (api.sendOn) {
       // 发送请求前，判断是否需要发送
       const sendOn = await evalExpressionWithConditionBuilderAsync(
         api.sendOn,
@@ -94,6 +96,7 @@ export class AjaxAction implements RendererAction {
       // 记录请求返回的数据
       event.setData(
         createObject(event.data, {
+          ...event.data,
           ...responseData, // 兼容历史配置
           responseData: responseData,
           [action.outputVar || 'responseResult']: {
@@ -149,9 +152,7 @@ export class AjaxAction implements RendererAction {
           env.notify('error', e.message);
         }
       }
-
-      // 不阻塞后面执行
-      // throw e;
+      throw e;
     }
   }
 }

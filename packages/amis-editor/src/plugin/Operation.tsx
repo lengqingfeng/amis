@@ -10,12 +10,13 @@ import {
   SubRendererInfo
 } from 'amis-editor-core';
 import {getSchemaTpl} from 'amis-editor-core';
+import {generateId} from '../util';
 
 export class OperationPlugin extends BasePlugin {
   static id = 'OperationPlugin';
   // 关联渲染器名字
   rendererName = 'operation';
-  $schema = '/schemas/OperationSchema.json';
+  $schema = '/schemas/AMISOperationSchema.json';
 
   // 组件名称
   name = '操作栏';
@@ -29,7 +30,8 @@ export class OperationPlugin extends BasePlugin {
     buttons: [
       {
         label: '按钮',
-        type: 'button'
+        type: 'button',
+        id: generateId()
       }
     ]
   };

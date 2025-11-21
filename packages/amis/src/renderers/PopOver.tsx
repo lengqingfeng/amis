@@ -4,120 +4,21 @@
  */
 
 import React from 'react';
-import {findDOMNode} from 'react-dom';
+import {findDomCompat as findDOMNode} from 'amis-core';
 import {RendererProps} from 'amis-core';
 import cx from 'classnames';
 import hoistNonReactStatic from 'hoist-non-react-statics';
 import {PopOver} from 'amis-core';
 import {Overlay} from 'amis-core';
 import {Icon} from 'amis-ui';
-import {SchemaCollection, SchemaExpression} from '../Schema';
-import {RootClose} from 'amis-core';
+import {RootClose, AMISPopOverBase} from 'amis-core';
 
-export interface SchemaPopOverObject {
-  /**
-   * 类名
-   */
-  className?: string;
-
-  /**
-   * 弹框外层类名
-   */
-  popOverClassName?: string;
-
-  /**
-   * 配置当前行是否启动，要用表达式
-   */
-  popOverEnableOn?: SchemaExpression;
-
-  /**
-   * 弹出模式
-   */
-  mode?: 'dialog' | 'drawer' | 'popOver';
-
-  /**
-   * 是弹窗形式的时候有用。
-   */
-  size?: 'sm' | 'md' | 'lg' | 'xl';
-
-  /**
-   * 弹出位置
-   */
-  position?:
-    | 'center'
-    | 'left-top'
-    | 'left-top-left-top'
-    | 'left-top-left-center'
-    | 'left-top-left-bottom'
-    | 'left-top-center-top'
-    | 'left-top-center-center'
-    | 'left-top-center-bottom'
-    | 'left-top-right-top'
-    | 'left-top-right-center'
-    | 'left-top-right-bottom'
-    | 'right-top'
-    | 'right-top-left-top'
-    | 'right-top-left-center'
-    | 'right-top-left-bottom'
-    | 'right-top-center-top'
-    | 'right-top-center-center'
-    | 'right-top-center-bottom'
-    | 'right-top-right-top'
-    | 'right-top-right-center'
-    | 'right-top-right-bottom'
-    | 'left-bottom'
-    | 'left-bottom-left-top'
-    | 'left-bottom-left-center'
-    | 'left-bottom-left-bottom'
-    | 'left-bottom-center-top'
-    | 'left-bottom-center-center'
-    | 'left-bottom-center-bottom'
-    | 'left-bottom-right-top'
-    | 'left-bottom-right-center'
-    | 'left-bottom-right-bottom'
-    | 'right-bottom'
-    | 'right-bottom-left-top'
-    | 'right-bottom-left-center'
-    | 'right-bottom-left-bottom'
-    | 'right-bottom-center-top'
-    | 'right-bottom-center-center'
-    | 'right-bottom-center-bottom'
-    | 'right-bottom-right-top'
-    | 'right-bottom-right-center'
-    | 'right-bottom-right-bottom'
-    | 'fixed-center'
-    | 'fixed-left-top'
-    | 'fixed-right-top'
-    | 'fixed-left-bottom'
-    | 'fixed-right-bottom';
-
-  /**
-   * 触发条件，默认是 click
-   */
-  trigger?: 'click' | 'hover';
-
-  /**
-   * 是否显示查看更多的 icon，通常是放大图标。
-   */
-  showIcon?: boolean;
-
-  /**
-   * 偏移量
-   */
-  offset?: {
-    top?: number;
-    left?: number;
-  };
-
-  /**
-   * 标题
-   */
-  title?: string;
-
-  body?: SchemaCollection;
+export interface AMISPopOver extends AMISPopOverBase {
+  type: 'popOver';
 }
 
-export type SchemaPopOver = boolean | SchemaPopOverObject;
+export type SchemaPopOverObject = AMISPopOver;
+export type SchemaPopOver = boolean | AMISPopOver;
 
 export interface PopOverProps extends RendererProps {
   name?: string;
@@ -125,6 +26,7 @@ export interface PopOverProps extends RendererProps {
   popOver: boolean | SchemaPopOverObject;
   onPopOverOpened: (popover: any) => void;
   onPopOverClosed: (popover: any) => void;
+  textOverflow?: 'noWrap' | 'ellipsis' | 'default';
 }
 
 export interface PopOverState {
@@ -162,10 +64,20 @@ export const HocPopOver =
         this.target = ref;
       }
 
-      openPopOver() {
+      openPopOver(event: any) {
         const onPopOverOpened = this.props.onPopOverOpened;
         lastOpenedInstance?.closePopOver();
         lastOpenedInstance = this;
+        const e = event.currentTarget;
+        // 如果内容不超出，不需要弹出
+        if (
+          (this.getClassName() === 'ellipsis' &&
+            e &&
+            e.clientHeight >= e.scrollHeight) ||
+          this.getClassName() === 'noWrap'
+        ) {
+          return;
+        }
         this.setState(
           {
             isOpened: true
@@ -192,7 +104,7 @@ export const HocPopOver =
 
       closePopOverLater() {
         // 5s 后自动关闭。
-        this.timer = setTimeout(this.closePopOver, 2000);
+        this.timer = setTimeout(this.closePopOver, 500);
       }
 
       clearCloseTimer() {
@@ -200,7 +112,7 @@ export const HocPopOver =
       }
 
       buildSchema() {
-        const {popOver, name, label, translate: __} = this.props;
+        const {popOver, name, label, translate: __, column} = this.props;
 
         let schema;
 
@@ -232,7 +144,12 @@ export const HocPopOver =
         } else if (popOver) {
           schema = {
             type: 'panel',
-            ...popOver
+            ...(popOver as any)
+          };
+        } else if (this.getClassName() === 'ellipsis') {
+          schema = {
+            type: 'panel',
+            body: column && column.type === 'mapping' ? column : `\${${name}}`
           };
         }
 
@@ -241,7 +158,8 @@ export const HocPopOver =
 
       getOffset() {
         const {popOver} = this.props;
-        if (typeof popOver === 'boolean' || !popOver.offset) {
+
+        if (!popOver || typeof popOver === 'boolean' || !popOver.offset) {
           return undefined;
         }
 
@@ -273,15 +191,19 @@ export const HocPopOver =
         }
 
         const content = render('popover-detail', this.buildSchema(), {
-          className: cx((popOver as SchemaPopOverObject).className)
+          className: cx(popOver && (popOver as SchemaPopOverObject).className)
         }) as JSX.Element;
 
         if (!popOverContainer) {
           popOverContainer = () => findDOMNode(this);
         }
 
+        const selectClassName = this.getClassName();
+        const defaultPlacement =
+          selectClassName === 'ellipsis' && !popOver ? 'auto' : 'center';
         const position =
           (popOver && (popOver as SchemaPopOverObject).position) || '';
+
         const isFixed = /^fixed\-/.test(position);
         return isFixed ? (
           <RootClose
@@ -312,7 +234,7 @@ export const HocPopOver =
         ) : (
           <Overlay
             container={popOverContainer}
-            placement={position || config.position || 'center'}
+            placement={position || config.position || defaultPlacement}
             target={() => this.target}
             onHide={this.closePopOver}
             rootClose
@@ -322,16 +244,18 @@ export const HocPopOver =
               classPrefix={ns}
               className={cx(
                 'PopOverAble-popover',
-                (popOver as SchemaPopOverObject).popOverClassName
+                popOver && (popOver as SchemaPopOverObject).popOverClassName
               )}
               offset={this.getOffset()}
               onMouseLeave={
-                (popOver as SchemaPopOverObject)?.trigger === 'hover'
+                (popOver as SchemaPopOverObject)?.trigger === 'hover' ||
+                selectClassName
                   ? this.closePopOver
                   : undefined
               }
               onMouseEnter={
-                (popOver as SchemaPopOverObject)?.trigger === 'hover'
+                (popOver as SchemaPopOverObject)?.trigger === 'hover' ||
+                selectClassName
                   ? this.clearCloseTimer
                   : undefined
               }
@@ -341,6 +265,10 @@ export const HocPopOver =
           </Overlay>
         );
       }
+      getClassName() {
+        const {textOverflow} = this.props;
+        return textOverflow === 'default' ? '' : textOverflow;
+      }
 
       render() {
         const {
@@ -349,12 +277,15 @@ export const HocPopOver =
           popOverEnable,
           className,
           noHoc,
+          width,
           classnames: cx,
           showIcon
         } = this.props;
 
+        const selectClassName = this.getClassName();
+
         if (
-          !popOver ||
+          (!popOver && !selectClassName) ||
           popOverEnabled === false ||
           noHoc ||
           popOverEnable === false
@@ -364,7 +295,10 @@ export const HocPopOver =
 
         const triggerProps: any = {};
         const trigger = (popOver as SchemaPopOverObject)?.trigger;
-        if (trigger === 'hover') {
+        if (
+          trigger === 'hover' ||
+          (selectClassName === 'ellipsis' && !popOver)
+        ) {
           triggerProps.onMouseEnter = this.openPopOver;
           triggerProps.onMouseLeave = this.closePopOverLater;
         } else {
@@ -379,7 +313,7 @@ export const HocPopOver =
             })}
             ref={config.targetOutter ? this.targetRef : undefined}
           >
-            {(popOver as SchemaPopOverObject)?.showIcon !== false ? (
+            {(popOver as SchemaPopOverObject)?.showIcon !== false && popOver ? (
               <>
                 <Component {...this.props} contentsOnly noHoc />
                 <span
@@ -395,7 +329,12 @@ export const HocPopOver =
             ) : (
               <>
                 <div
-                  className={cx('Field-popOverWrap')}
+                  className={cx(
+                    'Field-popOverWrap',
+                    selectClassName
+                      ? 'Field-popOverWrap-' + selectClassName
+                      : ''
+                  )}
                   {...triggerProps}
                   ref={config.targetOutter ? undefined : this.targetRef}
                 >

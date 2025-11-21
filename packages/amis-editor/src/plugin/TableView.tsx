@@ -18,9 +18,10 @@ import {
 } from 'amis-editor-core';
 import {defaultValue, getSchemaTpl} from 'amis-editor-core';
 import {VRenderer} from 'amis-editor-core';
-import type {TableViewSchema} from 'amis';
+import {type TableViewSchema} from 'amis';
 import {JSONGetById} from 'amis-editor-core';
 import {TableViewEditor} from '../component/TableViewEditor';
+import {generateId} from '../util';
 
 /**
  * 尚未实现的功能：
@@ -90,7 +91,8 @@ export class TableViewPlugin extends BasePlugin {
   static id = 'TableViewPlugin';
   // 关联渲染器名字
   rendererName = 'table-view';
-  $schema = '/schemas/TableViewSchema.json';
+  useLazyRender = true; // 使用懒渲染
+  $schema = '/schemas/AMISTableViewSchema.json';
 
   // 组件名称
   name = '表格视图';
@@ -111,13 +113,15 @@ export class TableViewPlugin extends BasePlugin {
             body: {
               type: 'tpl',
               wrapperComponent: '',
-              tpl: '地区'
+              tpl: '地区',
+              id: generateId()
             }
           },
           {
             body: {
               type: 'tpl',
               wrapperComponent: '',
+              id: generateId(),
               tpl: '城市'
             }
           },
@@ -125,6 +129,7 @@ export class TableViewPlugin extends BasePlugin {
             body: {
               type: 'tpl',
               wrapperComponent: '',
+              id: generateId(),
               tpl: '销量'
             }
           }
@@ -137,6 +142,7 @@ export class TableViewPlugin extends BasePlugin {
             body: {
               type: 'tpl',
               wrapperComponent: '',
+              id: generateId(),
               tpl: '华北'
             }
           },
@@ -144,6 +150,7 @@ export class TableViewPlugin extends BasePlugin {
             body: {
               type: 'tpl',
               wrapperComponent: '',
+              id: generateId(),
               tpl: '北京'
             }
           },
@@ -151,6 +158,7 @@ export class TableViewPlugin extends BasePlugin {
             body: {
               type: 'tpl',
               wrapperComponent: '',
+              id: generateId(),
               tpl: '${beijing}'
             }
           }
@@ -162,6 +170,7 @@ export class TableViewPlugin extends BasePlugin {
             body: {
               type: 'tpl',
               wrapperComponent: '',
+              id: generateId(),
               tpl: '天津'
             }
           },
@@ -169,6 +178,7 @@ export class TableViewPlugin extends BasePlugin {
             body: {
               type: 'tpl',
               wrapperComponent: '',
+              id: generateId(),
               tpl: '${tianjing}'
             }
           }
@@ -279,7 +289,7 @@ export class TableViewPlugin extends BasePlugin {
           plugin={info.plugin}
           renderer={info.renderer}
           key={id}
-          $schema="/schemas/TdObject.json"
+          $schema="/schemas/AMISTdObjectSchema.json"
           hostId={info.id}
           memberIndex={colIndex} // TODO: colIndex 其实不对，需要增加 schema filter 功能来让插件能
           name={`${`单元格 ${rowIndex + 1},${colIndex + 1}`}`}
@@ -309,7 +319,7 @@ export class TableViewPlugin extends BasePlugin {
           plugin={info.plugin}
           renderer={info.renderer}
           key={id}
-          $schema="/schemas/TrObject.json"
+          $schema="/schemas/AMISTrObjectSchema.json"
           hostId={info.id}
           memberIndex={rowIndex}
           name={`${`行 ${rowIndex + 1}`}`}

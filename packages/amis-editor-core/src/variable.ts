@@ -197,7 +197,7 @@ export class VariableManager {
       }
     });
 
-    return reverseOrder ? options : reverse(options);
+    return reverseOrder ? options : (reverse(options as any) as Option[]);
   }
 
   /**
@@ -259,15 +259,49 @@ export class VariableManager {
 
     const options = [
       ...this.getVariableOptions(),
-      ...this.getPageVariablesOptions()
+      ...this.getPageVariablesOptions(),
+      ...this.getGlobalVariablesOptions()
     ];
-    const node = findTree(
-      options,
-      item => item[valueField ?? 'value'] === path
-    );
-
+    let nodePaths: Array<any> = [];
+    const node = findTree(options, (item, key, level, paths) => {
+      if (item[valueField ?? 'value'] === path) {
+        nodePaths = paths.concat(item);
+        return true;
+      }
+      return false;
+    });
     return node
-      ? node[labelField ?? 'label'] ?? node[valueField ?? 'value'] ?? ''
+      ? nodePaths
+          .map(
+            node =>
+              node[labelField ?? 'label'] ?? node[valueField ?? 'value'] ?? ''
+          )
+          .join(' / ')
       : '';
+  }
+
+  /**
+   * 获取全局变量树形结构
+   * @returns
+   */
+  getGlobalVariablesOptions() {
+    let options: Option[] = [];
+
+    const rootScope = this.dataSchema?.root;
+    if (rootScope) {
+      options = rootScope
+        .getDataPropsAsOptions()
+        .filter((item: any) => ['global'].includes(item.value));
+    }
+    eachTree(options, item => {
+      if (item.type === 'array') {
+        delete item.children;
+      }
+      if (item.value === 'global') {
+        item.disabled = true;
+      }
+    });
+
+    return options;
   }
 }

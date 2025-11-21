@@ -30,24 +30,24 @@ export class BasicToolbarPlugin extends BasePlugin {
     const parent = store.getSchemaParentById(id);
     const draggableContainer = this.manager.draggableContainer(id);
     // 判断是否为吸附容器
-    const isSorptionContainer = schema?.isSorptionContainer || false;
+    // const isSorptionContainer = schema?.isSorptionContainer || false;
     // let vertical = true;
     const regionNode = node.parent as EditorNodeType; // 父级节点
     if ((Array.isArray(parent) && regionNode?.isRegion) || draggableContainer) {
       const host = node.host as EditorNodeType;
 
-      if ((node.draggable || draggableContainer) && !isSorptionContainer) {
-        toolbars.push({
-          id: 'drag',
-          iconSvg: 'drag-btn',
-          icon: 'fa fa-arrows',
-          tooltip: '按住拖动调整位置',
-          placement: 'bottom',
-          draggable: true,
-          order: -1000,
-          onDragStart: this.manager.startDrag.bind(this.manager, id)
-        });
-      }
+      // if ((node.draggable || draggableContainer) && !isSorptionContainer) {
+      //   toolbars.push({
+      //     id: 'drag',
+      //     iconSvg: 'drag-btn',
+      //     icon: 'fa fa-arrows',
+      //     tooltip: '按住拖动调整位置',
+      //     placement: 'bottom',
+      //     draggable: true,
+      //     order: -1000,
+      //     onDragStart: this.manager.startDrag.bind(this.manager, id)
+      //   });
+      // }
 
       const idx = parent?.indexOf(schema);
 
@@ -232,7 +232,10 @@ export class BasicToolbarPlugin extends BasePlugin {
 
             this.manager.openContextMenu(id, '', {
               x: x,
-              y: window.scrollY + info.top + info.height + 8
+              y: window.scrollY + info.top + info.height + 8,
+              target: e.target as HTMLElement,
+              clientX: e.clientX,
+              clientY: e.clientY
             });
           }
         }
@@ -250,8 +253,41 @@ export class BasicToolbarPlugin extends BasePlugin {
     }
   }
 
+  getElementsFromPoint(x: number, y: number, target: HTMLElement) {
+    const store = this.manager.store;
+    const doc = store.getDoc();
+
+    // 通常是来源于移动端预览的 iframe
+    if (target.ownerDocument !== doc) {
+      const preview: HTMLElement = (store.getLayer() as HTMLElement)
+        .previousSibling?.firstChild as HTMLElement;
+      const previewRect = preview.getBoundingClientRect();
+
+      x -= previewRect.left;
+      y -= previewRect.top;
+      // 如果有缩放比例，重新计算位置
+      const scale = store.getScale();
+      if (scale >= 0) {
+        x = x / scale;
+        y = y / scale;
+      }
+    }
+
+    let elements = store.getDoc().elementsFromPoint(x, y);
+    return elements.filter(item => item.hasAttribute('data-editor-id'));
+  }
+
   buildEditorContextMenu(
-    {id, schema, region, info, selections}: ContextMenuEventContext,
+    {
+      id,
+      schema,
+      region,
+      info,
+      selections,
+      clientX,
+      clientY,
+      target
+    }: ContextMenuEventContext,
     menus: Array<ContextMenuItem>
   ) {
     const manager = this.manager;
@@ -260,9 +296,11 @@ export class BasicToolbarPlugin extends BasePlugin {
     const node = store.getNodeById(id)!;
     const paths = store.getNodePathById(id);
     const first = paths.pop()!;
-    region = region || node.childRegions.find(i => i.region)?.region;
     const host = node.host as EditorNodeType;
-    const regionNode = node.parent as EditorNodeType;
+
+    const elements = target
+      ? this.getElementsFromPoint(clientX!, clientY!, target)
+      : [];
 
     if (selections.length) {
       // 多选时的右键菜单
@@ -280,7 +318,11 @@ export class BasicToolbarPlugin extends BasePlugin {
         id: 'unselect',
         label: '取消多选',
         icon: 'cancel-icon',
-        onSelect: () => store.setActiveId(id, region)
+        onSelect: () =>
+          store.setActiveId(
+            id,
+            region || node.childRegions.find(i => i.region)?.region
+          )
       });
 
       menus.push({
@@ -338,10 +380,12 @@ export class BasicToolbarPlugin extends BasePlugin {
           isHiglight && store.setHoverId(id)
       });
 
-      if (paths.length) {
-        const children = paths
-          .filter(node => !node.isRegion && node.info?.editable !== false)
-          .reverse()
+      if (elements.length) {
+        const children = elements
+          .map(item => store.getNodeById(item.getAttribute('data-editor-id')!)!)
+          .filter(
+            node => node && !node.isRegion && node.info?.editable !== false
+          )
           .map(node => ({
             label: node.label,
             data: node.id,
@@ -364,6 +408,60 @@ export class BasicToolbarPlugin extends BasePlugin {
         onSelect: () => store.setActiveId('')
       });
 
+      menus.push('|');
+
+      const idx = Array.isArray(parent) ? parent.indexOf(schema) : -1;
+      if (host?.schema?.isFreeContainer) {
+        menus.push({
+          label: '调整层级',
+          disabled:
+            !Array.isArray(parent) || parent.length <= 1 || !node.moveable,
+          children: [
+            {
+              id: 'move-top',
+              label: '置于顶层',
+              disabled: idx === parent.length - 1,
+              onSelect: () => manager.moveTop()
+            },
+            {
+              id: 'move-bottom',
+              label: '置于底层',
+              disabled: idx === 0,
+              onSelect: () => manager.moveBottom()
+            },
+            {
+              id: 'move-forward',
+              label: '上移一层',
+              disabled: idx === parent.length - 1,
+              onSelect: () => manager.moveDown()
+            },
+            {
+              id: 'move-backward',
+              label: '下移一层',
+              disabled: idx === 0,
+              onSelect: () => manager.moveUp()
+            }
+          ]
+        });
+      } else {
+        menus.push({
+          id: 'move-forward',
+          label: '向前移动',
+          disabled: !(Array.isArray(parent) && idx > 0) || !node.moveable,
+          // || !node.prevSibling,
+          onSelect: () => manager.moveUp()
+        });
+
+        menus.push({
+          id: 'move-backward',
+          label: '向后移动',
+          disabled:
+            !(Array.isArray(parent) && idx < parent.length - 1) ||
+            !node.moveable,
+          // || !node.nextSibling,
+          onSelect: () => manager.moveDown()
+        });
+      }
       menus.push('|');
 
       menus.push({
@@ -403,27 +501,6 @@ export class BasicToolbarPlugin extends BasePlugin {
         disabled: !node.removable,
         className: 'text-danger',
         onSelect: () => manager.del(id)
-      });
-
-      menus.push('|');
-
-      const idx = Array.isArray(parent) ? parent.indexOf(schema) : -1;
-
-      menus.push({
-        id: 'move-forward',
-        label: '向前移动',
-        disabled: !(Array.isArray(parent) && idx > 0) || !node.moveable,
-        // || !node.prevSibling,
-        onSelect: () => manager.moveUp()
-      });
-
-      menus.push({
-        id: 'move-backward',
-        label: '向后移动',
-        disabled:
-          !(Array.isArray(parent) && idx < parent.length - 1) || !node.moveable,
-        // || !node.nextSibling,
-        onSelect: () => manager.moveDown()
       });
 
       /** 「点选（默认向后插入）」+ 「向前移动」可以替换 「前面插入节点」 */
@@ -591,7 +668,7 @@ export class BasicToolbarPlugin extends BasePlugin {
       menus.push({
         id: 'build',
         label: `快速构建「${info.plugin.name}」`,
-        disabled: schema.$$commonSchema,
+        disabled: schema.$$commonSchema || schema.$$formSchema,
         onSelect: () =>
           this.manager.reScaffold(
             id,

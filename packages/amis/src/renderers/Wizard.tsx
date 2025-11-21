@@ -1,5 +1,13 @@
 import React from 'react';
-import {ScopedContext, IScopedContext, filterTarget} from 'amis-core';
+import {
+  ScopedContext,
+  IScopedContext,
+  filterTarget,
+  AMISFormBase,
+  AMISExpression,
+  AMISApi,
+  ApiObject
+} from 'amis-core';
 import {Renderer, RendererProps} from 'amis-core';
 import {ServiceStore, IServiceStore} from 'amis-core';
 import {Api, ActionObject} from 'amis-core';
@@ -9,7 +17,6 @@ import {
   createObject,
   until,
   isVisible,
-  getScrollParent,
   autobind,
   SkipOperation
 } from 'amis-core';
@@ -17,13 +24,10 @@ import {isApiOutdated, isEffectiveApi} from 'amis-core';
 import {IFormStore} from 'amis-core';
 import {Spinner, SpinnerExtraProps} from 'amis-ui';
 import {Steps} from 'amis-ui';
-import {findDOMNode} from 'react-dom';
-import {resizeSensor} from 'amis-core';
 import {
   BaseSchema,
-  FormSchema,
   SchemaApi,
-  SchemaClassName,
+  AMISClassName,
   SchemaExpression,
   SchemaName,
   SchemaReload
@@ -34,61 +38,59 @@ import {ActionSchema} from './Action';
 import {tokenize, evalExpressionWithConditionBuilderAsync} from 'amis-core';
 import {StepSchema} from './Steps';
 import isEqual from 'lodash/isEqual';
-import omit from 'lodash/omit';
+import {AMISButtonSchema} from 'amis-core';
 
-export type WizardStepSchema = Omit<FormSchema, 'type'> &
-  StepSchema & {
-    /**
-     * 当前步骤用来保存数据的 api。
-     */
-    api?: SchemaApi;
+export interface WizardStepSchema extends AMISFormBase, StepSchema {
+  /**
+   * 当前步骤用来保存数据的 api
+   */
+  api?: AMISApi;
 
-    asyncApi?: SchemaApi;
+  asyncApi?: AMISApi;
 
-    /**
-     * 当前步骤用来获取初始数据的 api
-     */
-    initApi?: SchemaApi;
+  /**
+   * 当前步骤用来获取初始数据的 api
+   */
+  initApi?: AMISApi;
 
-    /**
-     * 是否可直接跳转到该步骤，一般编辑模式需要可直接跳转查看。
-     */
-    jumpable?: boolean;
+  /**
+   * 是否可直接跳转到该步骤，一般编辑模式需要可直接跳转查看
+   */
+  jumpable?: boolean;
 
-    /**
-     * 通过 JS 表达式来配置当前步骤可否被直接跳转到。
-     */
-    jumpableOn?: SchemaExpression;
+  /**
+   * 通过 JS 表达式来配置当前步骤可否被直接跳转到
+   */
+  jumpableOn?: AMISExpression;
 
-    /**
-     * Step 标题
-     */
-    title?: string;
-    label?: string;
+  /**
+   * Step 标题
+   */
+  title?: string;
+  label?: string;
 
-    /**
-     * 每一步可以单独配置按钮。如果不配置wizard会自动生成。
-     */
-    actions?: Array<ActionSchema>;
+  /**
+   * 每一步可以单独配置按钮。如果不配置wizard会自动生成
+   */
+  actions?: Array<AMISButtonSchema>;
 
-    /**
-     * 保存完后，可以指定跳转地址，支持相对路径和组内绝对路径，同时可以通过 $xxx 使用变量
-     */
-    redirect?: string;
+  /**
+   * 保存完后，可以指定跳转地址，支持相对路径和组内绝对路径，同时通过 $xxx 使用变量
+   */
+  redirect?: string;
 
-    reload?: SchemaReload;
+  reload?: SchemaReload;
 
-    /**
-     * 默认表单提交自己会通过发送 api 保存数据，但是也可以设定另外一个 form 的 name 值，或者另外一个 `CRUD` 模型的 name 值。 如果 target 目标是一个 `Form` ，则目标 `Form` 会重新触发 `initApi` 和 `schemaApi`，api 可以拿到当前 form 数据。如果目标是一个 `CRUD` 模型，则目标模型会重新触发搜索，参数为当前 Form 数据。
-     */
-    target?: string;
-  };
+  /**
+   * 默认表单提交自己会通过发送 api 保存数据，但是也可以设定另外一个 form 的 name 值，或者另外一个 `CRUD` 模型的 name 值。 如果 target 目标是一个 `Form` ，则目标 `Form` 会重新触发 `initApi` 和 `schemaApi`，api 可以拿到当前 form 数据。如果目标是一个 `CRUD` 模型，则目标模型会重新触发搜索，参数为当前 Form 数据
+   */
+  target?: string;
+}
 
 /**
- * 表单向导
- * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/wizard
+ * 表单向导组件，用于分步表单流程。支持步骤切换、校验与提交控制。
  */
-export interface WizardSchema extends BaseSchema, SpinnerExtraProps {
+export interface AMISWizardSchema extends BaseSchema, SpinnerExtraProps {
   /**
    * 指定为表单向导
    */
@@ -97,7 +99,7 @@ export interface WizardSchema extends BaseSchema, SpinnerExtraProps {
   /**
    * 配置按钮 className
    */
-  actionClassName?: SchemaClassName;
+  actionClassName?: AMISClassName;
 
   /**
    * 完成按钮的文字描述
@@ -123,7 +125,9 @@ export interface WizardSchema extends BaseSchema, SpinnerExtraProps {
    * Wizard 用来保存数据的 api。
    * [详情](https://baidu.github.io/amis/docs/api#wizard)
    */
-  api?: SchemaApi;
+  api?: AMISApi;
+
+  asyncApi?: AMISApi;
 
   /**
    * 是否合并后再提交
@@ -133,7 +137,7 @@ export interface WizardSchema extends BaseSchema, SpinnerExtraProps {
   /**
    * Wizard 用来获取初始数据的 api。
    */
-  initApi?: SchemaApi;
+  initApi?: AMISApi;
 
   /**
    * 展示模式
@@ -150,7 +154,7 @@ export interface WizardSchema extends BaseSchema, SpinnerExtraProps {
   readOnly?: boolean;
 
   /**
-   * 保存完后，可以指定跳转地址，支持相对路径和组内绝对路径，同时可以通过 $xxx 使用变量
+   * 保存完后，可以指定跳转地址，支持相对路径和组内绝对路径，同时通过 $xxx 使用变量
    */
   redirect?: string;
 
@@ -198,7 +202,7 @@ export interface WizardSchema extends BaseSchema, SpinnerExtraProps {
 
 export interface WizardProps
   extends RendererProps,
-    Omit<WizardSchema, 'className'> {
+    Omit<AMISWizardSchema, 'className'> {
   store: IServiceStore;
   onFinished: (values: object, action: any) => any;
 }
@@ -241,10 +245,6 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
   form: any;
   asyncCancel: () => void;
 
-  parentNode?: any;
-  unSensor: Function;
-  affixDom: React.RefObject<HTMLDivElement> = React.createRef();
-  footerDom: React.RefObject<HTMLDivElement> = React.createRef();
   initalValues: {
     [propName: string]: any;
   } = {};
@@ -333,19 +333,6 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
       });
     }
 
-    const dom = findDOMNode(this) as HTMLElement;
-    if (!(dom instanceof Element)) {
-      return;
-    }
-
-    let parent: HTMLElement | Window | null = dom ? getScrollParent(dom) : null;
-    if (!parent || parent === document.body) {
-      parent = window;
-    }
-    this.parentNode = parent;
-    parent.addEventListener('scroll', this.affixDetect);
-    this.unSensor = resizeSensor(dom as HTMLElement, this.affixDetect);
-    this.affixDetect();
     this.normalizeSteps(store.data);
   }
 
@@ -378,9 +365,6 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
 
   componentWillUnmount() {
     this.asyncCancel && this.asyncCancel();
-    const parent = this.parentNode;
-    parent && parent.removeEventListener('scroll', this.affixDetect);
-    this.unSensor && this.unSensor();
   }
 
   async dispatchEvent(action: string, value?: object) {
@@ -433,34 +417,6 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
     });
   }
 
-  @autobind
-  affixDetect() {
-    if (
-      !this.props.affixFooter ||
-      !this.affixDom.current ||
-      !this.footerDom.current
-    ) {
-      return;
-    }
-
-    const affixDom = this.affixDom.current;
-    const footerDom = this.footerDom.current;
-    let affixed = false;
-    footerDom.offsetWidth &&
-      (affixDom.style.cssText = `width: ${footerDom.offsetWidth}px;`);
-
-    if (this.props.affixFooter === 'always') {
-      affixed = true;
-      footerDom.classList.add('invisible2');
-    } else {
-      const clip = footerDom.getBoundingClientRect();
-      const clientHeight = window.innerHeight;
-      affixed = clip.top + clip.height / 2 > clientHeight;
-    }
-
-    affixed ? affixDom.classList.add('in') : affixDom.classList.remove('in');
-  }
-
   async gotoStep(index: number) {
     const steps = this.state.rawSteps;
     index = Math.max(Math.min(steps.length, index), 1);
@@ -501,7 +457,7 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
     throw new Error('Please implements this!');
   }
 
-  reload(
+  async reload(
     subPath?: string,
     query?: any,
     ctx?: any,
@@ -521,60 +477,58 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
     } = this.props;
 
     if (isEffectiveApi(initApi, store.data) && this.state.currentStep === 1) {
-      store
-        .fetchInitData(initApi, store.data, {
-          successMessage: fetchSuccess,
-          errorMessage: fetchFailed,
-          onSuccess: () => {
-            if (
-              !isEffectiveApi(initAsyncApi, store.data) ||
-              store.data[initFinishedField || 'finished']
-            ) {
-              return;
-            }
-
-            return until(
-              () => store.checkRemote(initAsyncApi, store.data),
-              (ret: any) => ret && ret[initFinishedField || 'finished'],
-              cancel => (this.asyncCancel = cancel)
-            );
-          }
-        })
-        .then(value => {
-          const state = {
-            currentStep: 1
-          };
-
+      const value = await store.fetchInitData(initApi, store.data, {
+        successMessage: fetchSuccess,
+        errorMessage: fetchFailed,
+        onSuccess: () => {
           if (
-            value &&
-            value.data &&
-            (typeof value.data.step === 'number' ||
-              (typeof value.data.step === 'string' &&
-                /^\d+$/.test(value.data.step)))
+            !isEffectiveApi(initAsyncApi, store.data) ||
+            store.data[initFinishedField || 'finished']
           ) {
-            state.currentStep = toNumber(value.data.step, 1);
+            return;
           }
 
-          this.setState(state, () => {
-            // 如果 initApi 返回的状态是正在提交，则进入轮顺状态。
-            if (
-              value &&
-              value.data &&
-              (value.data.submiting || value.data.submited)
-            ) {
-              this.checkSubmit();
-            }
-          });
-          return value;
-        });
+          return until(
+            () => store.checkRemote(initAsyncApi, store.data),
+            (ret: any) => ret && ret[initFinishedField || 'finished'],
+            cancel => (this.asyncCancel = cancel)
+          );
+        }
+      });
+      const state = {
+        currentStep: 1
+      };
+
+      if (
+        value &&
+        value.data &&
+        (typeof value.data.step === 'number' ||
+          (typeof value.data.step === 'string' &&
+            /^\d+$/.test(value.data.step)))
+      ) {
+        state.currentStep = toNumber(value.data.step, 1);
+      }
+
+      this.setState(state, () => {
+        // 如果 initApi 返回的状态是正在提交，则进入轮顺状态。
+        if (
+          value &&
+          value.data &&
+          (value.data.submiting || value.data.submited)
+        ) {
+          this.checkSubmit();
+        }
+      });
     }
+
+    return store.data;
   }
 
-  receive(values: object, subPath?: string, replace?: boolean) {
+  receive(values: object, subPath?: string, replace?: boolean): Promise<any> {
     const {store} = this.props;
 
     store.updateData(values, undefined, replace);
-    this.reload();
+    return this.reload();
   }
 
   @autobind
@@ -607,7 +561,7 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
     });
 
     until(
-      () => store.checkRemote(finnalAsyncApi as Api, store.data),
+      () => store.checkRemote(finnalAsyncApi, store.data),
       (ret: any) => ret && ret[finishedField || 'finished'],
       cancel => (this.asyncCancel = cancel)
     )
@@ -616,7 +570,7 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
         this.gotoStep(this.state.currentStep + 1);
       })
       .catch(e => {
-        !finnalAsyncApi.silent && env.notify('error', e.message);
+        !(finnalAsyncApi as ApiObject).silent && env.notify('error', e.message);
         store.markSaving(false);
       });
   }
@@ -711,12 +665,12 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
         targetStep <= steps.length &&
         targetStep >= 0
       ) {
-        this.gotoStep((data as any).step);
+        return this.gotoStep((data as any).step);
       }
     } else if (action.actionType === 'submit') {
-      this.finalSubmit();
+      return this.finalSubmit();
     } else if (onAction) {
-      onAction(e, action, data, throwErrors, delegate || this.context);
+      return onAction(e, action, data, throwErrors, delegate || this.context);
     }
   }
 
@@ -1100,7 +1054,8 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
       actionFinishLabel,
       render,
       translate: __,
-      classnames: cx
+      classnames: cx,
+      testIdBuilder
     } = this.props;
     const steps = this.state.rawSteps;
 
@@ -1127,7 +1082,7 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
         <>
           {step.actions.map((action, index) =>
             render(`action/${index}`, action, {
-              key: index,
+              key: `${currentStepIndex}-${index}`,
               data: createObject(this.props.data, {
                 currentStep: currentStepIndex
               }),
@@ -1155,7 +1110,8 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
             label: __(actionPrevLabel),
             actionType: 'prev',
             className: actionClassName,
-            hiddenOn: '${currentStep === 1}'
+            hiddenOn: '${currentStep === 1}',
+            id: testIdBuilder?.getChild('button-prev').getTestIdValue()
           },
           {
             disabled: waiting || !prevCanJump || disabled,
@@ -1176,7 +1132,8 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
             actionType: 'next',
             primary: !nextStep || !!step.api,
             className: actionClassName,
-            level: 'primary'
+            level: 'primary',
+            id: testIdBuilder?.getChild('button-next').getTestIdValue()
           },
           {
             disabled:
@@ -1194,6 +1151,7 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
     if (!actions) {
       return actions;
     }
+
     const {
       classnames: cx,
       affixFooter,
@@ -1202,33 +1160,17 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
     } = this.props;
 
     return (
-      <>
-        <div
-          role="wizard-footer"
-          ref={this.footerDom}
-          className={cx(
-            'Wizard-footer',
-            wrapWithPanel ? 'Panel-footer' : '',
-            affixFooter ? 'Wizard-fixedButtom' : '',
-            footerClassName
-          )}
-        >
-          {actions}
-        </div>
-
-        {affixFooter && wrapWithPanel ? (
-          <div
-            ref={this.affixDom}
-            className={cx(
-              wrapWithPanel ? 'Panel-fixedBottom' : '',
-              'Wizard-footer',
-              footerClassName
-            )}
-          >
-            <div className={cx('Panel-footer')}>{actions}</div>
-          </div>
-        ) : null}
-      </>
+      <div
+        role="wizard-footer"
+        className={cx(
+          'Wizard-footer',
+          wrapWithPanel ? 'Panel-footer' : '',
+          affixFooter && wrapWithPanel ? 'Panel-fixedBottom' : '',
+          footerClassName
+        )}
+      >
+        {actions}
+      </div>
     );
   }
 
@@ -1289,7 +1231,7 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
                   wrapWithPanel: false,
 
                   // 接口相关需要外部来接管
-                  api: null
+                  api: undefined
                 },
                 {
                   key: this.state.currentStep,
@@ -1318,8 +1260,7 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
         {render(
           'dialog',
           {
-            ...((store.action as ActionObject) &&
-              ((store.action as ActionObject).dialog as object)),
+            ...store.dialogSchema,
             type: 'dialog'
           },
           {

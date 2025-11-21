@@ -76,6 +76,7 @@
     flex-direction: row;
 
     > .#{$ns}Checkbox {
+      margin-top: 0;
       margin-right: px2rem(10px);
     }
     cursor: pointer;
@@ -330,6 +331,7 @@
     flex-direction: row;
 
     > .#{$ns}Checkbox {
+      margin-top: 0;
       margin-right: 0;
     }
     cursor: pointer;
@@ -475,5 +477,9 @@
 
   &-input.is-active &-caret {
     transform: rotate(180deg);
+  }
+
+  &-searchbox.is-active {
+    width: 100%;
   }
 }

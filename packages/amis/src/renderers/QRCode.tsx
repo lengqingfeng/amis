@@ -2,6 +2,7 @@ import React from 'react';
 import cx from 'classnames';
 import {
   ActionObject,
+  AMISSchemaBase,
   IScopedContext,
   isNumeric,
   isObject,
@@ -13,22 +14,14 @@ import {
 } from 'amis-core';
 import {FormItem, FormControlProps} from 'amis-core';
 import {filter} from 'amis-core';
-import {QRCodeSVG} from 'qrcode.react';
-import {BaseSchema, SchemaClassName} from '../Schema';
+import {QRCode as QRCodeRender} from 'qrcode-react-next';
+import {BaseSchema, AMISClassName} from '../Schema';
 import {getPropValue} from 'amis-core';
 import mapValues from 'lodash/mapValues';
+import {saveAs} from 'file-saver';
 
 function downloadBlob(blob: Blob, filename: string) {
-  const objectUrl = URL.createObjectURL(blob);
-
-  const link = document.createElement('a');
-  link.href = objectUrl;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-
-  setTimeout(() => URL.revokeObjectURL(objectUrl), 500);
+  return saveAs(blob, filename);
 }
 
 export interface QRCodeImageSettings {
@@ -44,22 +37,24 @@ export interface QRCodeImageSettings {
  * 二维码展示控件。
  * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/qrcode
  */
-export interface QRCodeSchema extends BaseSchema {
+/**
+ * 二维码组件，用于生成和显示二维码。支持内容、尺寸与容错级别配置。
+ */
+export interface AMISQRCodeSchema extends AMISSchemaBase {
   type: 'qrcode' | 'qr-code';
 
   /**
-   * 关联字段名。
+   * 关联字段名
    */
   name?: string;
 
   /**
-   * css 类名
+   * CSS 类名
    */
-  qrcodeClassName?: SchemaClassName;
+  qrcodeClassName?: AMISClassName;
 
   /**
    * 二维码的宽高大小，默认 128
-   * @default 128
    */
   codeSize?: number;
 
@@ -74,7 +69,7 @@ export interface QRCodeSchema extends BaseSchema {
   foregroundColor?: string;
 
   /**
-   * 二维码复杂级别
+   * 二维码容错级别
    */
   level?: 'L' | 'M' | 'Q' | 'H';
 
@@ -87,11 +82,55 @@ export interface QRCodeSchema extends BaseSchema {
    * 图片配置
    */
   imageSettings?: QRCodeImageSettings;
+
+  /**
+   * 渲染模式
+   */
+  mode?: 'canvas' | 'svg';
+
+  /**
+   * 码眼类型
+   */
+  eyeType?: 'default' | 'circle' | 'rounded';
+
+  /**
+   * 码眼边框颜色
+   */
+  eyeBorderColor?: string;
+
+  /**
+   * 码眼边框大小
+   * @default 'default'
+   */
+  eyeBorderSize?: 'default' | 'sm' | 'xs';
+
+  /**
+   * 码眼内部颜色
+   * @default '#000000'
+   */
+  eyeInnerColor?: string;
+
+  /**
+   * 码点类型
+   */
+  pointType?: 'default' | 'circle';
+
+  /**
+   * 码点大小
+   * @default 'default'
+   */
+  pointSize?: 'default' | 'sm' | 'xs';
+
+  /**
+   * 码点大小随机
+   * @default false
+   */
+  pointSizeRandom?: boolean;
 }
 
 export interface QRCodeProps
   extends FormControlProps,
-    Omit<QRCodeSchema, 'type' | 'className'> {}
+    Omit<AMISQRCodeSchema, 'type' | 'className'> {}
 
 export default class QRCode extends React.Component<QRCodeProps, any> {
   static defaultProps: Partial<QRCodeProps> = {
@@ -100,7 +139,8 @@ export default class QRCode extends React.Component<QRCodeProps, any> {
     backgroundColor: '#fff',
     foregroundColor: '#000',
     level: 'L',
-    placeholder: '-'
+    placeholder: '-',
+    mode: 'canvas'
   };
 
   ref: React.RefObject<HTMLDivElement>;
@@ -154,17 +194,31 @@ export default class QRCode extends React.Component<QRCodeProps, any> {
     const codeSize = this.props.codeSize;
     const actionType = action?.actionType as string;
     if (actionType === 'saveAs') {
-      const fileName = args?.name || 'qr-code.svg';
       if (this.ref?.current) {
-        const svgElement = this.ref.current.querySelector('svg');
-        if (svgElement) {
-          const contentWithSvg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" height="${codeSize}" width="${codeSize}" viewBox="${
-            svgElement.getAttribute('viewBox') || '0 0 37 37'
-          }">
+        if (this.props.mode === 'svg') {
+          const svgElement = this.ref.current.querySelector('svg');
+          if (svgElement) {
+            const contentWithSvg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" height="${codeSize}" width="${codeSize}" viewBox="${
+              svgElement.getAttribute('viewBox') || '0 0 37 37'
+            }">
          ${svgElement.innerHTML}
          </svg>`;
-          const blob = new Blob([contentWithSvg], {type: 'image/svg+xml'});
-          downloadBlob(blob, fileName);
+            const blob = new Blob([contentWithSvg], {type: 'image/svg+xml'});
+            downloadBlob(blob, args?.name || 'qr-code.svg');
+          }
+        } else {
+          const canvasElement = this.ref.current.querySelector('canvas');
+          if (canvasElement) {
+            canvasElement.toBlob(blob => {
+              blob &&
+                downloadBlob(
+                  blob,
+                  args?.name
+                    ? args.name.replace(/\.svg$/, '.png')
+                    : 'qr-code.png'
+                );
+            }, 'image/png');
+          }
         }
       }
     }
@@ -182,6 +236,15 @@ export default class QRCode extends React.Component<QRCodeProps, any> {
       level,
       defaultValue,
       data,
+      mode,
+      eyeType,
+      eyeBorderColor,
+      eyeBorderSize,
+      eyeInnerColor,
+      pointType,
+      pointSize,
+      pointSizeRandom,
+      translate: __,
       classPrefix: ns
     } = this.props;
 
@@ -201,18 +264,31 @@ export default class QRCode extends React.Component<QRCodeProps, any> {
         ) : finalValue.length > 2953 ? (
           // https://github.com/zpao/qrcode.react/issues/69
           <span className="text-danger">
-            二维码值过长，请设置2953个字符以下的文本
+            {__('QRCode.tooLong', {max: 2953})}
           </span>
         ) : (
-          <QRCodeSVG
-            // @ts-ignore 其实是支持的
-            className={qrcodeClassName}
+          <QRCodeRender
+            className={qrcodeClassName as string}
             value={finalValue}
-            size={codeSize}
-            bgColor={backgroundColor}
-            fgColor={foregroundColor}
-            level={level || 'L'}
-            imageSettings={this.getImageSettings()}
+            config={{
+              level: level || 'L',
+              minVersion: 2,
+              boostLevel: true
+            }}
+            styleConfig={{
+              size: codeSize,
+              bgColor: backgroundColor,
+              color: foregroundColor,
+              eyeType,
+              eyeBorderColor,
+              eyeBorderSize,
+              eyeInnerColor,
+              pointType,
+              pointSize,
+              pointSizeRandom
+            }}
+            logoConfig={this.getImageSettings()}
+            mode={mode}
           />
         )}
       </div>
@@ -221,7 +297,8 @@ export default class QRCode extends React.Component<QRCodeProps, any> {
 }
 
 @Renderer({
-  test: /(^|\/)qr\-?code$/,
+  type: 'qrcode',
+  alias: ['qr-code'],
   name: 'qrcode'
 })
 export class QRCodeRenderer extends QRCode {

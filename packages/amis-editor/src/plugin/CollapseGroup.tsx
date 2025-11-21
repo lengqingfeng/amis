@@ -9,12 +9,14 @@ import {defaultValue, getSchemaTpl} from 'amis-editor-core';
 import {tipedLabel} from 'amis-editor-core';
 import {isObject} from 'amis-editor-core';
 import {getEventControlConfig} from '../renderer/event-control/helper';
+import {generateId} from '../util';
 
 export class CollapseGroupPlugin extends BasePlugin {
   static id = 'CollapseGroupPlugin';
   // 关联渲染器名字
   rendererName = 'collapse-group';
-  $schema = '/schemas/CollapseGroupSchema.json';
+  useLazyRender = true; // 使用懒渲染
+  $schema = '/schemas/AMISCollapseGroupSchema.json';
 
   // 组件名称
   name = '折叠面板';
@@ -27,6 +29,7 @@ export class CollapseGroupPlugin extends BasePlugin {
   pluginIcon = 'collapse-plugin';
   scaffold = {
     type: 'collapse-group',
+    enableFieldSetStyle: true,
     activeKey: ['1'],
     body: [
       {
@@ -34,12 +37,14 @@ export class CollapseGroupPlugin extends BasePlugin {
         key: '1',
         active: true,
         header: '标题1',
+        id: generateId(),
         body: [
           {
             type: 'tpl',
             tpl: '这里是内容1',
             wrapperComponent: '',
-            inline: false
+            inline: false,
+            id: generateId()
           }
         ]
       },
@@ -47,12 +52,14 @@ export class CollapseGroupPlugin extends BasePlugin {
         type: 'collapse',
         key: '2',
         header: '标题2',
+        id: generateId(),
         body: [
           {
             type: 'tpl',
             tpl: '这里是内容1',
             wrapperComponent: '',
-            inline: false
+            inline: false,
+            id: generateId()
           }
         ]
       }
@@ -101,6 +108,7 @@ export class CollapseGroupPlugin extends BasePlugin {
   panelJustify = true;
 
   panelBodyCreator = (context: BaseEventContext) => {
+    const isInForm = context.path.includes('/form/');
     const i18nEnabled = getI18nEnabled();
     return [
       getSchemaTpl('tabs', [
@@ -111,6 +119,22 @@ export class CollapseGroupPlugin extends BasePlugin {
               title: '基本',
               body: [
                 getSchemaTpl('layout:originPosition', {value: 'left-top'}),
+                {
+                  name: 'enableFieldSetStyle',
+                  label: '展示风格',
+                  visible: isInForm,
+                  type: 'button-group-select',
+                  options: [
+                    {
+                      label: '默认',
+                      value: false
+                    },
+                    {
+                      label: '简洁',
+                      value: true
+                    }
+                  ]
+                },
                 {
                   name: 'expandIconPosition',
                   label: '图标位置',
@@ -143,11 +167,15 @@ export class CollapseGroupPlugin extends BasePlugin {
                       getSchemaTpl('icon', {
                         name: 'expandIcon',
                         label: '图标',
+                        value: {
+                          type: 'icon',
+                          vendor: ''
+                        },
                         pipeIn: (value: any) => value?.icon,
                         pipeOut: (value: any) => ({
                           type: 'icon',
                           vendor: '',
-                          icon: value
+                          icon: value ? value : undefined
                         })
                       })
                     ]
@@ -269,6 +297,17 @@ export class CollapseGroupPlugin extends BasePlugin {
         {
           title: '外观',
           body: getSchemaTpl('collapseGroup', [
+            {
+              title: '基本样式',
+              body: [
+                getSchemaTpl('theme:paddingAndMargin', {
+                  name: `themeCss.className.padding-and-margin`,
+                  hidePadding: true
+                })
+              ]
+            },
+            getSchemaTpl('theme:cssCode'),
+            getSchemaTpl('animation'),
             getSchemaTpl('style:classNames', {
               isFormItem: false
             })
@@ -289,12 +328,12 @@ export class CollapseGroupPlugin extends BasePlugin {
   };
 
   regions: Array<RegionConfig> = [
-    {
-      key: 'body',
-      label: '内容区',
-      renderMethod: 'render',
-      insertPosition: 'inner'
-    }
+    // {
+    //   key: 'body',
+    //   label: '内容区',
+    //   renderMethod: 'render',
+    //   insertPosition: 'inner'
+    // }
   ];
 }
 

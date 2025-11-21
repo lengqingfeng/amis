@@ -6,7 +6,8 @@ import {RendererProps, Schema} from 'amis-core';
 import {RendererPluginAction} from 'amis-editor-core';
 import React from 'react';
 import cx from 'classnames';
-import {COMMON_ACTION_SCHEMA_MAP, renderCmptActionSelect} from './helper';
+import isFunction from 'lodash/isFunction';
+import {renderCmptActionSelect} from './helper';
 
 export default class ActionConfigPanel extends React.Component<RendererProps> {
   render() {
@@ -19,10 +20,6 @@ export default class ActionConfigPanel extends React.Component<RendererProps> {
       manager
     } = this.props;
     const actionType = data.__subActions ? data.groupType : data.actionType;
-    const commonActionConfig = {
-      ...COMMON_ACTION_SCHEMA_MAP,
-      ...actionConfigItemsMap
-    };
     let schema: any = null;
 
     if (data.actionType === 'component') {
@@ -30,7 +27,8 @@ export default class ActionConfigPanel extends React.Component<RendererProps> {
       const subActionSchema =
         pluginActions?.[data.__rendererName]?.find(
           (item: RendererPluginAction) => item.actionType === data.groupType
-        )?.schema ?? commonActionConfig[data.groupType]?.schema;
+        )?.schema ??
+        (actionConfigItemsMap && actionConfigItemsMap[data.groupType]?.schema);
       const baseSchema = renderCmptActionSelect(
         '选择组件',
         true,
@@ -38,15 +36,23 @@ export default class ActionConfigPanel extends React.Component<RendererProps> {
         data.componentId === 'customCmptId' ? true : false,
         manager
       );
+
+      const _subActionSchema = isFunction(subActionSchema)
+        ? subActionSchema(manager, data)
+        : subActionSchema;
+
       // 追加到基础配置
       schema = [
         ...(Array.isArray(baseSchema) ? baseSchema : [baseSchema]),
-        ...(Array.isArray(subActionSchema)
-          ? subActionSchema
-          : [subActionSchema])
+        ...(Array.isArray(_subActionSchema)
+          ? _subActionSchema
+          : [_subActionSchema])
       ];
     } else {
-      schema = data.__actionSchema;
+      const __originActionSchema = data.__actionSchema;
+      schema = isFunction(__originActionSchema)
+        ? __originActionSchema(manager, data)
+        : __originActionSchema;
     }
 
     return schema ? (

@@ -155,7 +155,7 @@ export class RichTextControlPlugin extends BasePlugin {
   static id = 'RichTextControlPlugin';
   // 关联渲染器名字
   rendererName = 'input-rich-text';
-  $schema = '/schemas/RichTextControlSchema.json';
+  $schema = '/schemas/AMISInputRichTextSchema.json';
 
   // 组件名称
   name = '富文本编辑器';
@@ -454,9 +454,7 @@ export class RichTextControlPlugin extends BasePlugin {
                 }
               ]
             },
-            getSchemaTpl('style:formItem', {
-              renderer: context.info.renderer
-            }),
+            getSchemaTpl('theme:formItem'),
             getSchemaTpl('style:classNames')
           ])
         ]

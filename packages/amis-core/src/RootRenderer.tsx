@@ -4,18 +4,43 @@ import type {RootProps} from './Root';
 import {IScopedContext, ScopedContext, filterTarget} from './Scoped';
 import {IRootStore, RootStore} from './store/root';
 import {ActionObject} from './types';
-import {bulkBindFunctions, guid, isVisible} from './utils/helper';
+import {bulkBindFunctions, guid, isVisible, JSONTraverse} from './utils/helper';
 import {filter} from './utils/tpl';
 import qs from 'qs';
 import pick from 'lodash/pick';
 import mapValues from 'lodash/mapValues';
 import {saveAs} from 'file-saver';
 import {normalizeApi} from './utils/api';
-import {findDOMNode} from 'react-dom';
+import {findDomCompat as findDOMNode} from './utils/findDomCompat';
+import LazyComponent from './components/LazyComponent';
+import {hasAsyncRenderers, loadAsyncRenderersByType} from './factory';
+import {dispatchEvent} from './utils/renderer-event';
+import {GlobalVariableItem} from './globalVar';
 
 export interface RootRendererProps extends RootProps {
+  /**
+   * 当前页面的路径信息，用于路由识别
+   */
   location?: any;
+
+  /**
+   * 当前页面的参数信息，用于路由识别
+   */
+  params?: Record<string, any>;
+
+  /**
+   * 数据对象，推荐用 context 代替，context 数据在弹窗中也会被继承
+   */
   data?: Record<string, any>;
+
+  /**
+   * 全局变量清单，只有这里面定义的变量才会被作为全局变量注入到各个组件中
+   */
+  globalVars?: Array<GlobalVariableItem>;
+
+  /**
+   * 上下文环境变量，所有组件都能获取得到
+   */
   context?: Record<string, any>;
   render: (region: string, schema: any, props: any) => React.ReactNode;
 }
@@ -33,22 +58,58 @@ export class RootRenderer extends React.Component<RootRendererProps> {
       storeType: RootStore.name,
       parentId: ''
     }) as IRootStore;
-    this.store.updateContext(props.context);
+    this.store.updateContext(props.context, true);
     this.store.initData(props.data);
     this.store.updateLocation(props.location, this.props.env?.parseLocation);
+    this.store.updateParams(props.params);
 
     // 将数据里面的函数批量的绑定到 this 上
     bulkBindFunctions<RootRenderer /*为毛 this 的类型自动识别不出来？*/>(this, [
       'handleAction',
+      'dispatchEvent',
       'handleDialogConfirm',
       'handleDialogClose',
       'handleDrawerConfirm',
       'handleDrawerClose',
       'handlePageVisibilityChange'
     ]);
+
+    this.store.init(() => {
+      if (!hasAsyncRenderers()) {
+        return;
+      }
+      const schema = props.schema;
+      const types: Array<string> = [
+        'tpl',
+        'dialog',
+        'drawer',
+        'cell',
+        'spinner',
+        'group',
+        'container',
+        'dropdown-button',
+        'plain'
+      ];
+      JSONTraverse(schema, (value: any, key: string) => {
+        if (key === 'type') {
+          types.push(value);
+
+          // form 依赖 panel
+          if (value === 'form') {
+            types.push('panel');
+          }
+        }
+      });
+      return hasAsyncRenderers(types)
+        ? loadAsyncRenderersByType(types, true)
+        : undefined;
+    });
   }
 
   componentDidMount() {
+    // 不要设置太早，否则组件内部的监控可能会监控不到，因为初始值可能在监控之前就设置了。
+    // 以至于监控不到变化。
+    this.store.setGlobalVars(this.props.globalVars);
     document.addEventListener(
       'visibilitychange',
       this.handlePageVisibilityChange
@@ -74,16 +135,29 @@ export class RootRenderer extends React.Component<RootRendererProps> {
   componentDidUpdate(prevProps: RootRendererProps) {
     const props = this.props;
 
-    if (props.data !== prevProps.data) {
-      this.store.initData(props.data);
+    // 更新全局变量
+    if (props.globalVars !== prevProps.globalVars) {
+      this.store.setGlobalVars(props.globalVars);
     }
 
     if (props.location !== prevProps.location) {
       this.store.updateLocation(props.location, this.props.env?.parseLocation);
     }
 
+    if (props.params !== prevProps.params) {
+      this.store.updateParams(props.params);
+    }
+
+    let contextChanged = false;
     if (props.context !== prevProps.context) {
+      contextChanged = true;
       this.store.updateContext(props.context);
+    }
+
+    // 一定要最后处理，否则 downStream 里面的上层数据 context 还是老的。
+    if (props.data !== prevProps.data || contextChanged) {
+      // context 依赖 data 变化才能触发变动，所以不管 data 变没变都更新一下
+      this.store.initData(props.data);
     }
   }
 
@@ -207,11 +281,11 @@ export class RootRenderer extends React.Component<RootRendererProps> {
         );
       });
     } else if (action.actionType === 'toast') {
-      action.toast?.items?.forEach((item: any) => {
+      action.toast?.items?.forEach(({level, body, title, ...item}: any) => {
         env.notify(
-          item.level || 'info',
-          item.body
-            ? render('body', item.body, {
+          level || 'info',
+          body
+            ? render('body', body, {
                 ...this.props,
                 data: ctx,
                 context: store.context
@@ -220,8 +294,8 @@ export class RootRenderer extends React.Component<RootRendererProps> {
           {
             ...action.toast,
             ...item,
-            title: item.title
-              ? render('title', item.title, {
+            title: title
+              ? render('title', title, {
                   ...this.props,
                   data: ctx,
                   context: store.context
@@ -282,6 +356,15 @@ export class RootRenderer extends React.Component<RootRendererProps> {
         saveAs(api.url, fileName);
       }
     }
+  }
+
+  dispatchEvent(
+    e: string | React.MouseEvent<any>,
+    data: any,
+    renderer?: React.Component<any>,
+    scoped?: IScopedContext
+  ) {
+    return dispatchEvent(e, renderer!, scoped!, data);
   }
 
   handleDialogConfirm(
@@ -451,8 +534,7 @@ export class RootRenderer extends React.Component<RootRendererProps> {
     return render(
       'dialog',
       {
-        ...((store.action as ActionObject) &&
-          ((store.action as ActionObject).dialog as object)),
+        ...store.dialogSchema,
         type: 'dialog'
       },
       {
@@ -464,7 +546,8 @@ export class RootRenderer extends React.Component<RootRendererProps> {
         onConfirm: this.handleDialogConfirm,
         onClose: this.handleDialogClose,
         show: store.dialogOpen,
-        onAction: this.handleAction
+        onAction: this.handleAction,
+        dispatchEvent: this.dispatchEvent
       }
     );
   }
@@ -475,8 +558,7 @@ export class RootRenderer extends React.Component<RootRendererProps> {
     return render(
       'drawer',
       {
-        ...((store.action as ActionObject) &&
-          ((store.action as ActionObject).drawer as object)),
+        ...store.drawerSchema,
         type: 'drawer'
       },
       {
@@ -488,17 +570,20 @@ export class RootRenderer extends React.Component<RootRendererProps> {
         onConfirm: this.handleDrawerConfirm,
         onClose: this.handleDrawerClose,
         show: store.drawerOpen,
-        onAction: this.handleAction
+        onAction: this.handleAction,
+        dispatchEvent: this.dispatchEvent
       }
     );
   }
 
   render() {
-    const {pathPrefix, schema, render, ...rest} = this.props;
+    const {pathPrefix, schema, render, globalVars, ...rest} = this.props;
     const store = this.store;
 
     if (store.runtimeError) {
       return this.renderRuntimeError();
+    } else if (!store.ready) {
+      return <LazyComponent className="RootLoader" />;
     }
 
     return (
@@ -509,7 +594,8 @@ export class RootRenderer extends React.Component<RootRendererProps> {
             topStore: this.store,
             data: this.store.downStream,
             context: store.context,
-            onAction: this.handleAction
+            onAction: this.handleAction,
+            dispatchEvent: this.dispatchEvent
           }) as JSX.Element
         }
 

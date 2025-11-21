@@ -6,7 +6,7 @@ export class RepeatControlPlugin extends BasePlugin {
   static id = 'RepeatControlPlugin';
   // 关联渲染器名字
   rendererName = 'input-repeat';
-  $schema = '/schemas/RepeatControlSchema.json';
+  $schema = '/schemas/AMISInputRepeatSchema.json';
 
   // 组件名称
   name = '重复周期选择';
@@ -38,12 +38,11 @@ export class RepeatControlPlugin extends BasePlugin {
   panelBody = [
     getSchemaTpl('layout:originPosition', {value: 'left-top'}),
     getSchemaTpl('switchDefaultValue'),
-    {
-      type: 'input-text',
+    getSchemaTpl('tplFormulaControl', {
       name: 'value',
       label: '默认值',
       visibleOn: 'typeof this.value !== "undefined"'
-    },
+    }),
 
     {
       name: 'options',

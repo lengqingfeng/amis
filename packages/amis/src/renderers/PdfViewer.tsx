@@ -13,7 +13,9 @@ import {
   Renderer,
   RendererProps,
   resolveVariableAndFilter,
-  ScopedContext
+  ScopedContext,
+  getGlobalOptions,
+  AMISSchemaBase
 } from 'amis-core';
 import {BaseSchema} from '../Schema';
 
@@ -21,7 +23,10 @@ export const PdfView = React.lazy(
   () => import('amis-ui/lib/components/PdfViewer')
 );
 
-export interface PdfViewerSchema extends BaseSchema {
+/**
+ * PDF 查看器组件，用于在线预览 PDF 文档。
+ */
+export interface AMISPdfViewerSchema extends AMISSchemaBase {
   type: 'pdf-viewer';
   /**
    * 文件地址
@@ -238,34 +243,51 @@ export default class PdfViewer extends React.Component<
     return null;
   }
 
+  @autobind
+  renderTip() {
+    return (
+      <div>
+        <p>
+          [PdfViewer]: pdfjsWorkerSrc is required, Please set the
+          `pdfjsWorkerSrc` in setGlobalOptions function.
+        </p>
+      </div>
+    );
+  }
+
   render() {
     const {
       className,
       classnames: cx,
       translate: __,
       height,
-      background,
-      src
+      background
     } = this.props;
+    const pdfjs = getGlobalOptions().pdfjsWorkerSrc;
     const {loading, inited, error} = this.state;
     const width = Math.max(this.props.width || this.state.width, 300);
 
     return (
       <div ref={this.wrapper}>
         {this.renderEmpty()}
-        <Suspense fallback={<div>...</div>}>
-          {inited && !error ? (
-            <PdfView
-              file={this.file}
-              loading={loading}
-              className={className}
-              classnames={cx}
-              width={width}
-              height={height}
-              background={background}
-            />
-          ) : null}
-        </Suspense>
+        {!pdfjs ? (
+          this.renderTip()
+        ) : (
+          <Suspense fallback={<div>...</div>}>
+            {inited && !error ? (
+              <PdfView
+                file={this.file}
+                loading={loading}
+                className={className}
+                classnames={cx}
+                width={width}
+                height={height}
+                background={background}
+              />
+            ) : null}
+          </Suspense>
+        )}
+
         {this.renderError()}
       </div>
     );

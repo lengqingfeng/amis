@@ -19,6 +19,7 @@ export interface HighlightBoxProps {
   onSwitch?: (id: string) => void;
   manager: EditorManager;
   children?: React.ReactNode;
+  readonly?: boolean;
 }
 
 export default observer(function ({
@@ -30,7 +31,8 @@ export default observer(function ({
   node,
   toolbarContainer,
   onSwitch,
-  manager
+  manager,
+  readonly
 }: HighlightBoxProps) {
   const handleWResizerMouseDown = React.useCallback(
     (e: MouseEvent) => startResize(e, 'horizontal'),
@@ -219,6 +221,26 @@ export default observer(function ({
 
   // 判断是否在最右侧（考虑组件头部工具栏被遮挡的问题）
   const isRightElem = aePreviewOffsetWidth - node.x < 176; // 跳过icode代码检查
+  const isSelected =
+    (isActive && !store.activeElement) || ~store.selections.indexOf(id);
+
+  React.useLayoutEffect(() => {
+    if (!node.draggable || !isSelected || !isAlive(node)) {
+      return;
+    }
+    const dom = node.getTarget() as HTMLElement;
+    const targets = Array.isArray(dom) ? dom : dom ? [dom] : [];
+    targets.forEach(item => {
+      item.setAttribute('draggable', 'true');
+      item.addEventListener('dragstart', handleDragStart as any);
+    });
+    return () => {
+      targets.forEach(item => {
+        item.removeAttribute('draggable');
+        item.removeEventListener('dragstart', handleDragStart as any);
+      });
+    };
+  }, [node.draggable, isSelected]);
 
   /* bca-disable */
   return (
@@ -227,7 +249,8 @@ export default observer(function ({
         'ae-Editor-hlbox',
         {
           shake: id === store.insertOrigId,
-          selected: isActive || ~store.selections.indexOf(id),
+          focused: store.activeElement && isActive,
+          selected: isSelected,
           hover: isHover,
           regionOn: node.childRegions.some(region =>
             store.isRegionHighlighted(region.id, region.region)
@@ -247,14 +270,15 @@ export default observer(function ({
       }}
       ref={mainRef}
       onMouseEnter={handleMouseEnter}
-      draggable={!!curFreeContainerId || isDraggableContainer}
+      draggable={node.draggable}
       onDragStart={handleDragStart}
     >
-      {isActive ? (
+      {isActive && !store.activeElement && !readonly ? (
         <div
           className={`ae-Editor-toolbarPopover ${
             isRightElem ? 'is-right-elem' : ''
           }`}
+          onClick={e => e.stopPropagation()}
         >
           <div className="ae-Editor-nav">
             {node.host ? (
@@ -280,7 +304,12 @@ export default observer(function ({
             ) : null}
           </div>
 
-          <div className="ae-Editor-toolbar" key="toolbar">
+          <div
+            className={cx('ae-Editor-toolbar', {
+              invisible: toolbars.length === 0
+            })}
+            key="toolbar"
+          >
             {toolbars.map(item => (
               <button
                 key={item.id}

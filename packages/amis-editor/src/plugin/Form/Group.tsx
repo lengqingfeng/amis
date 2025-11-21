@@ -9,12 +9,13 @@ import {
 } from 'amis-editor-core';
 import {defaultValue, getSchemaTpl} from 'amis-editor-core';
 import {JSONPipeIn, JSONUpdate, makeHorizontalDeeper} from 'amis-editor-core';
+import {generateId} from '../../util';
 
 export class GroupControlPlugin extends BasePlugin {
   static id = 'GroupControlPlugin';
   // 关联渲染器名字
   rendererName = 'group';
-  $schema = '/schemas/GroupControlSchema.json';
+  $schema = '/schemas/AMISGroupSchema.json';
   disabledRendererPlugin = true; // 组件面板不显示
 
   // 组件名称
@@ -31,12 +32,14 @@ export class GroupControlPlugin extends BasePlugin {
       {
         type: 'input-text',
         label: '文本',
+        id: generateId(),
         name: 'var1'
       },
 
       {
         type: 'input-text',
         label: '文本',
+        id: generateId(),
         name: 'var2'
       }
     ],

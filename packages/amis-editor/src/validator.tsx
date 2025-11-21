@@ -1,3 +1,4 @@
+import './locale/index';
 /**
  * @file 所有可用验证器
  */
@@ -130,6 +131,7 @@ registerValidator(
   {
     label: '必填',
     name: 'required',
+    message: '这是必填项',
     tag: {
       [ValidatorTag.Text]: ValidTagMatchType.isDefault,
       [ValidatorTag.File]: ValidTagMatchType.isDefault,

@@ -9,13 +9,14 @@ import {
   translateSchema
 } from 'amis-editor-core';
 import {BUTTON_DEFAULT_ACTION} from '../component/BaseControl';
+import {generateId} from '../util';
 
 export class ButtonGroupPlugin extends BasePlugin {
   static id = 'ButtonGroupPlugin';
   static scene = ['layout'];
   // 关联渲染器名字
   rendererName = 'button-group';
-  $schema = '/schemas/ButtonGroupSchema.json';
+  $schema = '/schemas/AMISButtonGroupSchema.json';
 
   // 组件名称
   name = '按钮组';
@@ -31,12 +32,14 @@ export class ButtonGroupPlugin extends BasePlugin {
       {
         type: 'button',
         label: '按钮1',
+        id: generateId(),
         ...BUTTON_DEFAULT_ACTION
       },
 
       {
         type: 'button',
         label: '按钮2',
+        id: generateId(),
         ...BUTTON_DEFAULT_ACTION
       }
     ]

@@ -13,12 +13,13 @@ import {
 } from 'amis-editor-core';
 import {defaultValue, getSchemaTpl} from 'amis-editor-core';
 import isArray from 'lodash/isArray';
+import {generateId} from '../util';
 
 export class CustomPlugin extends BasePlugin {
   static id = 'CustomRegionPlugin';
   // 关联渲染器名字
   rendererName = 'custom';
-  $schema = '/schemas/CustomSchema.json';
+  $schema = '/schemas/AMISCustomSchema.json';
 
   // 组件名称
   name = '自定义容器';
@@ -37,7 +38,8 @@ export class CustomPlugin extends BasePlugin {
       {
         type: 'tpl',
         wrapperComponent: '',
-        tpl: '自定义容器区域'
+        tpl: '自定义容器区域',
+        id: generateId()
       }
     ]
   };

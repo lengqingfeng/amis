@@ -3,12 +3,14 @@ import React from 'react';
 import {defaultValue, getSchemaTpl} from 'amis-editor-core';
 import {registerEditorPlugin} from 'amis-editor-core';
 import {BaseEventContext, BasePlugin, RegionConfig} from 'amis-editor-core';
+import {generateId} from '../../util';
 
 export class FieldSetControlPlugin extends BasePlugin {
   static id = 'FieldSetControlPlugin';
   // 关联渲染器名字
   rendererName = 'fieldset';
-  $schema = '/schemas/FieldSetControlSchema.json';
+  useLazyRender = true; // 使用懒渲染
+  $schema = '/schemas/AMISFieldSetSchema.json';
 
   // 组件名称
   name = '字段集';
@@ -26,11 +28,13 @@ export class FieldSetControlPlugin extends BasePlugin {
       {
         type: 'input-text',
         label: '文本1',
+        id: generateId(),
         name: 'text'
       },
       {
         type: 'input-text',
         label: '文本2',
+        id: generateId(),
         name: 'text'
       }
     ]

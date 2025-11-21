@@ -5,7 +5,8 @@ import {
   OptionsControlProps,
   Option,
   FormOptionsControl,
-  resolveEventData
+  resolveEventData,
+  AMISFormItemWithOptions
 } from 'amis-core';
 import {SpinnerExtraProps, UserSelect} from 'amis-ui';
 import {UserTabSelect} from 'amis-ui';
@@ -19,7 +20,10 @@ import {supportStatic} from './StaticHoc';
 /**
  * UserSelect 移动端人员选择。
  */
-export interface UserSelectControlSchema extends FormOptionsSchema {
+export interface AMISUsersSelectSchema extends AMISFormItemWithOptions {
+  /**
+   * 指定为 users-select 组件
+   */
   type: 'users-select';
 }
 
@@ -240,7 +244,8 @@ export default class UserSelectControl extends React.Component<
       data,
       displayFields,
       labelField,
-      loadingConfig
+      loadingConfig,
+      disabled
     } = this.props;
     tabOptions?.forEach((item: any) => {
       item.deferLoad = this.deferLoad;
@@ -255,10 +260,12 @@ export default class UserSelectControl extends React.Component<
             selection={selectedOptions}
             tabOptions={tabOptions}
             multiple={multiple}
+            displayFields={displayFields}
             onChange={this.changeValue}
             onSearch={this.onSearch}
             deferLoad={this.deferLoad}
             data={data}
+            disabled={disabled}
           />
         ) : (
           <UserSelect
@@ -270,7 +277,7 @@ export default class UserSelectControl extends React.Component<
             multi={multi}
             multiple={multiple}
             searchable={searchable}
-            placeholder={placeholder}
+            placeholder={placeholder as string}
             searchPlaceholder={searchPlaceholder}
             deferLoad={this.deferLoad}
             onChange={this.changeValue}
@@ -279,6 +286,7 @@ export default class UserSelectControl extends React.Component<
             labelField={labelField}
             isDep={isDep}
             isRef={isRef}
+            disabled={disabled}
           />
         )}
       </div>

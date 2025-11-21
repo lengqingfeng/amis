@@ -1,51 +1,60 @@
 import React from 'react';
-import {createObject, Renderer, RendererProps} from 'amis-core';
+import {
+  AMISSchemaBase,
+  createObject,
+  CustomStyle,
+  Renderer,
+  RendererProps,
+  setThemeClassName,
+  AMISSchemaCollection,
+  AMISButtonSchema
+} from 'amis-core';
 import {Overlay} from 'amis-core';
 import {PopOver} from 'amis-core';
 import {TooltipWrapper} from 'amis-ui';
 import {isDisabled, isVisible, noop, filterClassNameObject} from 'amis-core';
 import {filter} from 'amis-core';
-import {Icon, hasIcon} from 'amis-ui';
-import {
-  BaseSchema,
-  SchemaClassName,
-  SchemaCollection,
-  SchemaIcon
-} from '../Schema';
-import {ActionSchema} from './Action';
-import {DividerSchema} from './Divider';
+import {Icon} from 'amis-ui';
+import {AMISClassName, SchemaIcon} from '../Schema';
+import {AMISDividerSchema} from './Divider';
 import {RootClose} from 'amis-core';
 import type {
   TooltipObject,
   Trigger
 } from 'amis-ui/lib/components/TooltipWrapper';
 import {resolveVariableAndFilter} from 'amis-core';
-import {isMobile} from 'amis-core';
+
+export type DropdownNestedButton = AMISButtonSchema & {
+  children?: Array<DropdownButton>;
+};
 
 export type DropdownButton =
-  | (ActionSchema & {children?: Array<DropdownButton>})
-  | DividerSchema
+  | DropdownNestedButton
+  | AMISDividerSchema
   | 'divider';
 
 /**
  * 下拉按钮渲染器。
  * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/dropdown-button
  */
-export interface DropdownButtonSchema extends BaseSchema {
+/**
+ * 下拉按钮组件，结合按钮与下拉菜单。支持分组操作与权限控制。
+ */
+export interface AMISDropdownButtonSchema extends AMISSchemaBase {
   /**
-   * 指定为 DropDown Button 类型
+   * 指定为 dropdown-button 组件
    */
   type: 'dropdown-button';
 
   /**
-   * 是否独占一行 `display: block`
+   * 是否独占一行
    */
   block?: boolean;
 
   /**
-   * 给 Button 配置 className。
+   * 给 Button 配置 className
    */
-  btnClassName?: SchemaClassName;
+  btnClassName?: AMISClassName;
 
   /**
    * 按钮集合，支持分组
@@ -55,7 +64,7 @@ export interface DropdownButtonSchema extends BaseSchema {
   /**
    * 内容区域
    */
-  body?: SchemaCollection;
+  body?: AMISSchemaCollection;
 
   /**
    * 按钮文字
@@ -93,7 +102,7 @@ export interface DropdownButtonSchema extends BaseSchema {
   align?: 'left' | 'right';
 
   /**
-   * 是否只显示图标。
+   * 是否只显示图标
    */
   iconOnly?: boolean;
 
@@ -103,7 +112,7 @@ export interface DropdownButtonSchema extends BaseSchema {
   rightIcon?: SchemaIcon;
 
   /**
-   * 触发条件，默认是 click
+   * 触发条件，默认为 click
    */
   trigger?: 'click' | 'hover';
 
@@ -111,6 +120,11 @@ export interface DropdownButtonSchema extends BaseSchema {
    * 是否显示下拉按钮
    */
   hideCaret?: boolean;
+
+  /**
+   * 弹出的下拉按钮放在哪个节点下
+   */
+  popOverContainerSelector?: string;
 
   /**
    * 菜单 CSS 样式
@@ -122,7 +136,7 @@ export interface DropdownButtonSchema extends BaseSchema {
 
 export interface DropDownButtonProps
   extends RendererProps,
-    Omit<DropdownButtonSchema, 'type' | 'className'> {
+    Omit<AMISDropdownButtonSchema, 'type' | 'className'> {
   disabledTip?: string | TooltipObject;
   /**
    * 按钮提示文字，hover focus 时显示
@@ -187,7 +201,7 @@ export default class DropDownButton extends React.Component<
 
   toogle(e: React.MouseEvent<any>) {
     e.preventDefault();
-
+    e.stopPropagation();
     this.setState({
       isOpened: !this.state.isOpened
     });
@@ -258,25 +272,33 @@ export default class DropDownButton extends React.Component<
       classnames: cx,
       data,
       ignoreConfirm,
-      testIdBuilder
+      testIdBuilder,
+      mobileUI
     } = this.props;
     index = typeof index === 'number' ? index.toString() : index;
 
-    if (typeof button !== 'string' && Array.isArray(button?.children)) {
+    if (
+      typeof button !== 'string' &&
+      Array.isArray((button as DropdownNestedButton)?.children)
+    ) {
       return (
         <div
           key={index}
-          className={cx('DropDown-menu', {'is-mobile': isMobile()})}
+          className={cx('DropDown-menu', {'is-mobile': mobileUI})}
         >
           <li key={`${index}/0`} className={cx('DropDown-groupTitle')}>
-            {button.icon ? (
-              <Icon cx={cx} icon={button.icon} className="m-r-xs" />
+            {(button as DropdownNestedButton).icon ? (
+              <Icon
+                cx={cx}
+                icon={(button as DropdownNestedButton).icon}
+                className="m-r-xs"
+              />
             ) : null}
-            <span>{button.label}</span>
+            <span>{(button as DropdownNestedButton).label}</span>
           </li>
-          {button.children.map((child, childIndex) =>
+          {(button as DropdownNestedButton).children!.map((child, childIndex) =>
             this.renderButton(child, `${index}/${childIndex + 1}`)
-          )}
+          ) ?? []}
         </div>
       );
     }
@@ -330,6 +352,7 @@ export default class DropDownButton extends React.Component<
       buttons: _buttons,
       data,
       popOverContainer,
+      popOverContainerSelector,
       classnames: cx,
       classPrefix: ns,
       children,
@@ -339,7 +362,8 @@ export default class DropDownButton extends React.Component<
       closeOnOutside,
       menuClassName,
       overlayPlacement,
-      trigger
+      trigger,
+      mobileUI
     } = this.props;
 
     const buttons =
@@ -359,13 +383,14 @@ export default class DropDownButton extends React.Component<
                 'DropDown-menu-root',
                 'DropDown-menu',
                 {
-                  'is-mobile': isMobile()
+                  'is-mobile': mobileUI
                 },
                 menuClassName
               )}
               onClick={closeOnClick ? this.close : noop}
               onMouseEnter={this.keepOpen}
               ref={ref}
+              style={{width: this.target?.offsetWidth}}
             >
               {children
                 ? children
@@ -381,10 +406,11 @@ export default class DropDownButton extends React.Component<
         }}
       </RootClose>
     );
-    if (popOverContainer) {
+    if (popOverContainer || popOverContainerSelector) {
       return (
         <Overlay
           container={popOverContainer}
+          containerSelector={popOverContainerSelector}
           target={() => this.target}
           placement={overlayPlacement}
           show
@@ -433,7 +459,11 @@ export default class DropDownButton extends React.Component<
       data,
       hideCaret,
       env,
-      testIdBuilder
+      testIdBuilder,
+      id,
+      wrapperCustomStyle,
+      themeCss,
+      mobileUI
     } = this.props;
 
     return (
@@ -445,7 +475,7 @@ export default class DropDownButton extends React.Component<
             'DropDown--alignRight': align === 'right',
             'is-opened': this.state.isOpened,
             'is-actived': isActived,
-            'is-mobile': isMobile()
+            'is-mobile': mobileUI
           },
           className
         )}
@@ -478,13 +508,49 @@ export default class DropDownButton extends React.Component<
                 'Button--primary': primary,
                 'Button--iconOnly': iconOnly
               },
-              `Button--size-${size}`
+              `Button--size-${size}`,
+              setThemeClassName({
+                ...this.props,
+                name: 'wrapperCustomStyle',
+                id,
+                themeCss: wrapperCustomStyle
+              }),
+              setThemeClassName({
+                ...this.props,
+                name: 'className',
+                id,
+                themeCss: themeCss
+              })
             )}
           >
-            <Icon c={cx} icon={icon} className="icon m-r-xs" />
+            <Icon
+              c={cx}
+              icon={icon}
+              className={cx(
+                'icon m-r-xs',
+                setThemeClassName({
+                  ...this.props,
+                  name: 'iconClassName',
+                  id,
+                  themeCss: themeCss
+                })
+              )}
+            />
             {typeof label === 'string' ? filter(label, data) : label}
             {rightIcon && (
-              <Icon cx={cx} icon={rightIcon} className="icon m-l-xs" />
+              <Icon
+                cx={cx}
+                icon={rightIcon}
+                className={cx(
+                  'icon m-l-xs',
+                  setThemeClassName({
+                    ...this.props,
+                    name: 'iconClassName',
+                    id,
+                    themeCss: themeCss
+                  })
+                )}
+              />
             )}
             {!hideCaret ? (
               <span className={cx('DropDown-caret')}>
@@ -494,6 +560,43 @@ export default class DropDownButton extends React.Component<
           </button>
         </TooltipWrapper>
         {this.state.isOpened ? this.renderOuter() : null}
+
+        <CustomStyle
+          {...this.props}
+          config={{
+            themeCss: themeCss,
+            classNames: [
+              {
+                key: 'className',
+                weights: {
+                  hover: {
+                    suf: ':not(:disabled):not(.is-disabled)'
+                  },
+                  active: {suf: ':not(:disabled):not(.is-disabled)'}
+                }
+              },
+              {
+                key: 'iconClassName',
+                weights: {
+                  default: {
+                    important: true
+                  },
+                  hover: {
+                    important: true,
+                    suf: ':not(:disabled):not(.is-disabled)'
+                  },
+                  active: {
+                    important: true,
+                    suf: ':not(:disabled):not(.is-disabled)'
+                  }
+                }
+              }
+            ],
+            wrapperCustomStyle,
+            id
+          }}
+          env={env}
+        />
       </div>
     );
   }

@@ -70,6 +70,19 @@
     margin-bottom: var(--Combo-items-marginBottom);
   }
 
+  &-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    &:empty {
+      display: none;
+    }
+  }
+
+  // &-pager {
+
+  // }
+
   &-item {
     background: var(--combo-bg-color);
   }
@@ -293,6 +306,12 @@
       border-bottom: var(--Form-input-borderWidth) solid var(--borderColor);
     }
   }
+}
+
+.#{$ns}ComboTabs {
+  border-left: var(--Form-input-borderWidth) solid var(--borderColor);
+  border-right: var(--Form-input-borderWidth) solid var(--borderColor);
+  border-bottom: var(--Form-input-borderWidth) solid var(--borderColor);
 }
 
 .#{$ns}ComboTabs > .#{$ns}Tabs-links {

@@ -13,13 +13,14 @@ import {
 import {RegionWrapper as Region} from 'amis-editor-core';
 import {getEventControlConfig} from '../renderer/event-control';
 import React from 'react';
+import {generateId} from '../util';
 
 export class SwitchContainerPlugin extends LayoutBasePlugin {
   static id = 'SwitchContainerPlugin';
   static scene = ['layout'];
   // 关联渲染器名字
   rendererName = 'switch-container';
-  $schema = '/schemas/SwitchContainerSchema.json';
+  $schema = '/schemas/AMISSwitchContainerSchema.json';
 
   // 组件名称
   name = '状态容器';
@@ -34,21 +35,25 @@ export class SwitchContainerPlugin extends LayoutBasePlugin {
     items: [
       {
         title: '状态一',
+        id: generateId(),
         body: [
           {
             type: 'tpl',
             tpl: '状态一内容',
-            wrapperComponent: ''
+            wrapperComponent: '',
+            id: generateId()
           }
         ]
       },
       {
         title: '状态二',
+        id: generateId(),
         body: [
           {
             type: 'tpl',
             tpl: '状态二内容',
-            wrapperComponent: ''
+            wrapperComponent: '',
+            id: generateId()
           }
         ]
       }

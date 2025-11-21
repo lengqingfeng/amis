@@ -1,12 +1,17 @@
 import React from 'react';
-import {getPropValue, FormControlProps} from 'amis-core';
+import {getPropValue, FormControlProps, createObject} from 'amis-core';
 import {ErrorBoundary} from 'amis-core';
+import omit from 'lodash/omit';
 
 function renderCommonStatic(props: any, defaultValue: string) {
   const {type, render, staticSchema} = props;
   const staticProps = {
     ...props,
-    ...staticSchema
+    ...staticSchema,
+    dispatchEvent: (eventName: string, data: any) => {
+      // 不要透传 renderer， 因为这样 onEvent 就不是表单项那层的了
+      return props.dispatchEvent(eventName, data);
+    }
   };
 
   switch (type) {
@@ -85,7 +90,7 @@ function renderCommonStatic(props: any, defaultValue: string) {
 /**
  * 表单项类成员render支持静态展示装饰器
  */
-export function supportStatic<T extends FormControlProps>() {
+let supportStatic = <T extends FormControlProps>() => {
   return function (
     target: any,
     name: string,
@@ -102,13 +107,15 @@ export function supportStatic<T extends FormControlProps>() {
           classnames: cx,
           className,
           placeholder,
-          staticPlaceholder = (
-            <span className="text-muted">{placeholder || '-'}</span>
-          )
+          staticPlaceholder = <span className="text-muted">{'-'}</span>
         } = props;
 
         let body;
-        const displayValue = getPropValue(props);
+        const displayValue = getPropValue(
+          props,
+          undefined,
+          props.canAccessSuperData ?? false
+        );
         const isValueEmpty = displayValue == null || displayValue === '';
 
         if (
@@ -119,7 +126,25 @@ export function supportStatic<T extends FormControlProps>() {
             typeof staticSchema === 'number')
         ) {
           // 有自定义schema 且schema有type 时，展示schema
-          body = render('form-static-schema', staticSchema, props);
+          body = render(
+            [props.type || '', 'form-static-schema'].join('-'),
+            staticSchema,
+            {
+              selectedOptions: props.selectedOptions,
+              ...(props.selectedOptions
+                ? {
+                    data: createObject(
+                      {
+                        selectedItems: props.multiple
+                          ? props.selectedOptions
+                          : props.selectedOptions?.[0]
+                      },
+                      props.data
+                    )
+                  }
+                : {})
+            }
+          );
         } else if (target.renderStatic) {
           // 特殊组件，control有 renderStatic 时，特殊处理
           body = target.renderStatic.apply(this, [
@@ -155,7 +180,7 @@ export function supportStatic<T extends FormControlProps>() {
     };
     return descriptor;
   };
-}
+};
 
 function renderStaticDateTypes(props: any) {
   const {
@@ -176,3 +201,15 @@ function renderStaticDateTypes(props: any) {
     valueFormat: valueFormat || format
   });
 }
+
+const overrideSupportStatic = (
+  overrideFunc: () => (
+    target: any,
+    name: string,
+    descriptor: TypedPropertyDescriptor<any>
+  ) => TypedPropertyDescriptor<any>
+) => {
+  supportStatic = overrideFunc;
+};
+
+export {supportStatic, overrideSupportStatic};

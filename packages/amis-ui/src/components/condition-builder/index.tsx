@@ -10,8 +10,10 @@ import {
   getTree,
   spliceTree,
   mapTree,
+  findTree,
   guid,
-  noop
+  noop,
+  AMISConditionRule
 } from 'amis-core';
 import {uncontrollable} from 'amis-core';
 import {ConditionBuilderFields, ConditionBuilderFuncs} from './types';
@@ -20,7 +22,7 @@ import defaultConfig, {ConditionBuilderConfig} from './config';
 import {FormulaPickerProps} from '../formula/Picker';
 import PickerContainer from '../PickerContainer';
 import ResultBox from '../ResultBox';
-import type {ConditionGroupValue} from 'amis-core';
+import type {AMISConditionGroupValue, TestIdBuilder} from 'amis-core';
 
 export interface ConditionBuilderProps extends ThemeProps, LocaleProps {
   builderMode?: 'simple' | 'full'; // 简单模式｜完整模式
@@ -30,13 +32,14 @@ export interface ConditionBuilderProps extends ThemeProps, LocaleProps {
   title?: string;
   fields: ConditionBuilderFields;
   funcs?: ConditionBuilderFuncs;
+  uniqueFields?: boolean; // 是否限制字段唯一，也就是说不允许一个字段设置在两个规则里面
   showNot?: boolean; // 是否显示非按钮
   showANDOR?: boolean; // 是否显示并或切换键按钮
   showIf?: boolean; // 是否显示条件
   formulaForIf?: FormulaPickerProps;
-  value?: ConditionGroupValue;
+  value?: AMISConditionGroupValue;
   data?: any;
-  onChange: (value?: ConditionGroupValue) => void;
+  onChange: (value?: AMISConditionGroupValue) => void;
   config?: ConditionBuilderConfig;
   disabled?: boolean;
   draggable?: boolean;
@@ -46,12 +49,19 @@ export interface ConditionBuilderProps extends ThemeProps, LocaleProps {
   popOverContainer?: any;
   renderEtrValue?: any;
   selectMode?: 'list' | 'tree' | 'chained';
-  isAddBtnVisibleOn?: (param: {depth: number; breadth: number}) => boolean;
-  isAddGroupBtnVisibleOn?: (param: {depth: number; breadth: number}) => boolean;
+  isAddBtnVisibleOn?: (param: {
+    depth: number;
+    breadth: number;
+  }) => boolean | undefined;
+  isAddGroupBtnVisibleOn?: (param: {
+    depth: number;
+    breadth: number;
+  }) => boolean | undefined;
+  testIdBuilder?: TestIdBuilder;
 }
 
 export interface ConditionBuilderState {
-  tmpValue: ConditionGroupValue;
+  tmpValue: AMISConditionGroupValue;
 }
 
 export class QueryBuilder extends React.Component<
@@ -229,7 +239,7 @@ export class QueryBuilder extends React.Component<
   }
 
   @autobind
-  highlightValue(value: ConditionGroupValue) {
+  highlightValue(value: AMISConditionGroupValue) {
     const {classnames: cx, translate: __} = this.props;
     const html = {
       __html: `<span class="label label-info">${__(
@@ -243,8 +253,8 @@ export class QueryBuilder extends React.Component<
   }
 
   renderBody(
-    onChange: (value: ConditionGroupValue) => void,
-    value?: ConditionGroupValue,
+    onChange: (value: AMISConditionGroupValue) => void,
+    value?: AMISConditionGroupValue,
     popOverContainer?: any
   ) {
     const {
@@ -255,7 +265,6 @@ export class QueryBuilder extends React.Component<
       showNot,
       showANDOR,
       data,
-      disabled,
       draggable = true,
       searchable,
       builderMode,
@@ -265,8 +274,12 @@ export class QueryBuilder extends React.Component<
       isAddBtnVisibleOn,
       isAddGroupBtnVisibleOn,
       showIf,
-      formulaForIf
+      uniqueFields,
+      formulaForIf,
+      testIdBuilder
     } = this.props;
+
+    const disabled = value?.disabled ?? this.props.disabled;
 
     const normalizedValue = Array.isArray(value?.children)
       ? {
@@ -283,13 +296,32 @@ export class QueryBuilder extends React.Component<
           })
         }
       : value;
+    let finalFields = fields || this.config.fields;
+    if (uniqueFields && Array.isArray(value?.children)) {
+      finalFields = mapTree(finalFields, (field: any) => {
+        const selected = findTree(
+          (value as any)?.children,
+          (rule: any) =>
+            rule.left?.type === 'field' && rule.left?.field === field.name
+        );
+
+        if (selected) {
+          return {
+            ...field,
+            disabled: true
+          };
+        }
+
+        return field;
+      });
+    }
 
     return (
       <ConditionGroup
         builderMode={builderMode}
         config={this.config}
         funcs={funcs || this.config.funcs}
-        fields={fields || this.config.fields}
+        fields={finalFields}
         value={normalizedValue as any}
         onChange={onChange}
         classnames={cx}
@@ -311,6 +343,7 @@ export class QueryBuilder extends React.Component<
         isAddGroupBtnVisibleOn={isAddGroupBtnVisibleOn}
         showIf={showIf}
         formulaForIf={formulaForIf}
+        testIdBuilder={testIdBuilder?.getChild('group')}
       />
     );
   }
@@ -327,10 +360,12 @@ export class QueryBuilder extends React.Component<
       onChange: onFinalChange,
       value,
       title,
-      disabled,
       popOverContainer,
+      testIdBuilder,
       mobileUI
     } = this.props;
+
+    const disabled = value?.disabled ?? this.props.disabled;
 
     if (embed) {
       return this.renderBody(onFinalChange, value, popOverContainer);
@@ -358,8 +393,8 @@ export class QueryBuilder extends React.Component<
         size={'md'}
         popOverContainer={popOverContainer}
         bodyRender={(params: {
-          value: ConditionGroupValue;
-          onChange: (value: ConditionGroupValue) => void;
+          value: AMISConditionGroupValue;
+          onChange: (value: AMISConditionGroupValue) => void;
         }) => this.renderBody(params.onChange, params.value)}
         title={title}
       >
@@ -388,6 +423,7 @@ export class QueryBuilder extends React.Component<
             }
             mobileUI={mobileUI}
             onResultClick={onClick}
+            testIdBuilder={testIdBuilder?.getChild('result-box')}
           ></ResultBox>
         )}
       </PickerContainer>

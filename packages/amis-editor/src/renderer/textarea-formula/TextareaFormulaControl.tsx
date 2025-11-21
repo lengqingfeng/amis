@@ -14,7 +14,7 @@ import FormulaPicker, {CustomFormulaPickerProps} from './FormulaPicker';
 import {reaction} from 'mobx';
 import {renderFormulaValue} from '../FormulaControl';
 import {getVariables, getQuickVariables} from 'amis-editor-core';
-import {findDOMNode} from 'react-dom';
+import {findDomCompat as findDOMNode} from 'amis-core';
 
 import type {VariableItem, CodeMirror} from 'amis-ui';
 
@@ -680,7 +680,8 @@ export class TextareaFormulaControl extends React.Component<
           style={{fontSize: '12px'}}
           tooltip={{
             tooltipTheme: 'dark',
-            children: () => renderFormulaValue(highlightValue)
+            children: () =>
+              renderFormulaValue(highlightValue, this.props.env.filterHtml)
           }}
         >
           <div

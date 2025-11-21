@@ -2,7 +2,13 @@
  * 导出 Excel 功能
  */
 
-import {filter, isEffectiveApi, arraySlice, isObject} from 'amis-core';
+import {
+  filter,
+  isEffectiveApi,
+  arraySlice,
+  isObject,
+  AMISSchema
+} from 'amis-core';
 import './ColumnToggler';
 import {TableStore} from 'amis-core';
 import {saveAs} from 'file-saver';
@@ -286,7 +292,11 @@ export async function exportExcel(
       pageField,
       perPageField
     });
-    if (!res.data) {
+
+    if ((toolbar.api as any)?.responseType === 'blob') {
+      // 如果是返回的文件流就直接下载
+      return;
+    } else if (!res.data) {
       env.notify('warning', __('placeholder.noData'));
       return;
     }
@@ -430,7 +440,7 @@ export async function exportExcel(
 
       applyCellStyle(sheetRow, columIndex, column.pristine, rowData);
 
-      const type = (column as BaseSchema).type || 'plain';
+      const type = (column as AMISSchema).type || 'plain';
       // TODO: 这里很多组件都是拷贝对应渲染的逻辑实现的，导致每种都得实现一遍
       if ((type === 'image' || (type as any) === 'static-image') && value) {
         try {

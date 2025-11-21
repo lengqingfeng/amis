@@ -9,7 +9,7 @@ export class BreadcrumbPlugin extends BasePlugin {
   static id = 'BreadcrumbPlugin';
   // 关联渲染器名字
   rendererName = 'breadcrumb';
-  $schema = '/schemas/BreadcrumbSchema.json';
+  $schema = '/schemas/AMISBreadcrumbSchema.json';
   disabledRendererPlugin = true;
 
   // 组件名称
@@ -52,7 +52,7 @@ export class BreadcrumbPlugin extends BasePlugin {
             type: 'input-text',
             name: 'separator'
           },
-          getSchemaTpl('api', {
+          getSchemaTpl('apiControl', {
             label: '动态数据',
             name: 'source'
           }),

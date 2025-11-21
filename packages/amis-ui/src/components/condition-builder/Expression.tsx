@@ -22,7 +22,12 @@ import ConditionFunc from './Func';
 import {ConditionBuilderConfig} from './config';
 import Formula from './Formula';
 import {FormulaPickerProps} from '../formula/Picker';
-import type {ExpressionComplex, OperatorType, ExpressionFunc} from 'amis-core';
+import type {
+  AMISExpressionComplex,
+  AMISOperatorType,
+  AMISExpressionFunc,
+  TestIdBuilder
+} from 'amis-core';
 
 /**
  * 支持4中表达式设置方式
@@ -34,15 +39,15 @@ import type {ExpressionComplex, OperatorType, ExpressionFunc} from 'amis-core';
  */
 
 export interface ExpressionProps extends ThemeProps, LocaleProps {
-  value: ExpressionComplex;
+  value: AMISExpressionComplex;
   data?: any;
   index?: number;
-  onChange: (value: ExpressionComplex, index?: number) => void;
+  onChange: (value: AMISExpressionComplex, index?: number) => void;
   valueField?: FieldSimple;
   fields?: ConditionBuilderField[];
   funcs?: ConditionBuilderFuncs;
   allowedTypes?: Array<'value' | 'field' | 'func'>;
-  op?: OperatorType;
+  op?: AMISOperatorType;
   config: ConditionBuilderConfig;
   disabled?: boolean;
   searchable?: boolean;
@@ -51,6 +56,7 @@ export interface ExpressionProps extends ThemeProps, LocaleProps {
   popOverContainer?: any;
   renderEtrValue?: any;
   selectMode?: 'list' | 'tree' | 'chained';
+  testIdBuilder?: TestIdBuilder;
 }
 
 const fieldMap = {
@@ -131,7 +137,8 @@ export class Expression extends React.Component<ExpressionProps> {
       formula,
       popOverContainer,
       selectMode,
-      renderEtrValue
+      renderEtrValue,
+      testIdBuilder
     } = this.props;
     const inputType =
       ((value as any)?.type === 'field'
@@ -162,6 +169,7 @@ export class Expression extends React.Component<ExpressionProps> {
             formula={formula}
             popOverContainer={popOverContainer}
             renderEtrValue={renderEtrValue}
+            testIdBuilder={testIdBuilder?.getChild('tValue')}
           />
         ) : null}
 
@@ -174,6 +182,7 @@ export class Expression extends React.Component<ExpressionProps> {
             searchable={searchable}
             popOverContainer={popOverContainer}
             selectMode={selectMode}
+            testIdBuilder={testIdBuilder?.getChild('tField')}
             options={
               valueField
                 ? filterTree(
@@ -190,13 +199,14 @@ export class Expression extends React.Component<ExpressionProps> {
         {inputType === 'func' ? (
           <ConditionFunc
             config={config}
-            value={value as ExpressionFunc}
+            value={value as AMISExpressionFunc}
             onChange={this.handleFuncChange}
             fieldClassName={fieldClassName}
             funcs={funcs}
             fields={fields}
             allowedTypes={allowedTypes}
             disabled={disabled}
+            testIdBuilder={testIdBuilder?.getChild('tFunc')}
           />
         ) : null}
 
@@ -206,6 +216,7 @@ export class Expression extends React.Component<ExpressionProps> {
             value={inputType}
             popOverContainer={popOverContainer}
             onChange={this.handleInputTypeChange}
+            testIdBuilder={testIdBuilder?.getChild('tSwitch')}
             options={types.map(item => ({
               label: fieldMap[item],
               value: item

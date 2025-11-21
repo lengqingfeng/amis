@@ -85,7 +85,8 @@ const defaultFlexContainerSchema = (
 export class FlexPluginBase extends LayoutBasePlugin {
   static id = 'FlexPluginBase';
   rendererName = 'flex';
-  $schema = '/schemas/FlexSchema.json';
+  useLazyRender = true; // 使用懒渲染
+  $schema = '/schemas/AMISFlexSchema.json';
   disabledRendererPlugin = false;
 
   name = '布局容器';
@@ -104,11 +105,21 @@ export class FlexPluginBase extends LayoutBasePlugin {
 
   panelJustify = true; // 右侧配置项默认左右展示
 
+  getChildNodes = (node: EditorNodeType) => {
+    let nodes = node.children || [];
+
+    if (nodes.length === 1 && nodes[0].isRegion) {
+      nodes = nodes[0].children || [];
+    }
+
+    return nodes;
+  };
+
   // 设置分栏的默认布局比例
   setFlexLayout = (node: EditorNodeType, value: string) => {
     if (/^[\d:]+$/.test(value) && isAlive(node)) {
       let list = value.trim().split(':');
-      let children = node.children || [];
+      let children = this.getChildNodes(node);
       const isColumn = String(node.schema?.style?.flexDirection).includes(
         'column'
       );
@@ -164,7 +175,8 @@ export class FlexPluginBase extends LayoutBasePlugin {
       String(flexSetting.flexDirection).includes('column') &&
       !schema?.style?.height
     ) {
-      (node.children || []).forEach(child => {
+      const children = this.getChildNodes(node);
+      children.forEach(child => {
         if (
           !child.schema?.style?.height ||
           /^0/.test(child.schema?.style?.flexBasis)
@@ -449,7 +461,8 @@ export class FlexPluginBase extends LayoutBasePlugin {
   regions: Array<RegionConfig> = [
     {
       key: 'items',
-      label: '子节点集合'
+      label: '子节点集合',
+      renderMethod: 'renderItems'
     }
   ];
 
@@ -575,9 +588,9 @@ export class FlexPluginBase extends LayoutBasePlugin {
     event: PluginEvent<RendererJSONSchemaResolveEventContext>
   ) {
     const context = event.context;
-    const parent = context.node.parent?.host as EditorNodeType;
+    const parent = context.node.host as EditorNodeType;
 
-    if (parent?.info?.plugin === this) {
+    if (context.node.isVitualRenderer && parent?.info?.plugin === this) {
       event.setData('/schemas/FlexColumn.json');
     }
   }

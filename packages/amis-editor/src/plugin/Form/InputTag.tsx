@@ -2,28 +2,24 @@ import {
   EditorManager,
   EditorNodeType,
   getSchemaTpl,
-  tipedLabel
-} from 'amis-editor-core';
-import {registerEditorPlugin} from 'amis-editor-core';
-import {
+  tipedLabel,
   BasePlugin,
-  BasicSubRenderInfo,
-  RendererEventContext,
-  SubRendererInfo,
-  BaseEventContext
+  BaseEventContext,
+  registerEditorPlugin,
+  RendererPluginAction,
+  RendererPluginEvent
 } from 'amis-editor-core';
-
 import {formItemControl} from '../../component/BaseControl';
-import {RendererPluginAction, RendererPluginEvent} from 'amis-editor-core';
 import {resolveOptionEventDataSchame, resolveOptionType} from '../../util';
 import type {Schema} from 'amis';
+import {getActionCommonProps} from '../../renderer/event-control/helper';
 
 export class TagControlPlugin extends BasePlugin {
   static id = 'TagControlPlugin';
   static scene = ['layout'];
   // 关联渲染器名字
   rendererName = 'input-tag';
-  $schema = '/schemas/TagControlSchema.json';
+  $schema = '/schemas/AMISInputTagSchema.json';
 
   // 组件名称
   name = '标签选择';
@@ -153,17 +149,20 @@ export class TagControlPlugin extends BasePlugin {
     {
       actionType: 'clear',
       actionLabel: '清空',
-      description: '清除选中值'
+      description: '清除选中值',
+      ...getActionCommonProps('clear')
     },
     {
       actionType: 'reset',
       actionLabel: '重置',
-      description: '重置为默认值'
+      description: '重置为默认值',
+      ...getActionCommonProps('reset')
     },
     {
       actionType: 'setValue',
       actionLabel: '赋值',
-      description: '触发组件数据更新'
+      description: '触发组件数据更新',
+      ...getActionCommonProps('setValue')
     }
   ];
 
@@ -184,9 +183,13 @@ export class TagControlPlugin extends BasePlugin {
               rendererSchema: (schema: Schema) => schema,
               mode: 'vertical' // 改成上下展示模式
             }),
-            getSchemaTpl('joinValues'),
+            getSchemaTpl('joinValues', {
+              visibleOn: true
+            }),
             getSchemaTpl('delimiter'),
-            getSchemaTpl('extractValue'),
+            getSchemaTpl('extractValue', {
+              visibleOn: 'this.joinValues === false'
+            }),
             {
               type: 'input-number',
               name: 'max',

@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import {findDOMNode} from 'react-dom';
+import {findDomCompat as findDOMNode} from 'amis-core';
 import moment, {locale, unitOfTime} from 'moment';
 import omit from 'lodash/omit';
 import kebabCase from 'lodash/kebabCase';
@@ -57,6 +57,7 @@ export interface DateRangePickerProps extends ThemeProps, LocaleProps {
   ranges?: string | Array<ShortCuts>;
   shortcuts?: string | Array<ShortCuts>;
   clearable?: boolean;
+  inputForbid?: boolean; // 禁用输入
   minDate?: moment.Moment;
   maxDate?: moment.Moment;
   minDateRaw?: string;
@@ -813,6 +814,7 @@ export class DateRangePicker extends React.Component<
   }
 
   close(isConfirm: boolean = false) {
+    const newState: any = {};
     if (!isConfirm) {
       /** 未点击确认关闭时，将日期恢复至未做任何选择的状态 */
       const {
@@ -834,7 +836,7 @@ export class DateRangePicker extends React.Component<
         data,
         utc
       );
-      this.setState({
+      Object.assign(newState, {
         startDate,
         endDate,
         oldStartDate: startDate,
@@ -849,13 +851,14 @@ export class DateRangePicker extends React.Component<
             : ''
       });
     } else {
-      this.setState({
+      Object.assign(newState, {
         oldStartDate: this.state.startDate,
         oldEndDate: this.state.endDate
       });
     }
     this.setState(
       {
+        ...newState,
         isOpened: false,
         editState: undefined,
         endDateOpenedFirst: false
@@ -1996,6 +1999,7 @@ export class DateRangePicker extends React.Component<
       joinValues,
       delimiter,
       clearable,
+      inputForbid,
       disabled,
       embed,
       overlayPlacement,
@@ -2110,7 +2114,7 @@ export class DateRangePicker extends React.Component<
           autoComplete="off"
           value={this.state.startInputValue || ''}
           disabled={disabled}
-          readOnly={mobileUI}
+          readOnly={mobileUI || inputForbid}
           testIdBuilder={testIdBuilder?.getChild('start')}
         />
         <span
@@ -2131,7 +2135,7 @@ export class DateRangePicker extends React.Component<
           autoComplete="off"
           value={this.state.endInputValue || ''}
           disabled={disabled}
-          readOnly={mobileUI}
+          readOnly={mobileUI || inputForbid}
           testIdBuilder={testIdBuilder?.getChild('end')}
         />
 

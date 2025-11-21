@@ -8,7 +8,7 @@ import {
   resolveVariableAndFilter,
   createObject,
   evalExpression,
-  ConditionRule
+  AMISConditionRule
 } from 'amis-core';
 import {
   FormBaseControlSchema,
@@ -26,29 +26,30 @@ import {
   ConditionBuilder
 } from 'amis-ui';
 
-import {IconSchema} from '../Icon';
+import {AMISIconSchema} from '../Icon';
 import {isMobile} from 'amis-core';
-import type {InputFormulaControlSchema} from './InputFormula';
+import type {AMISInputFormulaSchemaBase} from './InputFormula';
+import {AMISFormItem} from 'amis-core';
 
 /**
  * 条件组合控件
  * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/condition-builder
  */
-export interface ConditionBuilderControlSchema extends FormBaseControlSchema {
+export interface AMISConditionBuilderSchema extends AMISFormItem {
   /**
-   * 指定为
+   * 指定为 condition-builder 组件
    */
   type: 'condition-builder';
 
   /**
-   * 内嵌模式，默认为 true
+   * 内嵌模式
    */
   embed?: boolean;
 
   /**
-   * 非内嵌模式时 弹窗触发icon
+   * 非内嵌模式时弹窗触发icon
    */
-  pickerIcon?: IconSchema;
+  pickerIcon?: AMISIconSchema;
 
   /**
    * 函数集合
@@ -59,6 +60,11 @@ export interface ConditionBuilderControlSchema extends FormBaseControlSchema {
    * 字段集合
    */
   fields: ConditionBuilderFields;
+
+  /**
+   * 是否限制字段唯一
+   */
+  uniqueFields?: boolean;
 
   /**
    * 其他配置
@@ -76,29 +82,29 @@ export interface ConditionBuilderControlSchema extends FormBaseControlSchema {
   builderMode?: 'simple' | 'full';
 
   /**
-   * 是否显示并或切换键按钮，只在简单模式下有用
+   * 是否显示并或切换键按钮
    */
   showANDOR?: boolean;
 
   /**
-   * 是否可拖拽，默认为 true
+   * 是否可拖拽
    */
   draggable?: boolean;
 
   /*
-   * 表达式：控制按钮“添加条件”的显示
+   * 表达式：控制按钮"添加条件"的显示
    */
   addBtnVisibleOn?: string;
 
   /**
-   * 表达式：控制按钮“添加条件组”的显示
+   * 表达式：控制按钮"添加条件组"的显示
    */
   addGroupBtnVisibleOn?: string;
 
   /**
    * 将字段输入控件变成公式编辑器。
    */
-  formula?: Omit<InputFormulaControlSchema, 'type'>;
+  formula?: AMISInputFormulaSchemaBase;
 
   /**
    * if 里面公式编辑器配置
@@ -109,7 +115,7 @@ export interface ConditionBuilderControlSchema extends FormBaseControlSchema {
 export interface ConditionBuilderProps
   extends FormControlProps,
     Omit<
-      ConditionBuilderControlSchema,
+      AMISConditionBuilderSchema,
       'type' | 'className' | 'descriptionClassName' | 'inputClassName'
     > {}
 
@@ -138,7 +144,7 @@ export default class ConditionBuilderControl extends React.PureComponent<Conditi
     if (typeof addBtnVisibleOn === 'string' && addBtnVisibleOn) {
       return evalExpression(addBtnVisibleOn, createObject(data, param));
     }
-    return true;
+    return;
   }
 
   @autobind
@@ -147,7 +153,7 @@ export default class ConditionBuilderControl extends React.PureComponent<Conditi
     if (typeof addGroupBtnVisibleOn === 'string' && addGroupBtnVisibleOn) {
       return evalExpression(addGroupBtnVisibleOn, createObject(data, param));
     }
-    return true;
+    return;
   }
 
   validate(): any {
@@ -161,7 +167,7 @@ export default class ConditionBuilderControl extends React.PureComponent<Conditi
 
       let isEmpty = true;
       const allowRightEmpty = ['is_empty', 'is_not_empty'];
-      value?.children?.forEach((item: ConditionRule) => {
+      value?.children?.forEach((item: AMISConditionRule) => {
         // 如果左侧、操作符为空，必填不通过
         if (
           item.op &&
@@ -185,6 +191,7 @@ export default class ConditionBuilderControl extends React.PureComponent<Conditi
       pickerIcon,
       env,
       popOverContainer,
+      mobileUI,
       ...rest
     } = this.props;
 
@@ -203,7 +210,7 @@ export default class ConditionBuilderControl extends React.PureComponent<Conditi
       <div
         className={cx(
           `ConditionBuilderControl`,
-          {'is-mobile': isMobile()},
+          {'is-mobile': mobileUI},
           className
         )}
       >
@@ -214,6 +221,7 @@ export default class ConditionBuilderControl extends React.PureComponent<Conditi
           isAddGroupBtnVisibleOn={this.getAddGroupBtnVisible}
           popOverContainer={popOverContainer || env.getModalContainer}
           {...rest}
+          placeholder={rest.placeholder as string}
           formula={formula as any}
         />
       </div>

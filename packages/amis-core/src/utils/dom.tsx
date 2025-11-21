@@ -3,16 +3,16 @@ import React from 'react';
 import getOffset from './offset';
 import getPosition from './position';
 import {getScrollParent} from './helper';
+import {findDomCompat} from './findDomCompat';
 
 export function getContainer(container: any, defaultContainer: any) {
   container = typeof container === 'function' ? container() : container;
-  return ReactDOM.findDOMNode(container) || defaultContainer;
+  return findDomCompat(container) || defaultContainer;
 }
 
 export function ownerDocument(componentOrElement: any) {
   return (
-    (ReactDOM.findDOMNode(componentOrElement) as Element)?.ownerDocument ||
-    document
+    (findDomCompat(componentOrElement) as Element)?.ownerDocument || document
   );
 }
 
@@ -96,8 +96,9 @@ export function calculatePosition(
 
   const clip = container.getBoundingClientRect();
   const clip2 = overlayNode.getBoundingClientRect();
+  const clip3 = scrollParent.getBoundingClientRect();
   const scaleX = overlayNode.offsetWidth
-    ? clip2.width / overlayNode.offsetWidth
+    ? Math.ceil(clip2.width) / overlayNode.offsetWidth
     : 1;
   const scaleY = overlayNode.offsetHeight
     ? clip2.height / overlayNode.offsetHeight
@@ -202,12 +203,15 @@ export function calculatePosition(
           : myY === 'bottom'
           ? overlayHeight
           : overlayHeight / 2;
+      // 需考虑 iframe 之外的高度，并不属于可视区域
+      const scrollParentOffset =
+        positionTop < 0 && window.self !== window.top ? clip3.y : 0;
 
       // 如果还有其他可选项，则做位置判断，是否在可视区域，不完全在则继续看其他定位情况。
       if (tests.length || isAuto) {
         const transformed = {
           x: clip.x + positionLeft / scaleX,
-          y: clip.y + positionTop / scaleY,
+          y: clip.y - scrollParentOffset + positionTop / scaleY,
           width: overlayWidth,
           height: overlayHeight
         };
@@ -335,9 +339,7 @@ export function getStyleNumber(element: HTMLElement, styleName: string) {
   if (!element) {
     return 0;
   }
-  return (
-    parseInt(getComputedStyle(element).getPropertyValue(styleName), 10) || 0
-  );
+  return parseFloat(getComputedStyle(element).getPropertyValue(styleName)) || 0;
 }
 
 /** 根据关键字高亮显示文本内容 */
@@ -359,4 +361,59 @@ export function renderTextByKeyword(rendererText: string, curKeyword: string) {
   } else {
     return rendererText;
   }
+}
+
+// 计算除去某个元素后，父元素剩余部分的高度总和（padding、margin、border、height）
+export function calculateHeight(
+  element: HTMLElement,
+  excludeElement: HTMLElement
+) {
+  const parentRect = element.getBoundingClientRect();
+  const childRect = excludeElement.getBoundingClientRect();
+
+  const topDifference = Math.abs(childRect.top - parentRect.top);
+
+  let bottomDifference = 0;
+  let selfNode = excludeElement;
+  let parentNode = selfNode.parentElement;
+  while (parentNode) {
+    const paddingBottom = getStyleNumber(parentNode, 'padding-bottom');
+    const borderBottom = getStyleNumber(parentNode, 'border-bottom-width');
+
+    let nextSiblingHeight = 0;
+    let nextSibling = selfNode.nextElementSibling as HTMLElement;
+    while (nextSibling) {
+      const positon = getComputedStyle(nextSibling).position;
+      const className = nextSibling.className;
+      if (
+        positon !== 'absolute' &&
+        positon !== 'fixed' &&
+        !className.includes('Spinner') // 过滤掉Loading
+      ) {
+        const rect1 = selfNode.getBoundingClientRect();
+        const rect2 = nextSibling.getBoundingClientRect();
+
+        if (rect1.bottom <= rect2.top) {
+          nextSiblingHeight +=
+            nextSibling.offsetHeight +
+            getStyleNumber(nextSibling, 'margin-bottom');
+        }
+      }
+
+      nextSibling = nextSibling.nextElementSibling as HTMLElement;
+    }
+
+    const marginBottom = getStyleNumber(selfNode, 'margin-bottom');
+    bottomDifference +=
+      paddingBottom + borderBottom + marginBottom + nextSiblingHeight;
+
+    selfNode = parentNode;
+    parentNode = selfNode.parentElement;
+
+    if (element === selfNode) {
+      break;
+    }
+  }
+
+  return topDifference + bottomDifference;
 }

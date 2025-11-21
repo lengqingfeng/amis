@@ -1,5 +1,5 @@
 import React from 'react';
-import {findDOMNode} from 'react-dom';
+import {findDomCompat as findDOMNode} from 'amis-core';
 import {localeable, LocaleProps} from 'amis-core';
 import {themeable, ThemeProps} from 'amis-core';
 // @ts-ignore
@@ -106,7 +106,13 @@ export class InputBoxWithSuggestion extends React.Component<InputBoxWithSuggesti
             ref={ref}
             placeholder={placeholder}
             disabled={disabled}
-            value={options.find(o => o.value === value)?.label ?? value}
+            value={value}
+            blurValue={
+              (Array.isArray(this.props.options)
+                ? this.props.options
+                : []
+              ).find(o => o.value === value)?.label
+            }
             onChange={onChange}
             clearable={clearable}
             onClick={onClick}

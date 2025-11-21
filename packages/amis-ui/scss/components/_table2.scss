@@ -2,6 +2,11 @@
   position: relative;
   border-radius: var(--Table-borderRadius);
 
+  .#{$ns}Table-cell-wrapper .#{$ns}Table-badge {
+    width: 100%;
+    height: 100%;
+  }
+
   &.#{$ns}Table-bordered {
     border-width: var(--Table-borderWidth) var(--Table-borderWidth) 0
       var(--Table-borderWidth);
@@ -122,6 +127,12 @@
   .#{$ns}Table-header {
     padding: var(--Table-toolbar-marginY) var(--Table-toolbar-marginX);
 
+    &--affixed {
+      overflow: hidden;
+      background-color: var(--Table-thead-bg);
+      padding-right: var(--Table-scrollbar-width) !important;
+    }
+
     &.#{$ns}Table-sticky-holder {
       position: sticky;
       z-index: 3;
@@ -171,8 +182,19 @@
     line-height: var(--table-body-lineHeight);
     background: var(--Table-bg);
     border-spacing: 0;
-    border-collapse: collapse;
+    // border-collapse: collapse;
     border: none;
+
+    &--fixed {
+      table-layout: fixed;
+
+      > thead > tr > th,
+      > thead > tr > td,
+      > tbody > tr > td,
+      > tfoot > tr > td {
+        white-space: normal !important;
+      }
+    }
 
     & th,
     & td {
@@ -193,6 +215,8 @@
 
     > thead > tr {
       > th {
+        height: var(--table-body-line-height);
+        vertical-align: middle;
         background: var(--Table-thead-bg);
         padding: var(--table-paddingTop) var(--table-paddingRight)
           var(--table-paddingBottom) var(--table-paddingLeft);
@@ -239,7 +263,7 @@
 
     > tbody > tr {
       position: relative;
-      border-bottom: var(--Table-borderWidth) solid var(--Table-borderColor);
+      border-top: unset !important;
 
       &.#{$ns}Table-summary-row {
         > td {
@@ -257,8 +281,20 @@
           var(--Table-thead-borderColor);
       }
 
+      > td {
+        border-top: var(--Table-borderWidth) solid var(--Table-borderColor);
+        border-bottom: unset;
+      }
+      &:last-child {
+        > td {
+          border-bottom: var(--Table-borderWidth) solid var(--Table-borderColor);
+        }
+      }
+
       > td,
       > th {
+        height: px2rem(40px);
+        vertical-align: middle;
         padding: var(--table-paddingTop) var(--table-paddingRight)
           var(--table-paddingBottom) var(--table-paddingLeft);
 
@@ -269,6 +305,10 @@
         &:last-child {
           padding-right: var(--TableCell--edge-paddingX-default);
         }
+
+        .#{$ns}Form-static {
+          min-height: auto;
+        }
       }
 
       .#{$ns}Table-cell-wrapper-prefix {
@@ -277,6 +317,16 @@
         .#{$ns}Table-expandBtn {
           margin-right: 5px;
         }
+      }
+
+      .#{$ns}Form-static {
+        padding: 0;
+        margin: 0;
+        min-height: inherit;
+        line-height: inherit;
+        font-size: inherit;
+        color: inherit;
+        font-weight: inherit;
       }
 
       .#{$ns}Table-cell-height-large {
@@ -592,6 +642,52 @@
     .#{$ns}Table-header {
       padding: 0;
     }
+
+    &-self-sticky {
+      position: relative !important;
+
+      .#{$ns}Table-content {
+        overflow-x: unset !important;
+      }
+
+      .#{$ns}Table-table {
+        border-collapse: separate;
+
+        > tbody > tr > td {
+          border-top: none;
+        }
+      }
+
+      .#{$ns}Table-row {
+        z-index: 1;
+      }
+
+      .#{$ns}Table-cell-self-sticky {
+        z-index: 2 !important;
+      }
+
+      .#{$ns}Table-cell-fix-left {
+        z-index: 3 !important;
+      }
+    }
+
+    &.is-autoFillHeight {
+      overflow: auto;
+      & > .#{$ns}Table-content {
+        overflow: visible !important;
+        transform: unset !important;
+      }
+      & > .#{$ns}Table-content > table > thead > tr > th {
+        position: sticky;
+        top: 0;
+        z-index: 2 !important; // 添加z-index确保显示在最上层
+
+        &.#{$ns}Table-cell-fix-left,
+        &.#{$ns}Table-cell-fix-right {
+          z-index: 3 !important;
+        }
+      }
+    }
   }
 
   &.#{$ns}Table-ping-left {
@@ -604,23 +700,23 @@
         }
       }
 
-      > tbody > tr:not(.#{$ns}Table-row-disabled) {
-        > td.#{$ns}Table-cell-fix-left {
-          border-right: none;
-        }
-      }
+      // > tbody > tr:not(.#{$ns}Table-row-disabled) {
+      //   > td.#{$ns}Table-cell-fix-left {
+      //     border-right-color: var(--table-body-bg-color);
+      //   }
+      // }
 
-      > tfoot > tr > td:not(:last-child) {
-        &.#{$ns}Table-cell-fix-left-last {
-          border-right: none;
-        }
-      }
+      // > tfoot > tr > td:not(:last-child) {
+      //   &.#{$ns}Table-cell-fix-left-last {
+      //     border-right-color: var(--table-body-bg-color);
+      //   }
+      // }
 
-      > thead > tr > th:not(:last-child) {
-        &.#{$ns}Table-cell-fix-left-last {
-          border-right: none;
-        }
-      }
+      // > thead > tr > th:not(:last-child) {
+      //   &.#{$ns}Table-cell-fix-left-last {
+      //     border-right-color: var(--table-body-bg-color);
+      //   }
+      // }
     }
   }
 

@@ -6,13 +6,18 @@ export const ModalStore = ServiceStore.named('ModalStore')
   .props({
     form: types.frozen(),
     entered: false,
+    dragging: false,
     resizeCoord: 0,
-    schema: types.frozen()
+    schema: types.frozen(),
+    isFullscreen: false
   })
   .views(self => {
     return {
       get formData() {
         return createObject(self.data, self.form);
+      },
+      get inDragging() {
+        return self.dragging;
       }
     };
   })
@@ -21,7 +26,9 @@ export const ModalStore = ServiceStore.named('ModalStore')
       setEntered(value: boolean) {
         self.entered = value;
       },
-
+      setDragging(value: boolean) {
+        self.dragging = value;
+      },
       setFormData(obj: any) {
         self.form = obj;
       },
@@ -43,6 +50,9 @@ export const ModalStore = ServiceStore.named('ModalStore')
         }
 
         self.schema = schema;
+      },
+      setFullScreen(isFullscreen: boolean = false) {
+        self.isFullscreen = isFullscreen;
       }
     };
   });

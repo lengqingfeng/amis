@@ -1,5 +1,5 @@
 import React from 'react';
-import {findDOMNode} from 'react-dom';
+import {findDomCompat as findDOMNode} from 'amis-core';
 import {
   Renderer,
   RendererProps,
@@ -32,50 +32,48 @@ import {filter} from 'amis-core';
 import {Icon} from 'amis-ui';
 import {
   BaseSchema,
-  SchemaClassName,
-  SchemaCollection,
+  AMISClassName,
   SchemaExpression,
   SchemaTpl,
   SchemaTokenizeableString
 } from '../Schema';
-import {CardProps, CardSchema} from './Card';
-import {Card2Props, Card2Schema} from './Card2';
-import type {IItem, IScopedContext} from 'amis-core';
+import {AMISCardSchemaBase, CardProps} from './Card';
+import {AMISCard2Schema, Card2Props} from './Card2';
+import type {
+  IItem,
+  IScopedContext,
+  AMISSchemaBase,
+  AMISSpinnerConfig,
+  AMISSchemaCollection,
+  AMISLocalSource,
+  AMISExpression
+} from 'amis-core';
 import find from 'lodash/find';
 
 /**
  * Cards 卡片集合渲染器。
- * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/card
+ * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/cards
  */
-export interface CardsSchema extends BaseSchema, SpinnerExtraProps {
-  /**
-   * 指定为 cards 类型
-   */
-  type: 'cards';
-
-  card?: Partial<CardSchema> | Card2Schema;
+export interface AMISCardsBase extends AMISSchemaBase, AMISSpinnerConfig {
+  card?: AMISCardSchemaBase | AMISCard2Schema;
 
   /**
    * 头部 CSS 类名
    */
-  headerClassName?: SchemaClassName;
+  headerClassName?: AMISClassName;
 
   /**
    * 底部 CSS 类名
    */
-  footerClassName?: SchemaClassName;
+  footerClassName?: AMISClassName;
 
   /**
    * 卡片 CSS 类名
-   *
-   * @default Grid-col--sm6 Grid-col--md4 Grid-col--lg3
    */
-  itemClassName?: SchemaClassName;
+  itemClassName?: AMISClassName;
 
   /**
    * 无数据提示
-   *
-   * @default 暂无数据
    */
   placeholder?: SchemaTpl;
 
@@ -90,11 +88,9 @@ export interface CardsSchema extends BaseSchema, SpinnerExtraProps {
   showHeader?: boolean;
 
   /**
-   * 数据源: 绑定当前环境变量
-   *
-   * @default ${items}
+   * 数据源
    */
-  source?: SchemaTokenizeableString;
+  source?: AMISLocalSource;
 
   /**
    * 标题
@@ -119,22 +115,22 @@ export interface CardsSchema extends BaseSchema, SpinnerExtraProps {
   /**
    * 顶部区域
    */
-  header?: SchemaCollection;
+  header?: AMISSchemaCollection;
 
   /**
    * 底部区域
    */
-  footer?: SchemaCollection;
+  footer?: AMISSchemaCollection;
 
   /**
-   * 配置某项是否可以点选
+   * 配置某项是否可点选
    */
-  itemCheckableOn?: SchemaExpression;
+  itemCheckableOn?: AMISExpression;
 
   /**
    * 配置某项是否可拖拽排序，前提是要开启拖拽功能
    */
-  itemDraggableOn?: SchemaExpression;
+  itemDraggableOn?: AMISExpression;
 
   /**
    * 点击卡片的时候是否勾选卡片。
@@ -151,7 +147,18 @@ export interface CardsSchema extends BaseSchema, SpinnerExtraProps {
    */
   valueField?: string;
 }
+export type BaseCardsSchema = AMISCardsBase;
 
+/**
+ * 卡片集合组件，以卡片形式展示列表数据。
+ */
+export interface AMISCardsSchema extends AMISCardsBase {
+  /**
+   * 指定为 cards 类型
+   */
+  type: 'cards';
+}
+export type CardsSchema = AMISCardsSchema;
 export interface Column {
   type: string;
   [propName: string]: any;
@@ -165,15 +172,27 @@ export interface GridProps
     Omit<CardsSchema, 'className' | 'itemClassName'> {
   store: IListStore;
   selectable?: boolean;
+  // 已选清单
   selected?: Array<any>;
   checkAll?: boolean;
   multiple?: boolean;
   valueField?: string;
   draggable?: boolean;
   dragIcon?: SVGAElement;
+  // 行数据集合
+  items?: Array<object>;
+
+  // 原始数据集合，前端分页时用来保存原始数据
+  fullItems?: Array<object>;
   onSelect: (
     selectedItems: Array<object>,
     unSelectedItems: Array<object>
+  ) => void;
+  // 单条修改时触发
+  onItemChange?: (
+    item: object,
+    diff: object,
+    rowIndex: string | number
   ) => void;
   onSave?: (
     items: Array<object> | object,
@@ -216,7 +235,7 @@ export default class Cards extends React.Component<GridProps, object> {
     selectable: false,
     headerClassName: '',
     footerClassName: '',
-    itemClassName: 'Grid-col--sm6 Grid-col--md4 Grid-col--lg3',
+    itemClassName: 'Grid-col--xs12 Grid-col--sm6 Grid-col--md4 Grid-col--lg3',
     hideCheckToggler: false,
     masonryLayout: false,
     affixHeader: true,
@@ -236,6 +255,7 @@ export default class Cards extends React.Component<GridProps, object> {
 
     this.handleAction = this.handleAction.bind(this);
     this.handleCheck = this.handleCheck.bind(this);
+    this.handleClick = this.handleClick.bind(this);
     this.handleCheckAll = this.handleCheckAll.bind(this);
     this.handleQuickChange = this.handleQuickChange.bind(this);
     this.handleSave = this.handleSave.bind(this);
@@ -277,13 +297,14 @@ export default class Cards extends React.Component<GridProps, object> {
     let items: Array<object> = [];
     let updateItems = false;
 
-    if (
-      Array.isArray(value) &&
-      (!prevProps ||
-        getPropValue(prevProps, (props: GridProps) => props.items) !== value)
-    ) {
-      items = value;
-      updateItems = true;
+    if (Array.isArray(value)) {
+      if (
+        !prevProps ||
+        getPropValue(prevProps, (props: GridProps) => props.items) !== value
+      ) {
+        items = value;
+        updateItems = true;
+      }
     } else if (typeof source === 'string') {
       const resolved = resolveVariableAndFilter(source, props.data, '| raw');
       const prev = prevProps
@@ -298,7 +319,7 @@ export default class Cards extends React.Component<GridProps, object> {
       }
     }
 
-    updateItems && store.initItems(items);
+    updateItems && store.initItems(items, props.fullItems, props.selected);
     Array.isArray(props.selected) &&
       store.updateSelected(props.selected, props.valueField);
     return updateItems;
@@ -361,12 +382,35 @@ export default class Cards extends React.Component<GridProps, object> {
     const {onAction} = this.props;
 
     // 需要支持特殊事件吗？
-    onAction(e, action, ctx);
+    return onAction?.(e, action, ctx);
   }
 
   handleCheck(item: IItem) {
     item.toggle();
     this.syncSelected();
+
+    const {store, dispatchEvent} = this.props;
+
+    dispatchEvent(
+      //增删改查卡片模式选择表格项
+      'selectedChange',
+      createObject(store.data, {
+        ...store.eventContext,
+        item: item.data
+      })
+    );
+  }
+
+  handleClick(item: IItem) {
+    const {dispatchEvent, data} = this.props;
+    return dispatchEvent(
+      //增删改查卡片模式单击卡片
+      'rowClick',
+      createObject(data, {
+        item: item.data,
+        index: item.index
+      })
+    );
   }
 
   handleCheckAll() {
@@ -418,9 +462,17 @@ export default class Cards extends React.Component<GridProps, object> {
   ) {
     item.change(values, savePristine);
 
-    if (!saveImmediately || savePristine) {
+    const {onSave, onItemChange, primaryField} = this.props;
+
+    if (savePristine) {
       return;
     }
+
+    onItemChange?.(
+      item.data,
+      difference(item.data, item.pristine, ['id', primaryField]),
+      item.index
+    );
 
     if (saveImmediately && saveImmediately.api) {
       this.props.onAction(
@@ -435,9 +487,7 @@ export default class Cards extends React.Component<GridProps, object> {
       return;
     }
 
-    const {onSave, primaryField} = this.props;
-
-    if (!onSave) {
+    if (!saveImmediately || !onSave) {
       return;
     }
 
@@ -475,9 +525,17 @@ export default class Cards extends React.Component<GridProps, object> {
     );
   }
 
-  handleSaveOrder() {
-    const {store, onSaveOrder} = this.props;
+  async handleSaveOrder() {
+    const {store, onSaveOrder, data, dispatchEvent} = this.props;
+    const movedItems = store.movedItems.map(item => item.data);
 
+    const rendererEvent = await dispatchEvent(
+      'orderChange',
+      createObject(data, {movedItems})
+    );
+    if (rendererEvent?.prevented) {
+      return;
+    }
     if (!onSaveOrder || !store.movedItems.length) {
       return;
     }
@@ -698,9 +756,7 @@ export default class Cards extends React.Component<GridProps, object> {
       ? headerToolbarRender(
           {
             ...this.props,
-            selectedItems: store.selectedItems.map(item => item.data),
-            items: store.items.map(item => item.data),
-            unSelectedItems: store.unSelectedItems.map(item => item.data)
+            ...store.eventContext
           },
           this.renderToolbar
         )
@@ -749,9 +805,7 @@ export default class Cards extends React.Component<GridProps, object> {
       ? footerToolbarRender(
           {
             ...this.props,
-            selectedItems: store.selectedItems.map(item => item.data),
-            items: store.items.map(item => item.data),
-            unSelectedItems: store.unSelectedItems.map(item => item.data)
+            ...store.eventContext
           },
           this.renderToolbar
         )
@@ -867,7 +921,7 @@ export default class Cards extends React.Component<GridProps, object> {
       return this.renderCheckAll();
     }
 
-    return void 0;
+    return;
   }
 
   // editor中重写，请勿更改前两个参数
@@ -909,6 +963,7 @@ export default class Cards extends React.Component<GridProps, object> {
       data: item.locals,
       onAction: this.handleAction,
       onCheck: this.handleCheck,
+      onClick: this.handleClick,
       onQuickChange: store.dragging ? null : this.handleQuickChange
     };
 
@@ -966,9 +1021,26 @@ export default class Cards extends React.Component<GridProps, object> {
     } = this.props;
 
     this.renderedToolbars = []; // 用来记录哪些 toolbar 已经渲染了，已经渲染了就不重复渲染了。
-    const itemFinalClassName: string = columnsCount
-      ? `Grid-col--sm${Math.round(12 / columnsCount)}`
-      : itemClassName || '';
+
+    const itemFinalClassName: string = (() => {
+      // 移动端且非砖石布局时不使用网格类名
+      if (mobileUI && !masonryLayout) {
+        return itemClassName || '';
+      }
+
+      // 砖石布局且设置了固定列数时使用计算的网格类名
+      if (masonryLayout && columnsCount) {
+        const colWidth = Math.round(12 / columnsCount);
+        return `Grid-col--xs${colWidth} Grid-col--sm${colWidth} Grid-col--md${colWidth} Grid-col--lg${colWidth}`;
+      }
+
+      if (columnsCount) {
+        return `Grid-col--sm${Math.round(12 / columnsCount)}`;
+      }
+
+      // 其他情况使用配置的类名或空字符串
+      return itemClassName || '';
+    })();
 
     const header = this.renderHeader();
     const heading = this.renderHeading();
@@ -1002,11 +1074,6 @@ export default class Cards extends React.Component<GridProps, object> {
 
     if (style?.gutterY >= 0) {
       itemStyles.marginBottom = style?.gutterY + 'px';
-    }
-    // 修正grid多列计算错误，另外移动端目前只显示一列
-    if (columnsCount && !masonryLayout && !mobileUI) {
-      itemStyles.flex = `0 0 ${100 / columnsCount}%`;
-      itemStyles.maxWidth = `${100 / columnsCount}%`;
     }
 
     return (
@@ -1083,8 +1150,8 @@ export default class Cards extends React.Component<GridProps, object> {
 }
 
 @Renderer({
-  test: /(^|\/)(?:crud\/body\/grid|cards)$/,
   name: 'cards',
+  type: 'cards',
   storeType: ListStore.name,
   weight: -100 // 默认的 grid 不是这样，这个只识别 crud 下面的 grid
 })
@@ -1185,6 +1252,9 @@ export class CardsRenderer extends Cards {
       targets.forEach(target => {
         target.updateData(values);
       });
+    } else if (this.props?.host) {
+      // 如果在 CRUD 里面，优先让 CRUD 去更新状态
+      return this.props.host.setData?.(values, replace, index, condition);
     } else {
       return store.updateData(values, undefined, replace);
     }
@@ -1193,6 +1263,10 @@ export class CardsRenderer extends Cards {
   getData() {
     const {store, data} = this.props;
     return store.getData(data);
+  }
+
+  hasModifiedItems() {
+    return this.props.store.modified;
   }
 
   async doAction(
@@ -1208,9 +1282,11 @@ export class CardsRenderer extends Cards {
       case 'selectAll':
         store.clear();
         store.toggleAll();
+        this.syncSelected();
         break;
       case 'clearAll':
         store.clear();
+        this.syncSelected();
         break;
       case 'select':
         const rows = await getMatchedEventTargets<IItem>(
@@ -1224,6 +1300,7 @@ export class CardsRenderer extends Cards {
           rows.map(item => item.data),
           valueField
         );
+        this.syncSelected();
         break;
       case 'initDrag':
         store.startDragging();

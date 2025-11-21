@@ -4,19 +4,25 @@ import {
   getI18nEnabled,
   getSchemaTpl,
   isObject,
-  undefinedPipeOut
+  undefinedPipeOut,
+  RendererPluginAction,
+  RendererPluginEvent,
+  registerEditorPlugin,
+  BasePlugin,
+  BaseEventContext,
+  tipedLabel
 } from 'amis-editor-core';
-import {registerEditorPlugin} from 'amis-editor-core';
-import {BasePlugin, BaseEventContext, tipedLabel} from 'amis-editor-core';
 import {ValidatorTag} from '../../validator';
-import {getEventControlConfig} from '../../renderer/event-control/helper';
-import {RendererPluginAction, RendererPluginEvent} from 'amis-editor-core';
+import {
+  getEventControlConfig,
+  getActionCommonProps
+} from '../../renderer/event-control/helper';
 
 export class RateControlPlugin extends BasePlugin {
   static id = 'RateControlPlugin';
   // 关联渲染器名字
   rendererName = 'input-rating';
-  $schema = '/schemas/RatingControlSchema.json';
+  $schema = '/schemas/AMISInputRatingSchema.json';
 
   // 组件名称
   name = '评分';
@@ -80,17 +86,20 @@ export class RateControlPlugin extends BasePlugin {
     {
       actionType: 'clear',
       actionLabel: '清空',
-      description: '清空评分值'
+      description: '清空评分值',
+      ...getActionCommonProps('clear')
     },
     {
       actionType: 'reset',
       actionLabel: '重置',
-      description: '将值重置为初始值'
+      description: '将值重置为初始值',
+      ...getActionCommonProps('reset')
     },
     {
       actionType: 'setValue',
       actionLabel: '赋值',
-      description: '触发组件数据更新'
+      description: '触发组件数据更新',
+      ...getActionCommonProps('setValue')
     }
   ];
 
@@ -235,18 +244,14 @@ export class RateControlPlugin extends BasePlugin {
         title: '外观',
         body: [
           getSchemaTpl('collapseGroup', [
-            getSchemaTpl('style:formItem', {
-              renderer: context.info.renderer
-            }),
+            getSchemaTpl('theme:formItem'),
             {
               title: '图标',
               body: [
                 {
                   type: 'ae-switch-more',
                   label: '自定义',
-                  bulk: true,
                   mode: 'normal',
-                  value: false,
                   formType: 'extend',
                   form: {
                     body: [
@@ -256,22 +261,6 @@ export class RateControlPlugin extends BasePlugin {
                         name: 'char'
                       }
                     ]
-                  },
-                  pipeIn: (value: string) => {
-                    if (typeof value === 'string' && value.length) {
-                      return {
-                        character: value
-                      };
-                    }
-                    return undefined;
-                  },
-                  pipeOut: (value: any) => {
-                    if (!isObject(value)) {
-                      return undefined;
-                    }
-                    return typeof value.character === 'string'
-                      ? value.character
-                      : undefined;
                   }
                 },
 

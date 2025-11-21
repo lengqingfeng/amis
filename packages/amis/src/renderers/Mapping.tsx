@@ -1,12 +1,18 @@
 import React from 'react';
-import {createObject, Renderer, RendererEnv, RendererProps} from 'amis-core';
+import {
+  AMISSchemaBase,
+  createObject,
+  Renderer,
+  RendererEnv,
+  RendererProps,
+  AMISSchemaCollection
+} from 'amis-core';
 import {Api, Payload} from 'amis-core';
 import {
   BaseSchema,
   SchemaApi,
   SchemaTokenizeableString,
-  SchemaTpl,
-  SchemaCollection
+  SchemaTpl
 } from '../Schema';
 import {withStore} from 'amis-ui';
 import {flow, Instance, types} from 'mobx-state-tree';
@@ -23,46 +29,49 @@ import {
  * Mapping 映射展示控件。
  * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/mapping
  */
-export interface MappingSchema extends BaseSchema {
+/**
+ * 数据映射组件，用于将输入值映射成标签/文本展示。
+ */
+export interface AMISMappingSchema extends AMISSchemaBase {
   /**
-   * 指定为映射展示控件
+   * 指定为 mapping 组件
    */
   type: 'map' | 'mapping';
 
   /**
-   * 关联字段名。
+   * 关联的字段名
    */
   name?: string;
 
   /**
-   * 配置映射规则，值可以使用模板语法。当 key 为 * 时表示 else，也就是说值没有映射到任何规则时用 * 对应的值展示。
+   * 映射规则配置
    */
   map?: {
     [propName: string]: SchemaTpl;
   };
 
   /**
-   * map或source为对象数组时，作为value值的字段名
+   * 当 map 或 source 为对象数组时，作为 value 值的字段名
    */
   valueField?: string;
 
   /**
-   * map或source为对象数组时，作为label值的字段名
+   * 当 map 或 source 为对象数组时，作为 label 值的字段名
    */
   labelField?: string;
 
   /**
-   * 自定义渲染映射值，支持html或schema
+   * 自定义渲染映射值的 Schema 配置
    */
-  itemSchema?: SchemaCollection;
+  itemSchema?: AMISSchemaCollection;
 
   /**
-   * 如果想远程拉取字典，请配置 source 为接口。
+   * 远程数据源配置
    */
   source?: SchemaApi | SchemaTokenizeableString;
 
   /**
-   * 占位符
+   * 占位符文本
    */
   placeholder?: string;
 }
@@ -91,6 +100,8 @@ export const Store = StoreNode.named('MappingStore')
                 ? data.options
                 : Array.isArray(data.items)
                 ? data.items
+                : Array.isArray(data.records)
+                ? data.records
                 : data
             );
           } else {
@@ -142,8 +153,10 @@ export type IStore = Instance<typeof Store>;
 
 export interface MappingProps
   extends Omit<RendererProps, 'store'>,
-    Omit<MappingSchema, 'type' | 'className'> {
+    Omit<AMISMappingSchema, 'type' | 'className'> {
   store: IStore;
+  renderValue: (map: any, key: any) => String;
+  renderViewValue: (value: any, key: any) => React.ReactNode;
 }
 
 export const MappingField = withStore(props =>
@@ -231,14 +244,14 @@ export const MappingField = withStore(props =>
         typeof key !== 'undefined' &&
         map &&
         (value =
-          map[key] ??
+          this.renderValue(map, key) ??
           (key === true && map['1']
             ? map['1']
             : key === false && map['0']
             ? map['0']
             : map['*'])) !== undefined
       ) {
-        viewValue = this.renderViewValue(value);
+        viewValue = this.renderViewValue(value, key);
       }
 
       return (
@@ -251,9 +264,14 @@ export const MappingField = withStore(props =>
         </span>
       );
     }
-
-    renderViewValue(value: any) {
-      const {render, itemSchema, data, labelField, name} = this.props;
+    renderViewValue(value: any, key: any) {
+      const {render, itemSchema, renderViewValue, data, labelField, name} =
+        this.props;
+      // 检查是否有外部renderViewValue函数传入
+      if (renderViewValue) {
+        // 使用外部传入的renderViewValue函数
+        return renderViewValue(value, key);
+      }
 
       if (!itemSchema) {
         let label = value;
@@ -296,6 +314,15 @@ export const MappingField = withStore(props =>
       });
     }
 
+    // 扩展函数,用于外围扩充
+    renderValue(map: any, key: any) {
+      const {renderValue} = this.props;
+      if (renderValue) {
+        return renderValue(map, key);
+      }
+      return map[key];
+    }
+
     render() {
       const {style, defaultValue, data} = this.props;
       let mapKey = getPropValue(this.props);
@@ -324,7 +351,8 @@ export const MappingField = withStore(props =>
 );
 
 @Renderer({
-  test: /(^|\/)(?:map|mapping)$/,
+  type: 'mapping',
+  alias: ['map'],
   name: 'mapping'
 })
 export class MappingFieldRenderer extends React.Component<RendererProps> {

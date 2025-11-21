@@ -4,12 +4,13 @@ import {getSchemaTpl} from 'amis-editor-core';
 import {registerEditorPlugin} from 'amis-editor-core';
 import {BasePlugin, RegionConfig, BaseEventContext} from 'amis-editor-core';
 import {formItemControl} from '../../component/BaseControl';
+import {generateId} from '../../util';
 
 export class ControlPlugin extends BasePlugin {
   static id = 'ControlPlugin';
   // 关联渲染器名字
   rendererName = 'control';
-  $schema = '/schemas/FormControlSchema.json';
+  $schema = '/schemas/AMISFormControlSchema.json';
 
   // 组件名称
   name = '表单项容器';
@@ -30,6 +31,7 @@ export class ControlPlugin extends BasePlugin {
       {
         type: 'tpl',
         wrapperComponent: '',
+        id: generateId(),
         tpl: 'a'
       }
     ]

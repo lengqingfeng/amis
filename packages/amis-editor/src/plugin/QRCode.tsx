@@ -1,13 +1,15 @@
 import {RendererPluginAction, registerEditorPlugin} from 'amis-editor-core';
 import {BasePlugin} from 'amis-editor-core';
 import {defaultValue, getSchemaTpl} from 'amis-editor-core';
+import React from 'react';
+import {buildLinkActionDesc} from '../renderer/event-control';
 
 export class QRCodePlugin extends BasePlugin {
   static id = 'QRCodePlugin';
   static scene = ['layout'];
   // 关联渲染器名字
   rendererName = 'qrcode';
-  $schema = '/schemas/QRCodeSchema.json';
+  $schema = '/schemas/AMISQRCodeSchema.json';
 
   // 组件名称
   name = '二维码';
@@ -29,7 +31,15 @@ export class QRCodePlugin extends BasePlugin {
     {
       actionType: 'saveAs',
       actionLabel: '下载',
-      description: '触发二维码下载'
+      description: '触发二维码下载',
+      descDetail: (info: any, context: any, props: any) => {
+        return (
+          <div className="action-desc">
+            下载二维码
+            {buildLinkActionDesc(props.manager, info)}
+          </div>
+        );
+      }
     }
   ];
 

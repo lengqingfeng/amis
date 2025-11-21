@@ -14,12 +14,13 @@ import {
   EditorNodeType,
   jsonToJsonSchema
 } from 'amis-editor-core';
+import {generateId} from '../../util';
 
 export class SubFormControlPlugin extends BasePlugin {
   static id = 'SubFormControlPlugin';
   // 关联渲染器名字
   rendererName = 'input-sub-form';
-  $schema = '/schemas/SubFormControlSchema.json';
+  $schema = '/schemas/AMISInputSubFormSchema.json';
 
   // 组件名称
   name = '子表单项';
@@ -39,6 +40,7 @@ export class SubFormControlPlugin extends BasePlugin {
         {
           type: 'input-text',
           label: '文本',
+          id: generateId(),
           name: 'text'
         }
       ]

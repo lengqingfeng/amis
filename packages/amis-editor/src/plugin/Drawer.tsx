@@ -1,3 +1,4 @@
+import React from 'react';
 import {
   registerEditorPlugin,
   BaseEventContext,
@@ -12,7 +13,10 @@ import {
   getI18nEnabled,
   JSONPipeOut
 } from 'amis-editor-core';
-import {getEventControlConfig} from '../renderer/event-control/helper';
+import {
+  getEventControlConfig,
+  getActionCommonProps
+} from '../renderer/event-control/helper';
 import {tipedLabel} from 'amis-editor-core';
 import omit from 'lodash/omit';
 import {InlineModal} from './Dialog';
@@ -21,7 +25,7 @@ export class DrawerPlugin extends BasePlugin {
   static id = 'DrawerPlugin';
   // 关联渲染器名字
   rendererName = 'drawer';
-  $schema = '/schemas/DrawerSchema.json';
+  $schema = '/schemas/AMISDrawerSchema.json';
 
   // 组件名称
   name = '抽屉式弹框';
@@ -100,7 +104,8 @@ export class DrawerPlugin extends BasePlugin {
     {
       actionType: 'confirm',
       actionLabel: '确认',
-      description: '触发抽屉确认操作'
+      description: '触发抽屉确认操作',
+      descDetail: (info: any) => <div>触发确认操作</div>
     },
     {
       actionType: 'cancel',
@@ -110,7 +115,8 @@ export class DrawerPlugin extends BasePlugin {
     {
       actionType: 'setValue',
       actionLabel: '变量赋值',
-      description: '触发组件数据更新'
+      description: '触发组件数据更新',
+      ...getActionCommonProps('setValue')
     }
   ];
 
@@ -126,7 +132,7 @@ export class DrawerPlugin extends BasePlugin {
             title: '基本',
             body: [
               {
-                type: 'input-text',
+                type: i18nEnabled ? 'input-text-i18n' : 'input-text',
                 label: '组件名称',
                 name: 'editorSetting.displayName'
               },
@@ -165,6 +171,7 @@ export class DrawerPlugin extends BasePlugin {
                 label: '显示蒙层',
                 pipeIn: defaultValue(true)
               }),
+              getSchemaTpl('button-manager'),
               getSchemaTpl('switch', {
                 name: 'showCloseButton',
                 label: '展示关闭按钮',
@@ -402,7 +409,7 @@ export class DrawerPlugin extends BasePlugin {
       for (const key in data) {
         if (!['&'].includes(key)) {
           dataSchema[key] = {
-            type: typeof data[key] ?? 'string', // 默认文本，不好确定类型
+            type: typeof data[key] || 'string', // 默认文本，不好确定类型
             title: key
           };
         }

@@ -5,34 +5,39 @@ import {
   RendererProps,
   buildStyle,
   CustomStyle,
-  setThemeClassName
+  setThemeClassName,
+  AMISSchemaCollection,
+  AMISSchema
 } from 'amis-core';
 import pick from 'lodash/pick';
-import {BaseSchema, SchemaClassName, SchemaCollection} from '../Schema';
+import {BaseSchema, AMISClassName} from '../Schema';
 
 import {ucFirst} from 'amis-core';
 import {Spinner, SpinnerExtraProps} from 'amis-ui';
+import {AMISSchemaBase} from 'amis-core';
 
 export const ColProps = ['lg', 'md', 'sm', 'xs'];
 
-export type GridColumnObject = {
+export type AMISGridColumn = {
+  id?: string;
+
   /**
-   * 极小屏（<768px）时宽度占比
+   * 极小屏幕宽度占比
    */
   xs?: number | 'auto';
 
   /**
-   * 小屏时（>=768px）宽度占比
+   * 小屏幕宽度占比
    */
   sm?: number | 'auto';
 
   /**
-   * 中屏时(>=992px)宽度占比
+   * 中等屏幕宽度占比
    */
   md?: number | 'auto';
 
   /**
-   * 大屏时(>=1200px)宽度占比
+   * 大屏幕宽度占比
    */
   lg?: number | 'auto';
 
@@ -42,49 +47,64 @@ export type GridColumnObject = {
   valign?: 'top' | 'middle' | 'bottom' | 'between';
 
   /**
-   * 配置子表单项默认的展示方式。
+   * 子表单项展示方式
    */
   mode?: 'normal' | 'inline' | 'horizontal';
 
   /**
-   * 如果是水平排版，这个属性可以细化水平排版的左右宽度占比。
+   * 水平排版宽度占比配置
    */
   horizontal?: FormHorizontal;
 
-  body?: SchemaCollection;
-
   /**
-   * 列类名
+   * 列内容配置
    */
-  columnClassName?: SchemaClassName;
+  body?: AMISSchemaCollection;
 
   /**
-   * 样式
+   * 列CSS类名
+   */
+  columnClassName?: AMISClassName;
+
+  /**
+   * 自定义样式
    */
   style?: any;
+
+  /**
+   * 包装器自定义样式
+   */
+  wrapperCustomStyle?: any;
+
+  /**
+   * 主题样式配置
+   */
+  themeCss?: any;
 };
 
-export type GridColumn = GridColumnObject;
-export type ColumnNode = GridColumn;
+export type ColumnNode = AMISGridColumn;
 export interface ColumnArray extends Array<ColumnNode> {}
 
 /**
- * Grid 格子布局渲染器。
+ * Grid 网格布局组件，用于创建响应式网格系统
  * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/grid
  */
-export interface GridSchema extends BaseSchema {
+/**
+ * 栅格布局组件，用于按列布局子元素。支持响应式断点与列间距配置。
+ */
+export interface AMISGridSchema extends AMISSchemaBase {
   /**
-   * 指定为 Grid 格子布局渲染器。
+   * 指定为 grid 组件
    */
   type: 'grid';
 
   /**
-   * 列集合
+   * 列配置数组，定义每列的布局和内容
    */
-  columns: Array<GridColumn>;
+  columns: Array<AMISGridColumn>;
 
   /**
-   * 水平间距
+   * 列之间的水平间距
    */
   gap?: 'xs' | 'sm' | 'base' | 'none' | 'md' | 'lg';
 
@@ -101,9 +121,14 @@ export interface GridSchema extends BaseSchema {
 
 export interface GridProps
   extends RendererProps,
-    Omit<GridSchema, 'type' | 'className' | 'columnClassName'>,
+    Omit<AMISGridSchema, 'type' | 'className' | 'columnClassName'>,
     SpinnerExtraProps {
-  itemRender?: (item: any, length: number, props: any) => JSX.Element;
+  itemRender?: (
+    item: any,
+    index: number,
+    length: number,
+    props: any
+  ) => JSX.Element;
 }
 
 function fromBsClass(cn: string) {
@@ -137,15 +162,24 @@ export default class Grid<T> extends React.Component<GridProps & T, object> {
 
   renderChild(
     region: string,
-    node: SchemaCollection,
+    key: number,
+    column: AMISGridColumn,
     length: number,
     props: any = {}
   ) {
     const {render, itemRender} = this.props;
 
     return itemRender
-      ? itemRender(node, length, this.props)
-      : render(region, node, props);
+      ? itemRender(
+          {
+            ...column,
+            ...(column.body ? {type: 'wrapper', wrap: false} : {})
+          },
+          key,
+          length,
+          this.props
+        )
+      : render(region, (column as any).body, props);
   }
 
   renderColumn(column: ColumnNode, key: number, length: number) {
@@ -165,9 +199,12 @@ export default class Grid<T> extends React.Component<GridProps & T, object> {
       formHorizontal,
       translate: __,
       disabled,
-      data
+      data,
+      env
     } = this.props;
     const styleVar = buildStyle(column.style, data);
+
+    const {id, themeCss, wrapperCustomStyle} = column;
     return (
       <div
         key={key}
@@ -176,16 +213,43 @@ export default class Grid<T> extends React.Component<GridProps & T, object> {
           fromBsClass((column as any).columnClassName!),
           {
             [`Grid-col--v${ucFirst(column.valign)}`]: column.valign
-          }
+          },
+          setThemeClassName({
+            ...column,
+            name: 'baseControlClassName',
+            id,
+            themeCss
+          }),
+          setThemeClassName({
+            ...column,
+            name: 'wrapperCustomStyle',
+            id,
+            themeCss
+          })
         )}
         style={styleVar}
       >
-        {this.renderChild(`column/${key}`, (column as any).body || '', length, {
+        {this.renderChild(`column/${key}`, key, column, length, {
           disabled,
           formMode: column.mode || subFormMode || formMode,
           formHorizontal:
             column.horizontal || subFormHorizontal || formHorizontal
         })}
+
+        <CustomStyle
+          {...column}
+          config={{
+            wrapperCustomStyle,
+            id,
+            themeCss,
+            classNames: [
+              {
+                key: 'baseControlClassName'
+              }
+            ]
+          }}
+          env={env}
+        />
       </div>
     );
   }
@@ -240,6 +304,7 @@ export default class Grid<T> extends React.Component<GridProps & T, object> {
         )}
         style={styleVar}
         data-id={id}
+        data-role="container"
       >
         {this.renderColumns(this.props.columns)}
         <Spinner loadingConfig={loadingConfig} overlay show={loading} />

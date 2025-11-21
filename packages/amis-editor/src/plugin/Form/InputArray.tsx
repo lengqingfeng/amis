@@ -13,12 +13,13 @@ import {
 import {defaultValue, getSchemaTpl, valuePipeOut} from 'amis-editor-core';
 import React from 'react';
 import {diff, JSONPipeOut} from 'amis-editor-core';
+import {generateId} from '../../util';
 
 export class ArrayControlPlugin extends BasePlugin {
   static id = 'ArrayControlPlugin';
   // 关联渲染器名字
   rendererName = 'input-array';
-  $schema = '/schemas/ArrayControlSchema.json';
+  $schema = '/schemas/AMISInputArraySchema.json';
   disabledRendererPlugin = true;
 
   // 组件名称
@@ -36,6 +37,7 @@ export class ArrayControlPlugin extends BasePlugin {
     name: 'array',
     items: {
       type: 'input-text',
+      id: generateId(),
       placeholder: '请输入'
     }
   };
@@ -108,7 +110,7 @@ export class ArrayControlPlugin extends BasePlugin {
         pipeIn: defaultValue(true)
       }),
 
-      getSchemaTpl('api', {
+      getSchemaTpl('apiControl', {
         name: 'deleteApi',
         label: '删除前的请求',
         visibleOn: 'this.removable'

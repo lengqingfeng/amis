@@ -24,17 +24,19 @@ export interface CellProps extends ThemeProps {
     node: SchemaNode,
     props?: PlainObject
   ) => JSX.Element;
+  filterItemIndex?: (index: number | string, item: any) => string | number;
   store: ITableStore;
   multiple: boolean;
   canAccessSuperData?: boolean;
   itemBadge?: BadgeObject;
-  onCheck?: (item: IRow) => void;
+  onCheck?: (item: IRow, value?: boolean, shift?: boolean) => void;
   onDragStart?: (e: React.DragEvent) => void;
   popOverContainer?: any;
   quickEditFormRef: any;
   onImageEnlarge?: any;
   translate: (key: string, ...args: Array<any>) => string;
   testIdBuilder?: TestIdBuilder;
+  offset?: number;
 }
 
 export default function Cell({
@@ -44,6 +46,7 @@ export default function Cell({
   props,
   ignoreDrag,
   render,
+  filterItemIndex,
   store,
   multiple,
   itemBadge,
@@ -56,7 +59,8 @@ export default function Cell({
   quickEditFormRef,
   onImageEnlarge,
   translate: __,
-  testIdBuilder
+  testIdBuilder,
+  offset
 }: CellProps) {
   if (column.name && item.rowSpans[column.name] === 0) {
     return null;
@@ -69,64 +73,14 @@ export default function Cell({
       store.filteredColumns
     );
     return [Object.assign(style, stickyStyle), stickyClassName];
-  }, []);
+  }, [store.filteredColumns.length]);
 
-  const onCheckboxChange = React.useCallback(() => {
-    onCheck?.(item);
-  }, []);
-
-  if (column.type === '__checkme') {
-    return (
-      <td
-        style={style}
-        className={cx(column.pristine.className, stickyClassName)}
-        {...testIdBuilder?.getTestId()}
-      >
-        <Checkbox
-          classPrefix={ns}
-          type={multiple ? 'checkbox' : 'radio'}
-          partial={item.partial}
-          checked={item.checked || item.partial}
-          disabled={item.checkdisable || !item.checkable}
-          onChange={onCheckboxChange}
-          testIdBuilder={testIdBuilder?.getChild('chekbx')}
-        />
-      </td>
-    );
-  } else if (column.type === '__dragme') {
-    return (
-      <td
-        style={style}
-        className={cx(column.pristine.className, stickyClassName, {
-          'is-dragDisabled': !item.draggable
-        })}
-        {...testIdBuilder?.getChild('drag').getTestId()}
-      >
-        {item.draggable ? <Icon icon="drag" className="icon" /> : null}
-      </td>
-    );
-  } else if (column.type === '__expandme') {
-    return (
-      <td
-        style={style}
-        className={cx(column.pristine.className, stickyClassName)}
-      >
-        {item.expandable ? (
-          <a
-            className={cx('Table-expandBtn', item.expanded ? 'is-active' : '')}
-            // data-tooltip="展开/收起"
-            // data-position="top"
-            onClick={item.toggleExpanded}
-            {...testIdBuilder
-              ?.getChild(item.expanded ? 'fold' : 'expand')
-              .getTestId()}
-          >
-            <Icon icon="right-arrow-bold" className="icon" />
-          </a>
-        ) : null}
-      </td>
-    );
-  }
+  const onCheckboxChange = React.useCallback(
+    (value: boolean, shiftKey?: boolean) => {
+      onCheck?.(item, value, shiftKey);
+    },
+    []
+  );
 
   let [prefix, affix, addtionalClassName] = React.useMemo(() => {
     let prefix: React.ReactNode[] = [];
@@ -259,10 +213,80 @@ export default function Cell({
   };
   delete subProps.label;
 
+  if (column.type === '__checkme') {
+    return (
+      <td
+        style={style}
+        className={cx(column.pristine.className, stickyClassName)}
+        {...testIdBuilder?.getTestId()}
+      >
+        <Checkbox
+          classPrefix={ns}
+          type={multiple ? 'checkbox' : 'radio'}
+          partial={multiple ? item.partial : false}
+          checked={item.checked || (multiple ? item.partial : false)}
+          disabled={item.checkdisable || !item.checkable}
+          onChange={onCheckboxChange}
+          testIdBuilder={testIdBuilder?.getChild('chekbx')}
+        />
+      </td>
+    );
+  } else if (column.type === '__dragme') {
+    return (
+      <td
+        style={style}
+        className={cx(column.pristine.className, stickyClassName, {
+          'is-dragDisabled': !item.draggable
+        })}
+        {...testIdBuilder?.getChild('drag').getTestId()}
+      >
+        {item.draggable ? <Icon icon="drag" className="icon" /> : null}
+      </td>
+    );
+  } else if (column.type === '__expandme') {
+    return (
+      <td
+        style={style}
+        className={cx(column.pristine.className, stickyClassName)}
+      >
+        {item.expandable ? (
+          <a
+            className={cx('Table-expandBtn', item.expanded ? 'is-active' : '')}
+            // data-tooltip="展开/收起"
+            // data-position="top"
+            onClick={item.toggleExpanded}
+            {...testIdBuilder
+              ?.getChild(item.expanded ? 'fold' : 'expand')
+              .getTestId()}
+          >
+            <Icon icon="right-arrow-bold" className="icon" />
+          </a>
+        ) : null}
+      </td>
+    );
+  } else if (column.type === '__index') {
+    return (
+      <td
+        style={style}
+        className={cx(column.pristine.className, stickyClassName)}
+      >
+        {`${filterItemIndex ? filterItemIndex(item.path, item) : item.path}`
+          .split('.')
+          .map(a => parseInt(a, 10) + 1 + (offset || 0))
+          .join('.')}
+      </td>
+    );
+  }
+
   return render(
     region,
     {
       ...column.pristine,
+      // 因为列本身已经做过显隐判断了，单元格不应该再处理
+      visibleOn: '',
+      hiddenOn: '',
+      visible: true,
+      hidden: false,
       column: column.pristine,
       type: 'cell'
     },

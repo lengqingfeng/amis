@@ -1,4 +1,4 @@
-import type {BaseApiObject, OperatorType} from 'amis-core';
+import type {BaseApiObject, AMISOperatorType} from 'amis-core';
 
 export type FieldTypes =
   | 'text'
@@ -12,7 +12,7 @@ export type FieldTypes =
 
 export type FieldItem = {
   type: 'text';
-  operators: Array<OperatorType>;
+  operators: Array<AMISOperatorType>;
 };
 
 interface customOperator {
@@ -32,6 +32,7 @@ interface BaseField {
 
   defaultValue?: any;
   placeholder?: string;
+  disabled?: boolean;
 }
 
 export type FieldGroup = {
@@ -145,8 +146,8 @@ export type ConditionBuilderFuncs = Array<ConditionFieldFunc | FuncGroup>;
 export type ConditionBuilderFields = Array<ConditionBuilderField>;
 
 export type ConditionBuilderType = {
-  defaultOp?: OperatorType;
-  operators: Array<OperatorType>;
+  defaultOp?: AMISOperatorType;
+  operators: Array<AMISOperatorType>;
   placeholder?: string;
   valueTypes?: Array<'value' | 'field' | 'func'>;
 };

@@ -17,6 +17,7 @@ exports[`Renderer:tabsTransfer 1`] = `
         >
           <div
             class="cxd-Panel cxd-Panel--default cxd-Panel--form"
+            data-role="container"
           >
             <div
               class="cxd-Panel-heading"
@@ -25,7 +26,7 @@ exports[`Renderer:tabsTransfer 1`] = `
                 class="cxd-Panel-title"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   <span>
                     表单
@@ -46,6 +47,7 @@ exports[`Renderer:tabsTransfer 1`] = `
                 />
                 <div
                   class="cxd-Form-item cxd-Form-item--normal"
+                  data-amis-name="a"
                   data-role="form-item"
                 >
                   <label
@@ -53,7 +55,7 @@ exports[`Renderer:tabsTransfer 1`] = `
                   >
                     <span>
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           组合穿梭器
@@ -72,10 +74,10 @@ exports[`Renderer:tabsTransfer 1`] = `
                       >
                         <div
                           class="cxd-Tabs cxd-Tabs--line cxd-TabsTransfer-tabs"
+                          data-role="container"
                         >
                           <div
                             class="cxd-Tabs-linksContainer-wrapper"
-                            style="position: relative;"
                           >
                             <div
                               class="cxd-Tabs-linksContainer"
@@ -88,7 +90,7 @@ exports[`Renderer:tabsTransfer 1`] = `
                                   role="tablist"
                                 >
                                   <li
-                                    class="cxd-Tabs-link is-active"
+                                    class="cxd-Tabs-link is-active cxd-TabsTransfer-tab"
                                   >
                                     <a
                                       title="成员"
@@ -101,7 +103,7 @@ exports[`Renderer:tabsTransfer 1`] = `
                                     </a>
                                   </li>
                                   <li
-                                    class="cxd-Tabs-link"
+                                    class="cxd-Tabs-link cxd-TabsTransfer-tab"
                                   >
                                     <a
                                       title="用户"
@@ -115,45 +117,6 @@ exports[`Renderer:tabsTransfer 1`] = `
                                   </li>
                                 </ul>
                               </div>
-                            </div>
-                            <div
-                              class="resize-sensor"
-                              style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-                            >
-                              
-  
-                              <div
-                                class="resize-sensor-expand"
-                                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-                              >
-                                
-    
-                                <div
-                                  style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-                                />
-                                
-  
-                              </div>
-                              
-  
-                              <div
-                                class="resize-sensor-shrink"
-                                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-                              >
-                                
-    
-                                <div
-                                  style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-                                />
-                                
-  
-                              </div>
-                              
-  
-                              <div
-                                class="resize-sensor-appear"
-                                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-                              />
                             </div>
                           </div>
                           <div
@@ -189,6 +152,7 @@ exports[`Renderer:tabsTransfer 1`] = `
                                 >
                                   <li
                                     class="cxd-Tree-item "
+                                    style="--Tree-depth: 0;"
                                   >
                                     <div
                                       class="cxd-Tree-itemLabel"
@@ -202,13 +166,17 @@ exports[`Renderer:tabsTransfer 1`] = `
                                         />
                                       </div>
                                       <label
-                                        class="cxd-Checkbox cxd-Checkbox--checkbox cxd-Checkbox--full cxd-Checkbox--sm"
+                                        class="cxd-Checkbox cxd-Checkbox--checkbox--default cxd-Checkbox--sm"
                                         data-role="checkbox"
                                       >
                                         <input
                                           type="checkbox"
                                         />
-                                        <i />
+                                        <i>
+                                          <div
+                                            class="checkbox-icon icon"
+                                          />
+                                        </i>
                                         <span
                                           class=""
                                         />
@@ -230,6 +198,7 @@ exports[`Renderer:tabsTransfer 1`] = `
                                   </li>
                                   <li
                                     class="cxd-Tree-item  cxd-Tree-item--isLeaf is-child"
+                                    style="--Tree-depth: 1;"
                                   >
                                     <div
                                       class="cxd-Tree-itemLabel"
@@ -238,13 +207,17 @@ exports[`Renderer:tabsTransfer 1`] = `
                                         class="cxd-Tree-itemArrowPlaceholder"
                                       />
                                       <label
-                                        class="cxd-Checkbox cxd-Checkbox--checkbox cxd-Checkbox--full cxd-Checkbox--sm"
+                                        class="cxd-Checkbox cxd-Checkbox--checkbox--default cxd-Checkbox--sm"
                                         data-role="checkbox"
                                       >
                                         <input
                                           type="checkbox"
                                         />
-                                        <i />
+                                        <i>
+                                          <div
+                                            class="checkbox-icon icon"
+                                          />
+                                        </i>
                                         <span
                                           class=""
                                         />
@@ -266,6 +239,7 @@ exports[`Renderer:tabsTransfer 1`] = `
                                   </li>
                                   <li
                                     class="cxd-Tree-item "
+                                    style="--Tree-depth: 0;"
                                   >
                                     <div
                                       class="cxd-Tree-itemLabel"
@@ -279,13 +253,17 @@ exports[`Renderer:tabsTransfer 1`] = `
                                         />
                                       </div>
                                       <label
-                                        class="cxd-Checkbox cxd-Checkbox--checkbox cxd-Checkbox--full cxd-Checkbox--sm"
+                                        class="cxd-Checkbox cxd-Checkbox--checkbox--default cxd-Checkbox--sm"
                                         data-role="checkbox"
                                       >
                                         <input
                                           type="checkbox"
                                         />
-                                        <i />
+                                        <i>
+                                          <div
+                                            class="checkbox-icon icon"
+                                          />
+                                        </i>
                                         <span
                                           class=""
                                         />
@@ -307,6 +285,7 @@ exports[`Renderer:tabsTransfer 1`] = `
                                   </li>
                                   <li
                                     class="cxd-Tree-item  cxd-Tree-item--isLeaf is-child"
+                                    style="--Tree-depth: 1;"
                                   >
                                     <div
                                       class="cxd-Tree-itemLabel"
@@ -315,13 +294,17 @@ exports[`Renderer:tabsTransfer 1`] = `
                                         class="cxd-Tree-itemArrowPlaceholder"
                                       />
                                       <label
-                                        class="cxd-Checkbox cxd-Checkbox--checkbox cxd-Checkbox--full cxd-Checkbox--sm"
+                                        class="cxd-Checkbox cxd-Checkbox--checkbox--default cxd-Checkbox--sm"
                                         data-role="checkbox"
                                       >
                                         <input
                                           type="checkbox"
                                         />
-                                        <i />
+                                        <i>
+                                          <div
+                                            class="checkbox-icon icon"
+                                          />
+                                        </i>
                                         <span
                                           class=""
                                         />
@@ -343,6 +326,7 @@ exports[`Renderer:tabsTransfer 1`] = `
                                   </li>
                                   <li
                                     class="cxd-Tree-item  cxd-Tree-item--isLeaf is-child"
+                                    style="--Tree-depth: 1;"
                                   >
                                     <div
                                       class="cxd-Tree-itemLabel"
@@ -351,13 +335,17 @@ exports[`Renderer:tabsTransfer 1`] = `
                                         class="cxd-Tree-itemArrowPlaceholder"
                                       />
                                       <label
-                                        class="cxd-Checkbox cxd-Checkbox--checkbox cxd-Checkbox--full cxd-Checkbox--sm"
+                                        class="cxd-Checkbox cxd-Checkbox--checkbox--default cxd-Checkbox--sm"
                                         data-role="checkbox"
                                       >
                                         <input
                                           type="checkbox"
                                         />
-                                        <i />
+                                        <i>
+                                          <div
+                                            class="checkbox-icon icon"
+                                          />
+                                        </i>
                                         <span
                                           class=""
                                         />
@@ -379,6 +367,7 @@ exports[`Renderer:tabsTransfer 1`] = `
                                   </li>
                                   <li
                                     class="cxd-Tree-item "
+                                    style="--Tree-depth: 0;"
                                   >
                                     <div
                                       class="cxd-Tree-itemLabel"
@@ -392,13 +381,17 @@ exports[`Renderer:tabsTransfer 1`] = `
                                         />
                                       </div>
                                       <label
-                                        class="cxd-Checkbox cxd-Checkbox--checkbox cxd-Checkbox--full cxd-Checkbox--sm"
+                                        class="cxd-Checkbox cxd-Checkbox--checkbox--default cxd-Checkbox--sm"
                                         data-role="checkbox"
                                       >
                                         <input
                                           type="checkbox"
                                         />
-                                        <i />
+                                        <i>
+                                          <div
+                                            class="checkbox-icon icon"
+                                          />
+                                        </i>
                                         <span
                                           class=""
                                         />
@@ -420,6 +413,7 @@ exports[`Renderer:tabsTransfer 1`] = `
                                   </li>
                                   <li
                                     class="cxd-Tree-item  cxd-Tree-item--isLeaf is-child"
+                                    style="--Tree-depth: 1;"
                                   >
                                     <div
                                       class="cxd-Tree-itemLabel"
@@ -428,13 +422,17 @@ exports[`Renderer:tabsTransfer 1`] = `
                                         class="cxd-Tree-itemArrowPlaceholder"
                                       />
                                       <label
-                                        class="cxd-Checkbox cxd-Checkbox--checkbox cxd-Checkbox--full cxd-Checkbox--sm"
+                                        class="cxd-Checkbox cxd-Checkbox--checkbox--default cxd-Checkbox--sm"
                                         data-role="checkbox"
                                       >
                                         <input
                                           type="checkbox"
                                         />
-                                        <i />
+                                        <i>
+                                          <div
+                                            class="checkbox-icon icon"
+                                          />
+                                        </i>
                                         <span
                                           class=""
                                         />
@@ -456,6 +454,7 @@ exports[`Renderer:tabsTransfer 1`] = `
                                   </li>
                                   <li
                                     class="cxd-Tree-item  cxd-Tree-item--isLeaf is-child"
+                                    style="--Tree-depth: 1;"
                                   >
                                     <div
                                       class="cxd-Tree-itemLabel"
@@ -464,13 +463,17 @@ exports[`Renderer:tabsTransfer 1`] = `
                                         class="cxd-Tree-itemArrowPlaceholder"
                                       />
                                       <label
-                                        class="cxd-Checkbox cxd-Checkbox--checkbox cxd-Checkbox--full cxd-Checkbox--sm"
+                                        class="cxd-Checkbox cxd-Checkbox--checkbox--default cxd-Checkbox--sm"
                                         data-role="checkbox"
                                       >
                                         <input
                                           type="checkbox"
                                         />
-                                        <i />
+                                        <i>
+                                          <div
+                                            class="checkbox-icon icon"
+                                          />
+                                        </i>
                                         <span
                                           class=""
                                         />
@@ -492,6 +495,7 @@ exports[`Renderer:tabsTransfer 1`] = `
                                   </li>
                                   <li
                                     class="cxd-Tree-item  cxd-Tree-item--isLeaf is-child"
+                                    style="--Tree-depth: 1;"
                                   >
                                     <div
                                       class="cxd-Tree-itemLabel"
@@ -500,13 +504,17 @@ exports[`Renderer:tabsTransfer 1`] = `
                                         class="cxd-Tree-itemArrowPlaceholder"
                                       />
                                       <label
-                                        class="cxd-Checkbox cxd-Checkbox--checkbox cxd-Checkbox--full cxd-Checkbox--sm"
+                                        class="cxd-Checkbox cxd-Checkbox--checkbox--default cxd-Checkbox--sm"
                                         data-role="checkbox"
                                       >
                                         <input
                                           type="checkbox"
                                         />
-                                        <i />
+                                        <i>
+                                          <div
+                                            class="checkbox-icon icon"
+                                          />
+                                        </i>
                                         <span
                                           class=""
                                         />
@@ -667,6 +675,7 @@ exports[`Renderer:tabsTransfer with deferApi 1`] = `
         >
           <div
             class="cxd-Panel cxd-Panel--default cxd-Panel--form"
+            data-role="container"
           >
             <div
               class="cxd-Panel-heading"
@@ -675,7 +684,7 @@ exports[`Renderer:tabsTransfer with deferApi 1`] = `
                 class="cxd-Panel-title"
               >
                 <span
-                  class="cxd-TplField"
+                  class="cxd-TplField fr-view"
                 >
                   <span>
                     表单
@@ -696,6 +705,7 @@ exports[`Renderer:tabsTransfer with deferApi 1`] = `
                 />
                 <div
                   class="cxd-Form-item cxd-Form-item--normal"
+                  data-amis-name="a"
                   data-role="form-item"
                 >
                   <label
@@ -703,7 +713,7 @@ exports[`Renderer:tabsTransfer with deferApi 1`] = `
                   >
                     <span>
                       <span
-                        class="cxd-TplField"
+                        class="cxd-TplField fr-view"
                       >
                         <span>
                           组合穿梭器
@@ -722,10 +732,10 @@ exports[`Renderer:tabsTransfer with deferApi 1`] = `
                       >
                         <div
                           class="cxd-Tabs cxd-Tabs--line cxd-TabsTransfer-tabs"
+                          data-role="container"
                         >
                           <div
                             class="cxd-Tabs-linksContainer-wrapper"
-                            style="position: relative;"
                           >
                             <div
                               class="cxd-Tabs-linksContainer"
@@ -738,7 +748,7 @@ exports[`Renderer:tabsTransfer with deferApi 1`] = `
                                   role="tablist"
                                 >
                                   <li
-                                    class="cxd-Tabs-link is-active"
+                                    class="cxd-Tabs-link is-active cxd-TabsTransfer-tab"
                                   >
                                     <a
                                       title="成员"
@@ -751,7 +761,7 @@ exports[`Renderer:tabsTransfer with deferApi 1`] = `
                                     </a>
                                   </li>
                                   <li
-                                    class="cxd-Tabs-link"
+                                    class="cxd-Tabs-link cxd-TabsTransfer-tab"
                                   >
                                     <a
                                       title="用户"
@@ -765,45 +775,6 @@ exports[`Renderer:tabsTransfer with deferApi 1`] = `
                                   </li>
                                 </ul>
                               </div>
-                            </div>
-                            <div
-                              class="resize-sensor"
-                              style="position: absolute; left: 0px; top: 0px; right: 0px; bottom: 0px; overflow: scroll; z-index: -1; visibility: hidden;"
-                            >
-                              
-  
-                              <div
-                                class="resize-sensor-expand"
-                                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-                              >
-                                
-    
-                                <div
-                                  style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px;"
-                                />
-                                
-  
-                              </div>
-                              
-  
-                              <div
-                                class="resize-sensor-shrink"
-                                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;"
-                              >
-                                
-    
-                                <div
-                                  style="position: absolute; left: 0; top: 0; width: 200%; height: 200%"
-                                />
-                                
-  
-                              </div>
-                              
-  
-                              <div
-                                class="resize-sensor-appear"
-                                style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; overflow: scroll; z-index: -1; visibility: hidden;animation-name: apearSensor; animation-duration: 0.2s;"
-                              />
                             </div>
                           </div>
                           <div
@@ -845,6 +816,7 @@ exports[`Renderer:tabsTransfer with deferApi 1`] = `
                                     >
                                       <li
                                         class="cxd-Tree-item "
+                                        style="--Tree-depth: 0;"
                                       >
                                         <div
                                           class="cxd-Tree-itemLabel"
@@ -882,6 +854,7 @@ exports[`Renderer:tabsTransfer with deferApi 1`] = `
                                       </li>
                                       <li
                                         class="cxd-Tree-item  cxd-Tree-item--isLeaf is-child"
+                                        style="--Tree-depth: 1;"
                                       >
                                         <div
                                           class="cxd-Tree-itemLabel"
@@ -914,6 +887,7 @@ exports[`Renderer:tabsTransfer with deferApi 1`] = `
                                       </li>
                                       <li
                                         class="cxd-Tree-item  cxd-Tree-item--isLeaf is-child"
+                                        style="--Tree-depth: 1;"
                                       >
                                         <div
                                           class="cxd-Tree-itemLabel is-checked"
@@ -946,6 +920,7 @@ exports[`Renderer:tabsTransfer with deferApi 1`] = `
                                       </li>
                                       <li
                                         class="cxd-Tree-item  cxd-Tree-item--isLeaf is-child"
+                                        style="--Tree-depth: 1;"
                                       >
                                         <div
                                           class="cxd-Tree-itemLabel"
@@ -978,6 +953,7 @@ exports[`Renderer:tabsTransfer with deferApi 1`] = `
                                       </li>
                                       <li
                                         class="cxd-Tree-item  cxd-Tree-item--isLeaf is-child"
+                                        style="--Tree-depth: 1;"
                                       >
                                         <div
                                           class="cxd-Tree-itemLabel"
@@ -1010,6 +986,7 @@ exports[`Renderer:tabsTransfer with deferApi 1`] = `
                                       </li>
                                       <li
                                         class="cxd-Tree-item  cxd-Tree-item--isLeaf is-child"
+                                        style="--Tree-depth: 1;"
                                       >
                                         <div
                                           class="cxd-Tree-itemLabel"
@@ -1042,6 +1019,7 @@ exports[`Renderer:tabsTransfer with deferApi 1`] = `
                                       </li>
                                       <li
                                         class="cxd-Tree-item  cxd-Tree-item--isLeaf"
+                                        style="--Tree-depth: 0;"
                                       >
                                         <div
                                           class="cxd-Tree-itemLabel"

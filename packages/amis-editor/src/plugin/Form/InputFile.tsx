@@ -1,15 +1,25 @@
-import {defaultValue, getSchemaTpl, valuePipeOut} from 'amis-editor-core';
-import {registerEditorPlugin, tipedLabel} from 'amis-editor-core';
-import {BasePlugin, BaseEventContext} from 'amis-editor-core';
+import {
+  defaultValue,
+  getSchemaTpl,
+  valuePipeOut,
+  RendererPluginAction,
+  RendererPluginEvent,
+  registerEditorPlugin,
+  tipedLabel,
+  BasePlugin,
+  BaseEventContext
+} from 'amis-editor-core';
 import {ValidatorTag} from '../../validator';
-import {getEventControlConfig} from '../../renderer/event-control/helper';
-import {RendererPluginAction, RendererPluginEvent} from 'amis-editor-core';
+import {
+  getEventControlConfig,
+  getActionCommonProps
+} from '../../renderer/event-control/helper';
 
 export class FileControlPlugin extends BasePlugin {
   static id = 'FileControlPlugin';
   // 关联渲染器名字
   rendererName = 'input-file';
-  $schema = '/schemas/FileControlSchema.json';
+  $schema = '/schemas/AMISInputFileSchema.json';
 
   // 组件名称
   name = '文件上传';
@@ -146,12 +156,14 @@ export class FileControlPlugin extends BasePlugin {
     {
       actionType: 'clear',
       actionLabel: '清空数据',
-      description: '清除选择的文件'
+      description: '清除选择的文件',
+      ...getActionCommonProps('clear')
     },
     {
       actionType: 'setValue',
       actionLabel: '赋值',
-      description: '触发组件数据更新'
+      description: '触发组件数据更新',
+      ...getActionCommonProps('setValue')
     }
   ];
 
@@ -180,6 +192,18 @@ export class FileControlPlugin extends BasePlugin {
                   }
                 ]
               }),
+              getSchemaTpl('switch', {
+                name: 'joinValues',
+                label: '文件上传路径拼接',
+                pipeIn: defaultValue(true)
+              }),
+              {
+                type: 'input-text',
+                name: 'delimiter',
+                label: '拼接符',
+                visibleOn: 'this.joinValues !== false',
+                pipeIn: defaultValue(',')
+              },
               {
                 type: 'input-group',
                 name: 'maxSize',
@@ -404,7 +428,7 @@ export class FileControlPlugin extends BasePlugin {
       {
         title: '外观',
         body: getSchemaTpl('collapseGroup', [
-          getSchemaTpl('style:formItem', {renderer: context.info.renderer}),
+          getSchemaTpl('theme:formItem'),
           getSchemaTpl('style:classNames', {
             unsupportStatic: true,
             schema: [

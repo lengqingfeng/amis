@@ -7,7 +7,7 @@ import {
 } from 'amis-core';
 import React from 'react';
 import {Spinner, SpinnerExtraProps} from 'amis-ui';
-import {BaseTransferRenderer, TransferControlSchema} from './Transfer';
+import {BaseTransferRenderer, AMISTransferSchemaBase} from './Transfer';
 import {TransferPicker} from 'amis-ui';
 import {autobind, createObject} from 'amis-core';
 import {ActionObject, toNumber} from 'amis-core';
@@ -19,12 +19,12 @@ import pick from 'lodash/pick';
  * TransferPicker 穿梭器的弹框形态
  * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/transfer-picker
  */
-export interface TransferPickerControlSchema
-  extends Omit<TransferControlSchema, 'type'>,
+export interface AMISTransferPickerSchema
+  extends AMISTransferSchemaBase,
     SpinnerExtraProps {
   type: 'transfer-picker';
   /**
-   * 边框模式，全边框，还是半边框，或者没边框。
+   * 边框模式
    */
   borderMode?: 'full' | 'half' | 'none';
 
@@ -32,12 +32,14 @@ export interface TransferPickerControlSchema
    * 弹窗大小
    */
   pickerSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
+
+  onlyChildren?: boolean;
 }
 
 export interface TabsTransferProps
   extends OptionsControlProps,
     Omit<
-      TransferPickerControlSchema,
+      AMISTransferPickerSchema,
       | 'type'
       | 'options'
       | 'inputClassName'
@@ -53,6 +55,20 @@ export class TransferPickerRenderer extends BaseTransferRenderer<TabsTransferPro
   dispatchEvent(name: string) {
     const {dispatchEvent, value} = this.props;
     dispatchEvent(name, resolveEventData(this.props, {value}));
+  }
+
+  @autobind
+  // 增加点击选项事件函数
+  async onItemClick(item: Object) {
+    // 触发渲染器事件
+    const {dispatchEvent} = this.props;
+    const rendererEvent = await dispatchEvent(
+      'itemClick',
+      resolveEventData(this.props, {item})
+    );
+    if (rendererEvent?.prevented) {
+      return;
+    }
   }
 
   // 动作
@@ -110,8 +126,10 @@ export class TransferPickerRenderer extends BaseTransferRenderer<TabsTransferPro
       data,
       popOverContainer,
       placeholder,
+      onlyChildren,
       autoCheckChildren = true,
-      initiallyOpen = true
+      initiallyOpen = true,
+      searchPlaceholder
     } = this.props;
 
     // 目前 LeftOptions 没有接口可以动态加载
@@ -133,17 +151,20 @@ export class TransferPickerRenderer extends BaseTransferRenderer<TabsTransferPro
     return (
       <div className={cx('TransferControl', className)}>
         <TransferPicker
-          placeholder={placeholder}
+          placeholder={placeholder as string}
           borderMode={borderMode}
           selectMode={selectMode}
+          onlyChildren={onlyChildren}
           value={selectedOptions}
           disabled={disabled}
           options={options}
+          onItemClick={this.onItemClick}
           onChange={this.handleChange}
           option2value={this.option2value}
           sortable={sortable}
           searchResultMode={searchResultMode}
           onSearch={searchable ? this.handleSearch : undefined}
+          searchPlaceholder={searchPlaceholder}
           showArrow={showArrow}
           onDeferLoad={deferLoad}
           selectTitle={selectTitle}

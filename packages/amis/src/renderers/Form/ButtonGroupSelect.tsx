@@ -3,30 +3,38 @@ import {
   OptionsControl,
   OptionsControlProps,
   FormOptionsControl,
+  FormOptionsControlSelf,
+  FormBaseControl,
+  BaseSchemaWithoutType,
+  FormBaseControlWithoutSize,
   filter,
-  getVariable
+  getVariable,
+  AMISFormItemWithOptions
 } from 'amis-core';
 import {Option, TestIdBuilder} from 'amis-core';
 import {ActionObject, isObject} from 'amis-core';
 import type {BadgeObject} from 'amis-ui';
 import {getLevelFromClassName, autobind, isEmpty} from 'amis-core';
-import {ButtonGroupSchema} from '../ButtonGroup';
+import {AMISButtonGroupSchemaBase} from '../ButtonGroup';
 import {supportStatic} from './StaticHoc';
 
 /**
  * 按钮组控件。
  * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/button-group
  */
-export interface ButtonGroupControlSchema
-  extends Omit<ButtonGroupSchema, 'type'>,
-    Omit<FormOptionsControl, 'size'> {
+/**
+ * 按钮组选择器表单项，用于在表单中通过按钮组样式选择单个或多个选项。
+ */
+export interface AMISButtonGroupSelectSchema
+  extends AMISFormItemWithOptions,
+    AMISButtonGroupSchemaBase {
   type: 'button-group-select';
 }
 
 export interface ButtonGroupProps
   extends OptionsControlProps,
     Omit<
-      ButtonGroupControlSchema,
+      AMISButtonGroupSelectSchema,
       | 'size'
       | 'source'
       | 'type'
@@ -69,9 +77,9 @@ export default class ButtonGroupControl extends React.Component<
     onToggle(option);
   }
 
-  reload() {
+  reload(subpath?: string, query?: any) {
     const reload = this.props.reloadOptions;
-    reload && reload();
+    reload && reload(subpath, query);
   }
 
   getBadgeConfig(config: BadgeObject, item: Option) {

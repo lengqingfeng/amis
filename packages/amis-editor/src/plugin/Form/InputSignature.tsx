@@ -9,7 +9,7 @@ export class SignaturePlugin extends BasePlugin {
   static id = 'SignaturePlugin';
   // 关联渲染器名字
   rendererName = 'input-signature';
-  $schema = '/schemas/InputSignatureSchema.json';
+  $schema = '/schemas/AMISInputSignatureSchema.json';
 
   // 组件名称
   name = '手写签';
@@ -168,9 +168,7 @@ export class SignaturePlugin extends BasePlugin {
         title: '外观',
         body: [
           getSchemaTpl('collapseGroup', [
-            getSchemaTpl('style:formItem', {
-              renderer: context.info.renderer
-            }),
+            getSchemaTpl('theme:formItem'),
             getSchemaTpl('style:classNames', {unsupportStatic: true})
           ])
         ]

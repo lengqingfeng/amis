@@ -1,24 +1,37 @@
 import React from 'react';
 import {BaseSchema} from '../../Schema';
 import {ActionSchema} from '../Action';
-import {FormControlProps, FormItem} from 'amis-core';
+import {
+  FormControlProps,
+  FormItem,
+  FormBaseControlWithoutSize,
+  AMISButtonSchema
+} from 'amis-core';
 
 /**
  * Button Toolar 渲染器。
  * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/button-toolbar
  */
-export interface ButtonToolbarSchema extends BaseSchema {
+/**
+ * ButtonToolbar 用于在表单中展示多个操作按钮的工具条组件，通常用于批量操作或表单按钮组合。
+ */
+export interface AMISButtonToolbarSchema
+  extends BaseSchema,
+    FormBaseControlWithoutSize {
   /**
-   * 指定为按钮工具集合类型
+   * 指定为 button-toolbar 组件
    */
   type: 'button-toolbar';
 
-  buttons: Array<ActionSchema>;
+  buttons: Array<AMISButtonSchema>;
 }
 
 export interface ButtonToolbarProps
   extends FormControlProps,
-    Omit<ButtonToolbarSchema, 'className'> {}
+    Omit<
+      AMISButtonToolbarSchema,
+      'className' | 'descriptionClassName' | 'inputClassName'
+    > {}
 
 export default class ButtonToolbar extends React.Component<
   ButtonToolbarProps,

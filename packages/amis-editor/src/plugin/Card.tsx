@@ -16,13 +16,14 @@ import {
 import {defaultValue, getSchemaTpl} from 'amis-editor-core';
 import flatten from 'lodash/flatten';
 import {VRenderer} from 'amis-editor-core';
+import {generateId} from '../util';
 
 export class CardPlugin extends BasePlugin {
   static id = 'CardPlugin';
   static scene = ['layout'];
   // 关联渲染器名字
   rendererName = 'card';
-  $schema = '/schemas/CardSchema.json';
+  $schema = '/schemas/AMISCardSchema.json';
 
   // 组件名称
   name = '卡片';
@@ -44,6 +45,7 @@ export class CardPlugin extends BasePlugin {
         type: 'button',
         label: '按钮',
         actionType: 'dialog',
+        id: generateId(),
         dialog: {
           title: '标题',
           body: '内容'
@@ -183,7 +185,7 @@ export class CardPlugin extends BasePlugin {
   fieldWrapperResolve = (dom: HTMLElement) => dom;
 
   overrides = {
-    renderFeild: function (
+    renderField: function (
       this: any,
       region: string,
       field: any,
@@ -206,7 +208,7 @@ export class CardPlugin extends BasePlugin {
           renderer={info.renderer}
           multifactor
           key={id}
-          $schema="/schemas/CardBodyField.json"
+          $schema="/schemas/AMISCardBodyFieldSchema.json"
           hostId={info.id}
           memberIndex={index}
           name={`${`字段${index + 1}`}`}

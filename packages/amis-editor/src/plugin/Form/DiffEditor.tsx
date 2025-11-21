@@ -3,21 +3,20 @@ import {
   defaultValue,
   getSchemaTpl,
   undefinedPipeOut,
-  valuePipeOut
+  registerEditorPlugin,
+  BasePlugin
 } from 'amis-editor-core';
-import {registerEditorPlugin} from 'amis-editor-core';
-import {BasePlugin} from 'amis-editor-core';
-
 import type {BaseEventContext} from 'amis-editor-core';
 import {ValidatorTag} from '../../validator';
 import {getEventControlConfig} from '../../renderer/event-control/helper';
 import {RendererPluginEvent, RendererPluginAction} from 'amis-editor-core';
+import {getActionCommonProps} from '../../renderer/event-control/helper';
 
 export class DiffEditorControlPlugin extends BasePlugin {
   static id = 'DiffEditorControlPlugin';
   // 关联渲染器名字
   rendererName = 'diff-editor';
-  $schema = '/schemas/DiffEditorControlSchema.json';
+  $schema = '/schemas/AMISDiffEditorSchema.json';
 
   // 组件名称
   name = 'Diff编辑器';
@@ -122,22 +121,26 @@ export class DiffEditorControlPlugin extends BasePlugin {
     {
       actionType: 'clear',
       actionLabel: '清空',
-      description: '清除选中值'
+      description: '清除选中值',
+      ...getActionCommonProps('clear')
     },
     {
       actionType: 'reset',
       actionLabel: '重置',
-      description: '将值重置为初始值'
+      description: '将值重置为初始值',
+      ...getActionCommonProps('reset')
     },
     {
       actionType: 'focus',
       actionLabel: '获取焦点',
-      description: '获取焦点，焦点落在右侧编辑面板'
+      description: '获取焦点，焦点落在右侧编辑面板',
+      ...getActionCommonProps('focus')
     },
     {
       actionType: 'setValue',
       actionLabel: '赋值',
-      description: '触发组件数据更新'
+      description: '触发组件数据更新',
+      ...getActionCommonProps('setValue')
     }
   ];
 
@@ -204,44 +207,7 @@ export class DiffEditorControlPlugin extends BasePlugin {
       {
         title: '外观',
         body: getSchemaTpl('collapseGroup', [
-          getSchemaTpl('style:formItem', {
-            renderer: context.info.renderer,
-            schema: [
-              {
-                name: 'size',
-                type: 'select',
-                pipeIn: defaultValue(''),
-                pipeOut: undefinedPipeOut,
-                label: '控件尺寸',
-                options: [
-                  {
-                    label: '默认',
-                    value: ''
-                  },
-
-                  {
-                    label: '中',
-                    value: 'md'
-                  },
-
-                  {
-                    label: '大',
-                    value: 'lg'
-                  },
-
-                  {
-                    label: '特大',
-                    value: 'xl'
-                  },
-
-                  {
-                    label: '超大',
-                    value: 'xxl'
-                  }
-                ]
-              }
-            ]
-          }),
+          getSchemaTpl('theme:formItem'),
           getSchemaTpl('style:classNames', {
             unsupportStatic: true
           })

@@ -7,7 +7,9 @@ import {
   resolveVariableAndFilter,
   setThemeClassName,
   ValidateError,
-  RendererEvent
+  RendererEvent,
+  AMISSchema,
+  AMISButtonSchema
 } from 'amis-core';
 import {Renderer, RendererProps} from 'amis-core';
 import {SchemaNode, Schema, ActionObject} from 'amis-core';
@@ -20,148 +22,30 @@ import {
   isObjectShallowModified
 } from 'amis-core';
 import {reaction} from 'mobx';
-import {findDOMNode} from 'react-dom';
+import {findDomCompat as findDOMNode} from 'amis-core';
 import {IModalStore, ModalStore} from 'amis-core';
 import {filter} from 'amis-core';
 import {Spinner} from 'amis-ui';
 import {IServiceStore, CustomStyle} from 'amis-core';
-import {
-  BaseSchema,
-  SchemaClassName,
-  SchemaCollection,
-  SchemaName
-} from '../Schema';
+import {BaseSchema, AMISClassName, SchemaName} from '../Schema';
 import {ActionSchema} from './Action';
 import {isAlive} from 'mobx-state-tree';
+import {AMISDrawerSchemaBase, AMISSchemaCollection} from 'amis-core';
 
 /**
- * Drawer 抽出式弹框。
- * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/drawer
+ * 抽屉组件，用于侧边弹窗展示内容。支持从左右两侧滑出、自定义内容等。
  */
-export interface DrawerSchema extends BaseSchema {
+export interface AMISDrawerSchema extends AMISDrawerSchemaBase {
+  /**
+   * 指定为 drawer 组件
+   */
   type: 'drawer';
-
-  /**
-   * 弹窗参数说明，值格式为 JSONSchema。
-   */
-  inputParams?: any;
-
-  /**
-   * 默认不用填写，自动会创建确认和取消按钮。
-   */
-  actions?: Array<ActionSchema>;
-
-  /**
-   * 内容区域
-   */
-  body?: SchemaCollection;
-
-  /**
-   * 配置 外层 className
-   */
-  className?: SchemaClassName;
-
-  /**
-   * 配置 Body 容器 className
-   */
-  bodyClassName?: SchemaClassName;
-
-  /**
-   * 配置 头部 容器 className
-   */
-  headerClassName?: SchemaClassName;
-
-  /**
-   * 配置 头部 容器 className
-   */
-  footerClassName?: SchemaClassName;
-
-  /**
-   * 是否支持按 ESC 关闭 Dialog
-   */
-  closeOnEsc?: boolean;
-
-  name?: SchemaName;
-
-  /**
-   * Dialog 大小
-   */
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'full';
-
-  /**
-   * 请通过配置 title 设置标题
-   */
-  title?: SchemaCollection;
-
-  /**
-   * 从什么位置弹出
-   */
-  position?: 'left' | 'right' | 'top' | 'bottom';
-
-  /**
-   * 是否展示关闭按钮
-   * 当值为false时，默认开启closeOnOutside
-   */
-  showCloseButton?: boolean;
-
-  /**
-   * 抽屉的宽度 （当position为left | right时生效）
-   */
-  width?: number | string;
-
-  /**
-   * 抽屉的高度 （当position为top | bottom时生效）
-   */
-  height?: number | string;
-
-  /**
-   * 头部
-   */
-  header?: SchemaCollection;
-
-  /**
-   * 底部
-   */
-  footer?: SchemaCollection;
-
-  /**
-   * 影响自动生成的按钮，如果自己配置了按钮这个配置无效。
-   */
-  confirm?: boolean;
-
-  /**
-   * 是否可以拖动弹窗大小
-   */
-  resizable?: boolean;
-
-  /**
-   * 是否显示蒙层
-   */
-  overlay?: boolean;
-
-  /**
-   * 点击外部的时候是否关闭弹框。
-   */
-  closeOnOutside?: boolean;
-
-  /**
-   * 是否显示错误信息
-   */
-  showErrorMsg?: boolean;
-
-  /**
-   * 数据映射
-   */
-  data?: {
-    [propName: string]: any;
-  };
 }
-
-export type DrawerSchemaBase = Omit<DrawerSchema, 'type'>;
+export type DrawerSchema = AMISDrawerSchema;
 
 export interface DrawerProps
   extends RendererProps,
-    Omit<DrawerSchema, 'className' | 'data'>,
+    Omit<AMISDrawerSchema, 'className' | 'data'>,
     SpinnerExtraProps {
   onClose: () => void;
   onConfirm: (
@@ -172,7 +56,7 @@ export interface DrawerProps
   ) => void;
   children?: React.ReactNode | ((props?: any) => React.ReactNode);
   wrapperComponent: React.ElementType;
-  lazySchema?: (props: DrawerProps) => SchemaCollection;
+  lazySchema?: (props: DrawerProps) => AMISSchemaCollection;
   store: IModalStore;
   show?: boolean;
   drawerContainer?: () => HTMLElement;
@@ -181,6 +65,7 @@ export interface DrawerProps
 export interface DrawerState {
   entered: boolean;
   resizeCoord: number;
+
   [propName: string]: any;
 }
 
@@ -229,6 +114,7 @@ export default class Drawer extends React.Component<DrawerProps> {
   $$id: string = guid();
   drawer: any;
   clearErrorTimer: ReturnType<typeof setTimeout> | undefined;
+
   constructor(props: DrawerProps) {
     super(props);
 
@@ -269,14 +155,14 @@ export default class Drawer extends React.Component<DrawerProps> {
     clearTimeout(this.clearErrorTimer);
   }
 
-  buildActions(): Array<ActionSchema> {
+  buildActions(): Array<AMISButtonSchema> {
     const {actions, confirm, translate: __, testIdBuilder} = this.props;
 
     if (typeof actions !== 'undefined') {
       return actions;
     }
 
-    let ret: Array<ActionSchema> = [];
+    let ret: Array<AMISButtonSchema> = [];
     ret.push({
       type: 'button',
       testIdBuilder: testIdBuilder?.getChild('cancel'),
@@ -450,6 +336,8 @@ export default class Drawer extends React.Component<DrawerProps> {
     const {lazySchema, store} = this.props;
 
     store.setEntered(true);
+    // 可能还没来得及关闭，事件动作又打开了这个弹窗，这时候需要重置 busying 状态
+    store.markBusying(false);
     if (typeof lazySchema === 'function') {
       store.setSchema(lazySchema(this.props));
     }
@@ -461,6 +349,7 @@ export default class Drawer extends React.Component<DrawerProps> {
     if (isAlive(store)) {
       store.reset();
       store.clearMessage();
+      store.markBusying(false);
       store.setEntered(false);
       if (typeof lazySchema === 'function') {
         store.setSchema('');
@@ -475,14 +364,14 @@ export default class Drawer extends React.Component<DrawerProps> {
     );
   }
 
-  renderBody(body: SchemaNode, key?: any): React.ReactNode {
+  renderBody(body: AMISSchemaCollection, key?: any): React.ReactNode {
     let {render, store} = this.props;
 
     if (Array.isArray(body)) {
       return body.map((body, key) => this.renderBody(body, key));
     }
 
-    let schema: Schema = body as Schema;
+    let schema = body as AMISSchema;
     let subProps: any = {
       key,
       disabled: store.loading,
@@ -494,6 +383,7 @@ export default class Drawer extends React.Component<DrawerProps> {
       onSaved: this.handleFormSaved,
       onActionSensor: this.handleActionSensor,
       btnDisabled: store.loading,
+      inDragging: store.inDragging,
       syncLocation: false
     };
 
@@ -501,7 +391,7 @@ export default class Drawer extends React.Component<DrawerProps> {
       schema = {
         mode: 'horizontal',
         wrapWithPanel: false,
-        submitText: null,
+        submitText: undefined,
         ...schema
       };
     }
@@ -652,6 +542,7 @@ export default class Drawer extends React.Component<DrawerProps> {
         overlay={overlay}
         onEntered={this.handleEntered}
         onExited={this.handleExited}
+        onDragging={store.setDragging}
         closeOnEsc={closeOnEsc}
         closeOnOutside={
           !store.drawerOpen && !store.dialogOpen && closeOnOutside
@@ -774,8 +665,7 @@ export default class Drawer extends React.Component<DrawerProps> {
           ? render(
               'dialog',
               {
-                ...((store.action as ActionObject) &&
-                  ((store.action as ActionObject).dialog as object)),
+                ...store.dialogSchema,
                 type: 'dialog'
               },
               {
@@ -793,8 +683,7 @@ export default class Drawer extends React.Component<DrawerProps> {
           ? render(
               'drawer',
               {
-                ...((store.action as ActionObject) &&
-                  ((store.action as ActionObject).drawer as object)),
+                ...store.drawerSchema,
                 type: 'drawer'
               },
               {
@@ -943,10 +832,11 @@ export class DrawerRenderer extends Drawer {
     delegate?: IScopedContext,
     rendererEvent?: RendererEvent<any>
   ) {
-    const {onClose, onAction, store, env, dispatchEvent} = this.props;
+    const {onClose, onAction, store, env, dispatchEvent, show} = this.props;
 
-    if (action.from === this.$$id) {
+    if (action.from === this.$$id || !show) {
       // 如果是从 children 里面委托过来的，那就直接向上冒泡。
+      // 或者自己已经关闭了，那就不处理。
       return onAction
         ? onAction(e, action, data, throwErrors, delegate || this.context)
         : false;

@@ -22,7 +22,8 @@ export class ContainerPlugin extends LayoutBasePlugin {
   static scene = ['layout'];
   // 关联渲染器名字
   rendererName = 'container';
-  $schema = '/schemas/ContainerSchema.json';
+  useLazyRender = true; // 使用懒渲染
+  $schema = '/schemas/AMISContainerSchema.json';
 
   // 组件名称
   name = '容器';
@@ -54,7 +55,23 @@ export class ContainerPlugin extends LayoutBasePlugin {
   regions: Array<RegionConfig> = [
     {
       key: 'body',
-      label: '内容区'
+      label: '内容区',
+      accept: (json, node, dragNode) => {
+        // Grid 或者 flex 里面作为栏的时候，不让切换进去
+        // 只让其调整顺序
+        // node 是 region 节点，node.host 才是容器节点
+        // node.host.host 是容器节点所在组件节点
+        if (
+          dragNode &&
+          dragNode.info?.plugin === this &&
+          node.host.host === dragNode.host
+        ) {
+          // sibling 不接受, 通常是调整顺序
+          return false;
+        }
+
+        return true;
+      }
     }
   ];
 
@@ -167,7 +184,11 @@ export class ContainerPlugin extends LayoutBasePlugin {
   ) {
     const context = event.context;
     const node = context.node;
-    const host = node.host;
+    const region = node.parent;
+
+    if (node.info?.plugin !== this || !region || !region.isRegion) {
+      return;
+    }
 
     const dom = context.dom;
     const parent = dom.parentElement as HTMLElement;
@@ -188,6 +209,7 @@ export class ContainerPlugin extends LayoutBasePlugin {
 
     let flexGrow = 1;
     let width = 0;
+    const nodes = region.children;
 
     event.setData({
       onMove: (e: MouseEvent) => {
@@ -214,9 +236,9 @@ export class ContainerPlugin extends LayoutBasePlugin {
                   1,
                   Math.min(12, Math.round((12 * width) / frameRect.width))
                 );
-                host.children[i]?.updateState({
+                nodes[i]?.updateState({
                   style: {
-                    ...host.children[i].schema.style,
+                    ...nodes[i].schema.style,
                     flexGrow: grow
                   }
                 });
@@ -257,7 +279,7 @@ export class ContainerPlugin extends LayoutBasePlugin {
         resizer.removeAttribute('data-value');
 
         if (isFlexSize) {
-          host?.children.forEach((item: EditorNodeType) => {
+          nodes.forEach((item: EditorNodeType) => {
             item.updateSchema({
               style: {
                 ...node.schema.style,

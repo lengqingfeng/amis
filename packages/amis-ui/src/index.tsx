@@ -11,5 +11,14 @@ import './themes/dark';
 import './themes/default';
 import type {SchemaEditorItemPlaceholder} from './components/schema-editor/Common';
 import {schemaEditorItemPlaceholder} from './components/schema-editor/Common';
+import withStore from './withStore';
+import withRemoteConfig from './withRemoteConfig';
+import {HTMLFilterContext} from './HTMLFilterContext';
 
-export {schemaEditorItemPlaceholder, SchemaEditorItemPlaceholder};
+export {
+  schemaEditorItemPlaceholder,
+  SchemaEditorItemPlaceholder,
+  withStore,
+  withRemoteConfig,
+  HTMLFilterContext
+};

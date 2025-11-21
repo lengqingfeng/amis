@@ -24,7 +24,8 @@ export class GridPlugin extends BasePlugin {
   static scene = ['layout'];
   // 关联渲染器名字
   rendererName = 'grid';
-  $schema = '/schemas/GridSchema.json';
+  useLazyRender = true; // 使用懒渲染
+  $schema = '/schemas/AMISGridSchema.json';
 
   // 组件名称
   name = '分栏';
@@ -587,7 +588,7 @@ export class GridPlugin extends BasePlugin {
             type={info.type}
             plugin={info.plugin}
             renderer={info.renderer}
-            $schema="/schemas/GridColumn.json"
+            $schema="/schemas/AMISGridColumnSchema.json"
             hostId={info.id}
             memberIndex={index}
             name={`第${index + 1}栏`}
@@ -627,9 +628,9 @@ export class GridPlugin extends BasePlugin {
     event: PluginEvent<RendererJSONSchemaResolveEventContext>
   ) {
     const context = event.context;
-    const parent = context.node.parent?.host as EditorNodeType;
+    const parent = context.node.host as EditorNodeType;
 
-    if (parent?.info?.plugin === this) {
+    if (context.node.isVitualRenderer && parent?.info?.plugin === this) {
       event.setData('/schemas/GridColumn.json');
     }
   }

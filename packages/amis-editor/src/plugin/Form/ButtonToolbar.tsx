@@ -6,13 +6,14 @@ import {
   BUTTON_DEFAULT_ACTION,
   formItemControl
 } from '../../component/BaseControl';
+import {generateId} from '../../util';
 
 export class ButtonToolbarControlPlugin extends BasePlugin {
   static id = 'ButtonToolbarControlPlugin';
   static scene = ['layout'];
   // 关联渲染器名字
   rendererName = 'button-toolbar';
-  $schema = '/schemas/ButtonToolbarControlSchema.json';
+  $schema = '/schemas/AMISButtonToolbarSchema.json';
 
   // 组件名称
   name = '按钮工具栏';
@@ -29,11 +30,13 @@ export class ButtonToolbarControlPlugin extends BasePlugin {
       {
         type: 'button',
         label: '按钮1',
+        id: generateId(),
         ...BUTTON_DEFAULT_ACTION
       },
       {
         type: 'button',
         label: '按钮2',
+        id: generateId(),
         ...BUTTON_DEFAULT_ACTION
       }
     ]

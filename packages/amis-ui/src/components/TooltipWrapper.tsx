@@ -7,7 +7,7 @@
 import React from 'react';
 import Html from './Html';
 import {EnvContext, uncontrollable} from 'amis-core';
-import {findDOMNode} from 'react-dom';
+import {findDomCompat as findDOMNode} from 'amis-core';
 import Tooltip from './Tooltip';
 import {ClassNamesFn, themeable} from 'amis-core';
 import {Overlay} from 'amis-core';
@@ -80,6 +80,11 @@ export interface TooltipObject {
    * 文字提示浮层CSS类名
    */
   tooltipClassName?: string;
+
+  /**
+   * 箭头CSS类名
+   */
+  tooltipArrowClassName?: string;
 
   /**
    * 文字提示浮层Body的CSS类名
@@ -305,14 +310,14 @@ export class TooltipWrapper extends React.Component<
       trigger,
       rootClose,
       tooltipClassName,
+      tooltipArrowClassName,
       tooltipBodyClassName,
       style,
       disabled = false,
       offset,
       tooltipTheme = 'light',
       showArrow = true,
-      children,
-      filterHtml
+      children
     } = tooltipObj;
 
     const childProps: any = {
@@ -354,6 +359,7 @@ export class TooltipWrapper extends React.Component<
           className={tooltipClassName}
           tooltipTheme={tooltipTheme}
           showArrow={showArrow}
+          arrowClassName={tooltipArrowClassName}
           bodyClassName={tooltipBodyClassName}
           onMouseEnter={
             ~triggers.indexOf('hover') ? this.tooltipMouseEnter : () => {}
@@ -365,10 +371,7 @@ export class TooltipWrapper extends React.Component<
           {children ? (
             <>{typeof children === 'function' ? children() : children}</>
           ) : (
-            <Html
-              html={typeof content === 'string' ? content : ''}
-              filterHtml={filterHtml}
-            />
+            <Html html={typeof content === 'string' ? content : ''} />
           )}
         </Tooltip>
       </Overlay>

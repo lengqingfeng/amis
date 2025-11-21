@@ -6,13 +6,13 @@ import {EditorManager} from '../../manager';
 import {EditorStoreType} from '../../store/editor';
 import {Tab, Tabs} from 'amis';
 import {autobind} from '../../util';
-import {findDOMNode} from 'react-dom';
+import {findDomCompat as findDOMNode} from 'amis-core';
 import find from 'lodash/find';
 import {PanelItem} from '../../plugin';
 import {DrawerPanel} from './DrawerPanel';
 import {DrawerRendererPanel} from './DrawerRendererPanel';
 
-interface LeftPanelsProps {
+export interface LeftPanelsProps {
   store: EditorStoreType;
   manager: EditorManager;
   theme?: string;
@@ -153,7 +153,16 @@ export class LeftPanels extends React.Component<
                   <Tab
                     key={panel.key}
                     eventKey={panel.key}
-                    title={panel.title}
+                    title={
+                      panel.title ?? (
+                        <span
+                          className="editor-tab-icon editor-tab-s-icon"
+                          editor-tooltip={panel.tooltip}
+                        >
+                          {panel.icon}
+                        </span>
+                      )
+                    }
                     // icon={panel.icon}
                     className={`editorPanel-tabs-pane ae-Editor-${panel.key}Pane`}
                     mountOnEnter={true}

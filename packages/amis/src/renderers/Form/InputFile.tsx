@@ -3,7 +3,8 @@ import {
   FormItem,
   FormControlProps,
   prettyBytes,
-  resolveEventData
+  resolveEventData,
+  AMISFormItem
 } from 'amis-core';
 import find from 'lodash/find';
 import isPlainObject from 'lodash/isPlainObject';
@@ -24,7 +25,7 @@ import {dataMapping} from 'amis-core';
 import {
   FormBaseControlSchema,
   SchemaApi,
-  SchemaClassName,
+  AMISClassName,
   SchemaTokenizeableString
 } from '../../Schema';
 import merge from 'lodash/merge';
@@ -35,76 +36,59 @@ import {filter} from 'amis-core';
  * File 文件上传控件
  * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/file
  */
-export interface FileControlSchema extends FormBaseControlSchema {
+/**
+ * 文件上传控件，支持选择文件、上传文件、下载文件等操作，适用于需要文件上传的场景。
+ */
+export interface AMISInputFileSchema extends AMISFormItem {
   /**
-   * 指定为文件上传
+   * 指定为 file 组件
    */
   type: 'input-file';
 
   /**
-   * 上传文件按钮说明
+   * 按钮文案
    * @default 请选择文件
    */
   btnLabel?: string;
 
   /**
-   * 默认只支持纯文本，要支持其他类型，请配置此属性。建议直接填写文件后缀
-   * 如：.txt,.csv
-   *
-   * 多个类型用逗号隔开。
-   *
+   * 接受的文件类型
    * @default text/plain
    */
   accept?: string;
 
   /**
-   * 控制 input 标签的 capture 属性，用于移动端拍照或录像。
+   * 移动端拍照录像
    */
   capture?: string;
 
   /**
-   * 如果上传的文件比较小可以设置此选项来简单的把文件 base64 的值给 form 一起提交，目前不支持多选。
+   * 是否转为 base64
    */
   asBase64?: boolean;
 
   /**
-   * 如果不希望 File 组件上传，可以配置 `asBlob` 或者 `asBase64`，采用这种方式后，组件不再自己上传了，而是直接把文件数据作为表单项的值，文件内容会在 Form 表单提交的接口里面一起带上。
+   * 是否转为 blob
    */
   asBlob?: boolean;
 
   /**
-   * 是否自动开始上传
+   * 是否自动上传
    */
   autoUpload?: boolean;
 
   /**
-   * 默认 `/api/upload/chunk` 想自己存储时才需要关注。
-   */
-  chunkApi?: SchemaApi;
-
-  /**
-   * 分块大小，默认为 5M.
-   *
-   * @default 5242880
-   */
-  chunkSize?: number;
-
-  /**
-   * 分块上传的并发数
+   * 并发数
    */
   concurrency?: number;
 
   /**
-   * 分割符
+   * 分隔符
    */
   delimiter?: string;
 
   /**
-   * 默认显示文件路径的时候会支持直接下载，
-   * 可以支持加前缀如：`http://xx.dom/filename=` ，
-   * 如果不希望这样，可以把当前配置项设置为 `false`。
-   *
-   * 1.1.6 版本开始将支持变量 ${xxx} 来自己拼凑个下载地址，并且支持配置成 post.
+   * 下载地址
    */
   downloadUrl?: SchemaApi;
 
@@ -114,10 +98,53 @@ export interface FileControlSchema extends FormBaseControlSchema {
   templateUrl?: SchemaApi;
 
   /**
-   * 默认 `file`, 如果你不想自己存储，则可以忽略此属性。
+   * 文件字段名
    * @default file
    */
   fileField?: string;
+
+  /**
+   * 是否隐藏上传按钮
+   */
+  hideUploadButton?: boolean;
+
+  /**
+   * 最大文件数
+   */
+  maxLength?: number;
+
+  /**
+   * 最大文件大小
+   */
+  maxSize?: number;
+
+  /**
+   * 上传接口
+   * @default /api/upload/file
+   */
+  receiver?: SchemaApi;
+
+  /**
+   * 是否分块上传
+   */
+  useChunk?: 'auto' | boolean;
+
+  /**
+   * 分块大小
+   * @default 5242880
+   */
+  chunkSize?: number;
+
+  /**
+   * 分块开始接口
+   * @default /api/upload/startChunk
+   */
+  startChunkApi?: string;
+
+  /**
+   * 默认 `/api/upload/chunk` 想自己存储时才需要关注。
+   */
+  chunkApi?: SchemaApi;
 
   /**
    * 默认 `/api/upload/finishChunkApi` 想自己存储时才需要关注。
@@ -127,48 +154,14 @@ export interface FileControlSchema extends FormBaseControlSchema {
   finishChunkApi?: SchemaApi;
 
   /**
-   * 是否隐藏上传按钮
-   */
-  hideUploadButton?: boolean;
-
-  /**
-   * 最多的个数
-   */
-  maxLength?: number;
-
-  /**
-   * 默认没有限制，当设置后，文件大小大于此值将不允许上传。
-   */
-  maxSize?: number;
-
-  /**
-   * 默认 `/api/upload/file` 如果想自己存储，请设置此选项。
-   *
-   * @default /api/upload/file
-   */
-  receiver?: SchemaApi;
-
-  /**
-   * 默认 `/api/upload/startChunk` 想自己存储时才需要关注。
-   *
-   * @default /api/upload/startChunk
-   */
-  startChunkApi?: string;
-
-  /**
-   * 默认为 'auto' amis 所在服务器，限制了文件上传大小不得超出10M，所以 amis 在用户选择大文件的时候，自动会改成分块上传模式。
-   */
-  useChunk?: 'auto' | boolean;
-
-  /**
    * 按钮 CSS 类名
    */
-  btnClassName?: SchemaClassName;
+  btnClassName?: AMISClassName;
 
   /**
    * 上传按钮 CSS 类名
    */
-  btnUploadClassName?: SchemaClassName;
+  btnUploadClassName?: AMISClassName;
 
   /**
    * 是否为多选
@@ -176,9 +169,9 @@ export interface FileControlSchema extends FormBaseControlSchema {
   multiple?: boolean;
 
   /**
-   * 1. 单选模式：当用户选中某个选项时，选项中的 value 将被作为该表单项的值提交，
+   * 1. 单选模式：当用户选中某个选项时，选项中的 value 将被作为该表单项的值提交
    * 否则，整个选项对象都会作为该表单项的值提交。
-   * 2. 多选模式：选中的多个选项的 `value` 会通过 `delimiter` 连接起来，
+   * 2. 多选模式：选中的多个选项的 `value` 会通过 `delimiter` 连接起来
    * 否则直接将以数组的形式提交值。
    */
   joinValues?: boolean;
@@ -246,12 +239,20 @@ export interface FileControlSchema extends FormBaseControlSchema {
    * 是否为拖拽上传
    */
   drag?: boolean;
+  /**
+   * 校验格式失败时显示的文字信息
+   */
+  invalidTypeMessage?: string;
+  /**
+   * 校验文件大小失败时显示的文字信息
+   */
+  invalidSizeMessage?: string;
 }
 
 export interface FileProps
   extends FormControlProps,
     Omit<
-      FileControlSchema,
+      AMISInputFileSchema,
       'type' | 'className' | 'descriptionClassName' | 'inputClassName'
     > {
   stateTextMap: {
@@ -579,7 +580,13 @@ export default class FileControl extends React.Component<FileProps, FileState> {
     if (evt.type !== 'change' && evt.type !== 'drop') {
       return;
     }
-    const {multiple, env, accept, translate: __} = this.props;
+    const {
+      multiple,
+      env,
+      accept,
+      translate: __,
+      invalidTypeMessage
+    } = this.props;
     const nameField = this.props.nameField || 'name';
 
     const files = rejectedFiles.map(fileRejection => ({
@@ -598,7 +605,7 @@ export default class FileControl extends React.Component<FileProps, FileState> {
     // });
 
     env.alert(
-      __('File.invalidType', {
+      __(invalidTypeMessage ?? 'File.invalidType', {
         files: files.map((item: any) => `「${item[nameField]}」`).join(' '),
         accept
       })
@@ -657,9 +664,9 @@ export default class FileControl extends React.Component<FileProps, FileState> {
   }
 
   handleSelect() {
-    const {disabled, multiple, maxLength} = this.props;
-    !disabled &&
-      !(multiple && maxLength && this.state.files.length >= maxLength) &&
+    const {disabled, multiple, maxLength, static: isStatic} = this.props;
+    !disabled && !isStatic;
+    !(multiple && maxLength && this.state.files.length >= maxLength) &&
       this.dropzone.current &&
       this.dropzone.current.open();
   }
@@ -732,6 +739,9 @@ export default class FileControl extends React.Component<FileProps, FileState> {
               const idx = files.indexOf(file as FileX);
 
               if (!~idx) {
+                // 事件里面可能把当前表单值给改了
+                this.current = null;
+                requestAnimationFrame(this.tick);
                 return;
               }
 
@@ -1339,6 +1349,16 @@ export default class FileControl extends React.Component<FileProps, FileState> {
     }
   }
 
+  // 文件大小限制 提示信息
+  sizeLimitTip(maxSize: number, file?: FileValue | FileX) {
+    let {translate: __, invalidSizeMessage} = this.props;
+    return __(invalidSizeMessage ?? 'File.sizeLimit', {
+      filename: file?.name,
+      actualSize: prettyBytes(file?.size || 0, 1024),
+      maxSize: prettyBytes(maxSize, 1024)
+    });
+  }
+
   render() {
     const {
       btnLabel,
@@ -1367,7 +1387,8 @@ export default class FileControl extends React.Component<FileProps, FileState> {
       documentLink,
       env,
       container,
-      testIdBuilder
+      testIdBuilder,
+      static: isStatic
     } = this.props;
     let {files, uploading, error} = this.state;
     const nameField = this.props.nameField || 'name';
@@ -1401,7 +1422,7 @@ export default class FileControl extends React.Component<FileProps, FileState> {
         ) : null}
 
         <DropZone
-          disabled={disabled}
+          disabled={disabled || isStatic}
           key="drop-zone"
           ref={this.dropzone}
           onDrop={this.handleDrop}
@@ -1417,13 +1438,14 @@ export default class FileControl extends React.Component<FileProps, FileState> {
               className={cx('FileControl-dropzone', {
                 'disabled':
                   disabled ||
+                  isStatic ||
                   (multiple && !!maxLength && files.length >= maxLength),
                 'is-empty': !files.length,
                 'is-active': isDragActive
               })}
             >
               <input
-                disabled={disabled}
+                disabled={disabled || isStatic}
                 {...getInputProps()}
                 capture={capture as any}
                 {...testIdBuilder?.getChild('input').getTestId()}
@@ -1441,7 +1463,12 @@ export default class FileControl extends React.Component<FileProps, FileState> {
                       {__('File.clickUpload')}
                     </span>
                   </span>
-                  <div className={cx('FileControl-acceptTip-help', 'TplField')}>
+                  <div
+                    className={cx(
+                      'FileControl-acceptTip-help',
+                      'TplField fr-view'
+                    )}
+                  >
                     {documentLink ? (
                       <a href={documentLink} onClick={e => e.stopPropagation()}>
                         {documentation ? documentation : __('File.helpText')}
@@ -1450,13 +1477,11 @@ export default class FileControl extends React.Component<FileProps, FileState> {
                   </div>
                   {maxSize ? (
                     <div className={cx('FileControl-sizeTip')}>
-                      {__('File.sizeLimit', {
-                        maxSize: prettyBytes(maxSize, 1024)
-                      })}
+                      {this.sizeLimitTip(maxSize)}
                     </div>
                   ) : null}
                 </div>
-              ) : (
+              ) : !isStatic ? (
                 <>
                   <Button
                     level="enhance"
@@ -1483,7 +1508,7 @@ export default class FileControl extends React.Component<FileProps, FileState> {
                     </span>
                   </Button>
                 </>
-              )}
+              ) : null}
             </div>
           )}
         </DropZone>
@@ -1495,7 +1520,7 @@ export default class FileControl extends React.Component<FileProps, FileState> {
           : null}
         {maxSize && !drag ? (
           <div className={cx('FileControl-sizeTip')}>
-            {__('File.sizeLimit', {maxSize: prettyBytes(maxSize, 1024)})}
+            {this.sizeLimitTip(maxSize)}
           </div>
         ) : null}
 
@@ -1521,11 +1546,7 @@ export default class FileControl extends React.Component<FileProps, FileState> {
                       file.state === 'invalid' || file.state === 'error'
                         ? (file as FileValue).error ||
                           (maxSize && file.size > maxSize
-                            ? __('File.maxSize', {
-                                filename: file.name,
-                                actualSize: prettyBytes(file.size, 1024),
-                                maxSize: prettyBytes(maxSize, 1024)
-                              })
+                            ? this.sizeLimitTip(maxSize, file)
                             : '')
                         : filename
                     }
@@ -1558,7 +1579,7 @@ export default class FileControl extends React.Component<FileProps, FileState> {
                         </span>
                       )}
 
-                      {!disabled ? (
+                      {!disabled && !isStatic ? (
                         <a
                           data-tooltip={__('Select.clear')}
                           data-position="left"
@@ -1598,7 +1619,7 @@ export default class FileControl extends React.Component<FileProps, FileState> {
           </div>
         ) : null}
 
-        {!autoUpload && !hideUploadButton && files.length ? (
+        {!isStatic && !autoUpload && !hideUploadButton && files.length ? (
           <Button
             level="default"
             testIdBuilder={testIdBuilder?.getChild('upload')}

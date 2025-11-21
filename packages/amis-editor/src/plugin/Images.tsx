@@ -8,7 +8,7 @@ export class ImagesPlugin extends BasePlugin {
   static scene = ['layout'];
   // 关联渲染器名字
   rendererName = 'images';
-  $schema = '/schemas/ImagesSchema.json';
+  $schema = '/schemas/AMISImagesSchema.json';
 
   // 组件名称
   name = '图片集';
@@ -20,7 +20,8 @@ export class ImagesPlugin extends BasePlugin {
   pluginIcon = 'images-plugin';
   scaffold = {
     type: 'images',
-    imageGallaryClassName: 'app-popover :AMISCSSWrapper'
+    imageGallaryClassName: 'app-popover :AMISCSSWrapper',
+    displayMode: 'thumb' // 默认缩略图模式
   };
   previewSchema = {
     ...this.scaffold,
@@ -126,6 +127,22 @@ export class ImagesPlugin extends BasePlugin {
                       }
                     ]
                   },
+                  {
+                    type: 'select',
+                    name: 'displayMode',
+                    label: '图片集模式',
+                    value: 'thumb',
+                    options: [
+                      {
+                        label: '缩略图模式',
+                        value: 'thumb'
+                      },
+                      {
+                        label: '大图模式',
+                        value: 'full'
+                      }
+                    ]
+                  },
                   getSchemaTpl('switch', {
                     name: 'enlargeAble',
                     label: '图片放大功能'
@@ -184,7 +201,8 @@ export class ImagesPlugin extends BasePlugin {
                     label: '铺满',
                     value: 'cover'
                   }
-                ]
+                ],
+                visibleOn: 'this.displayMode === "thumb"'
               },
 
               {
@@ -208,7 +226,8 @@ export class ImagesPlugin extends BasePlugin {
                     label: '16:9',
                     value: '16:9'
                   }
-                ]
+                ],
+                visibleOn: 'this.displayMode === "thumb"'
               }
             ]
           },
@@ -219,18 +238,28 @@ export class ImagesPlugin extends BasePlugin {
           {
             title: '其他',
             body: [
-              {
+              // {
+              //   name: 'themeCss.galleryControlClassName.--image-images-prev-icon',
+              //   label: '左切换图标',
+              //   type: 'icon-select',
+              //   returnSvg: true
+              // },
+              // {
+              //   name: 'themeCss.galleryControlClassName.--image-images-next-icon',
+              //   label: '右切换图标',
+              //   type: 'icon-select',
+              //   returnSvg: true
+              // },
+              getSchemaTpl('icon', {
                 name: 'themeCss.galleryControlClassName.--image-images-prev-icon',
                 label: '左切换图标',
-                type: 'icon-select',
                 returnSvg: true
-              },
-              {
+              }),
+              getSchemaTpl('icon', {
                 name: 'themeCss.galleryControlClassName.--image-images-next-icon',
                 label: '右切换图标',
-                type: 'icon-select',
                 returnSvg: true
-              },
+              }),
               getSchemaTpl('theme:select', {
                 label: '切换图标大小',
                 name: 'themeCss.galleryControlClassName.--image-images-item-size'

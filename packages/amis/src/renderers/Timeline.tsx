@@ -5,19 +5,32 @@ import {
   filter,
   isPureVariable,
   resolveVariableAndFilter,
-  createObject
+  createObject,
+  isEffectiveApi,
+  ApiObject,
+  autobind,
+  isObject,
+  BaseSchemaWithoutType,
+  AMISSchemaBase,
+  AMISSchemaCollection
 } from 'amis-core';
 import {RemoteOptionsProps, withRemoteConfig, Timeline} from 'amis-ui';
 
-import type {
-  BaseSchema,
-  SchemaApi,
-  SchemaCollection,
-  SchemaTokenizeableString
-} from '../Schema';
+import type {BaseSchema, SchemaApi, SchemaTokenizeableString} from '../Schema';
 import type {IconCheckedSchema} from 'amis-ui';
+import {AMISCardSchema} from './Card';
 
-export interface TimelineItemSchema extends Omit<BaseSchema, 'type'> {
+type DotSize = 'sm' | 'md' | 'lg' | 'xl';
+
+enum DirectionMode {
+  left = 'left',
+  right = 'right',
+  top = 'top',
+  bottom = 'bottom',
+  alternate = 'alternate'
+}
+
+export interface TimelineItemSchema extends AMISSchemaBase {
   /**
    * 时间点
    */
@@ -26,7 +39,7 @@ export interface TimelineItemSchema extends Omit<BaseSchema, 'type'> {
   /**
    * 时间节点标题
    */
-  title?: SchemaCollection;
+  title?: AMISSchemaCollection;
 
   /**
    * 详细内容
@@ -69,9 +82,25 @@ export interface TimelineItemSchema extends Omit<BaseSchema, 'type'> {
    * 节点详情的CSS类名（优先级高于统一配置的detailClassName）
    */
   detailClassName?: string;
+
+  // 节点大小，可选值为 sm md lg xl，默认为md
+  dotSize?: DotSize;
+
+  // 连线颜色，默认为空字符串（跟随主题色）
+  lineColor?: string;
+
+  // 隐藏当前节点的圆圈
+  hideDot?: boolean;
+  /**
+   * 卡片展示配置，如果传入则以卡片形式展示，传入对象转为卡片展示，传入的time、title、detail及相关属性将被忽略，只有连线配置和节点圆圈配置生效
+   */
+  cardSchema?: AMISCardSchema;
 }
 
-export interface TimelineSchema extends BaseSchema {
+/**
+ * 时间轴组件，用于按时间顺序展示事件。支持方向、颜色与标签。
+ */
+export interface AMISTimelineSchema extends AMISSchemaBase {
   /**
    * 指定为 Timeline 时间轴渲染器
    */
@@ -90,7 +119,7 @@ export interface TimelineSchema extends BaseSchema {
   /**
    * 文字相对于时间轴展示方向
    */
-  mode?: 'left' | 'right' | 'alternate';
+  mode?: DirectionMode;
 
   /**
    * 展示方向
@@ -104,7 +133,7 @@ export interface TimelineSchema extends BaseSchema {
   /**
    * 节点title自定一展示模板
    */
-  itemTitleSchema?: SchemaCollection;
+  itemTitleSchema?: AMISSchemaCollection;
   /**
    * 图标的CSS类名
    */
@@ -121,11 +150,16 @@ export interface TimelineSchema extends BaseSchema {
    * 节点详情的CSS类名
    */
   detailClassName?: string;
+
+  /**
+   * 卡片展示配置，如果传入则将items数据传入cardSchema中循环渲染，itemTitleSchema、titleClassName、detailClassName将不生效。配置后 timeline item中的数据都将可以在cardSchema中通过数据方式引用。如果子节点也配置了cardSchema，则子节点的cardSchema优先级高于timeline的cardSchema
+   */
+  cardSchema?: AMISCardSchema;
 }
 
 export interface TimelineProps
   extends RendererProps,
-    Omit<TimelineSchema, 'className'> {}
+    Omit<AMISTimelineSchema, 'className'> {}
 
 export function TimelineCmpt(props: TimelineProps) {
   const {
@@ -140,11 +174,15 @@ export function TimelineCmpt(props: TimelineProps) {
     timeClassName,
     titleClassName,
     detailClassName,
+    cardSchema: commonCardSchema,
+    name,
+    itemKeyName,
+    indexKeyName,
     render
   } = props;
 
   // 渲染内容
-  const resolveRender = (region: string, val?: SchemaCollection) =>
+  const resolveRender = (region: string, val?: AMISSchemaCollection) =>
     typeof val === 'string' ? filter(val, data) : val && render(region, val);
 
   // 处理源数据
@@ -154,10 +192,22 @@ export function TimelineCmpt(props: TimelineProps) {
         icon,
         iconClassName,
         title,
+        time,
+        detail,
         timeClassName,
         titleClassName,
-        detailClassName
+        detailClassName,
+        cardSchema
       } = timelineItem;
+
+      const cardRenderer = cardSchema || commonCardSchema;
+      const ctx = createObject(data, {
+        ...(isObject(timelineItem)
+          ? {index, ...timelineItem}
+          : {[name]: timelineItem}),
+        [itemKeyName || 'item']: timelineItem,
+        [indexKeyName || 'index']: index
+      });
 
       return {
         ...timelineItem,
@@ -166,13 +216,20 @@ export function TimelineCmpt(props: TimelineProps) {
         titleClassName,
         detailClassName,
         icon: isPureVariable(icon)
-          ? resolveVariableAndFilter(icon, data, '| raw')
+          ? resolveVariableAndFilter(icon, ctx, '| raw')
           : icon,
         title: itemTitleSchema
           ? render(`${index}/body`, itemTitleSchema, {
-              data: createObject(data, timelineItem)
+              data: ctx
             })
-          : resolveRender('title', title)
+          : resolveRender('title', title),
+        time: resolveRender('time', time),
+        detail: resolveRender('detail', detail),
+        cardNode: cardRenderer
+          ? render('card', cardRenderer, {
+              data: ctx // 当前继承的data和本身节点的数据作为当前卡片schema的渲染数据
+            })
+          : undefined
       };
     }
   );
@@ -219,7 +276,37 @@ const TimelineWithRemoteConfig = withRemoteConfig({
   type: 'timeline'
 })
 export class TimelineRenderer extends React.Component<TimelineProps> {
+  remoteRef:
+    | {
+        loadConfig: (ctx?: any) => Promise<any> | void;
+        setConfig: (value: any) => void;
+        syncConfig: () => void;
+      }
+    | undefined = undefined;
+
+  @autobind
+  remoteConfigRef(ref: any) {
+    this.remoteRef = ref;
+  }
+
+  componentDidUpdate(prevProps: any) {
+    const {source, data} = this.props;
+    if (this.remoteRef && source !== prevProps.source) {
+      // 如果是变量，则同步配置。如果为api，则重新加载配置
+      (isPureVariable(source) && this.remoteRef.syncConfig()) ||
+        (isEffectiveApi(source, data)
+          ? (source as ApiObject).autoRefresh !== false &&
+            this.remoteRef.loadConfig()
+          : this.remoteRef.setConfig(undefined));
+    }
+  }
+
   render() {
-    return <TimelineWithRemoteConfig {...this.props} />;
+    return (
+      <TimelineWithRemoteConfig
+        {...this.props}
+        remoteConfigRef={this.remoteConfigRef}
+      />
+    );
   }
 }

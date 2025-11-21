@@ -69,6 +69,7 @@ export function asyncFilter(
 
 // 缓存一下提升性能
 const EVAL_CACHE: {[key: string]: Function} = {};
+const WARNING_CACHE: {[key: string]: boolean} = {};
 
 let customEvalExpressionFn: (expression: string, data?: any) => boolean;
 export function setCustomEvalExpression(
@@ -122,7 +123,10 @@ export function evalExpression(expression: string, data?: object): boolean {
     data = data || {};
     return fn.call(data, data, getFilters());
   } catch (e) {
-    console.warn(expression, e);
+    if (!WARNING_CACHE[expression]) {
+      console.warn(expression, e);
+      WARNING_CACHE[expression] = true;
+    }
     return false;
   }
 }
@@ -156,10 +160,14 @@ export function evalExpressionWithConditionBuilder(
   expression: any,
   data?: object,
   defaultResult?: boolean
-) {
+): boolean {
   // 支持ConditionBuilder
   if (Object.prototype.toString.call(expression) === '[object Object]') {
-    return resolveCondition(expression, data, defaultResult);
+    const ret = resolveCondition(expression, data, defaultResult);
+    if ((ret as any)?.then) {
+      return false;
+    }
+    return !!ret;
   }
 
   return evalExpression(String(expression), data);

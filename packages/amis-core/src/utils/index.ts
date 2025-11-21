@@ -1,3 +1,4 @@
+export * from './tpl-builtin';
 export * from './api';
 export * from './attachmentAdpator';
 export * from './autobind';
@@ -28,6 +29,7 @@ export * from './isPureVariable';
 export * from './json-schema-2-amis-schema';
 export * from './keyToPath';
 export * from './labelToString';
+export * from './loopTooMuch';
 export * from './makeSorter';
 export * from './normalizeLink';
 export * from './normalizeOptions';
@@ -49,7 +51,6 @@ export * from './SimpleMap';
 export * from './string2regExp';
 export * from './style';
 export * from './tokenize';
-export * from './tpl-builtin';
 export * from './tpl';
 export * from './uncontrollable';
 export * from './validations';
@@ -59,6 +60,8 @@ export * from './style-helper';
 export * from './resolveCondition';
 export * from './arraySlice';
 export * from './math';
+export * from './memoryParse';
+export * from './findDomCompat';
 
 import animation from './Animation';
 

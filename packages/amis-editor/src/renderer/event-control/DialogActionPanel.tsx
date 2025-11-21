@@ -23,7 +23,7 @@ import {
   Select,
   Switch
 } from 'amis-ui';
-import type {EditorModalBody} from '../../../../amis-editor-core/src/store/editor';
+import type {EditorModalBody} from 'amis-editor-core/lib/store/editor';
 
 export interface DialogActionPanelProps extends RendererProps {
   manager: EditorManager;
@@ -223,7 +223,7 @@ function DialogActionPanel({
         if (originInd) {
           const parent = JSONGetParentById(schema, originInd);
           if (parent && parent.actionType) {
-            originActionId = parent.$$id;
+            originActionId = originInd;
             newRefName = currentModal.modal.$$ref;
           } else {
             // 没找到很可能是在主页面里面的弹窗
@@ -312,7 +312,7 @@ function DialogActionPanel({
       if (originActionId && newRefName) {
         schema = JSONUpdate(
           schema,
-          currentModal.value,
+          originActionId,
           JSONPipeIn({
             $ref: newRefName
           }),
@@ -497,19 +497,30 @@ function DialogActionPanel({
           arr = members.concat();
         }
 
-        const {$$originId, ...modal} = definitions[key];
+        const {$$originId, ...definition} = definitions[key];
+
+        // 当前弹窗不需要合并
+        if (
+          $$originId === modal.$$id ||
+          (definition.$$ref && definition.$$ref === modal.$$ref)
+        ) {
+          return;
+        }
+
         const idx = arr.findIndex(item =>
           $$originId
             ? (item.modal.$$originId || item.modal.$$id) === $$originId
             : item.modal.$$ref === key
         );
         const label = `${
-          modal.editorSetting?.displayName || modal.title || '未命名弹窗'
+          definition.editorSetting?.displayName ||
+          definition.title ||
+          '未命名弹窗'
         }`;
         const tip =
-          (modal as any).actionType === 'confirmDialog'
+          (definition as any).actionType === 'confirmDialog'
             ? '确认框'
-            : modal.type === 'drawer'
+            : definition.type === 'drawer'
             ? '抽屉弹窗'
             : '弹窗';
 
@@ -518,7 +529,7 @@ function DialogActionPanel({
             ...arr[idx],
             label: label,
             tip: tip,
-            modal: {...modal, $$ref: key, $$originId},
+            modal: {...definition, $$ref: key, $$originId},
             isModified: true,
             isRefered: refs.includes(key)
           });
@@ -529,9 +540,9 @@ function DialogActionPanel({
           arr.push({
             label,
             tip,
-            value: modal.$$id,
+            value: definition.$$id,
             modal: JSONPipeIn({
-              ...modal,
+              ...definition,
               $$ref: key
             }),
             isModified: true
@@ -568,7 +579,7 @@ function DialogActionPanel({
       manager.openSubEditor({
         title: '新建弹窗',
         value: modal,
-        onChange: ({definitions, ...modal}: any, diff: any) => {
+        onDefinitionsChange: (definitions, originDefinitions, modal) => {
           // 不能变 $$id 如果有内部有引用，就找不到了
           modal = JSONPipeIn({...modal, $$id: modalId});
           let arr = modals.concat();
@@ -598,6 +609,7 @@ function DialogActionPanel({
           }
           setModals(arr);
           onBulkChange({__actionModals: arr});
+          return false;
         }
       });
       closePopOver?.();
@@ -629,7 +641,7 @@ function DialogActionPanel({
           currentModal.modal
         )
       },
-      onChange: ({definitions, ...modal}: any, diff: any) => {
+      onDefinitionsChange: (definitions, originDefinitions, modal) => {
         // 编辑的时候不要修改 $$id
         modal = JSONPipeIn({...modal, $$id: currentModal.modal.$$id});
         let arr = modals.map(item =>
@@ -655,6 +667,7 @@ function DialogActionPanel({
         arr = mergeDefinitions(arr, definitions, modal);
         setModals(arr);
         onBulkChange({__actionModals: arr});
+        return false;
       }
     });
   }, [modals]);

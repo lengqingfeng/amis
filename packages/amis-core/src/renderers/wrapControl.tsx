@@ -14,6 +14,7 @@ import {
   getVariable,
   createObject
 } from '../utils/helper';
+import {str2rules} from '../utils/validations';
 import {
   isNeedFormula,
   isExpression,
@@ -27,16 +28,18 @@ import {isAlive} from 'mobx-state-tree';
 import {observer} from 'mobx-react';
 import hoistNonReactStatic from 'hoist-non-react-statics';
 import {withRootStore} from '../WithRootStore';
-import {FormBaseControl, FormItemWrap} from './Item';
-import {Api} from '../types';
+import {AMISFormItem, FormItemConfig, FormItemWrap} from './Item';
+import {Api, DataChangeReason} from '../types';
 import {TableStore} from '../store/table';
 import pick from 'lodash/pick';
+import {reaction} from 'mobx';
 import {
   callStrFunction,
   changedEffect,
   cloneObject,
   setVariable,
-  tokenize
+  tokenize,
+  injectObjectChain
 } from '../utils';
 
 export interface ControlOutterProps extends RendererProps {
@@ -75,21 +78,25 @@ export interface ControlOutterProps extends RendererProps {
     value: any,
     name: string,
     submit?: boolean,
-    changePristine?: boolean
+    changePristine?: boolean,
+    changeReason?: DataChangeReason
   ) => void;
-  formItemDispatchEvent: (type: string, data: any) => void;
   formItemRef?: (control: any) => void;
 }
 
 export interface ControlProps {
-  onBulkChange?: (values: Object) => void;
+  onBulkChange?: (
+    values: Object,
+    submitOnChange?: boolean,
+    changeReason?: DataChangeReason
+  ) => void;
   onChange?: (value: any, name: string, submit: boolean) => void;
   store: IIRendererStore;
 }
 
 export function wrapControl<
   T extends React.ComponentType<React.ComponentProps<T> & ControlProps>
->(ComposedComponent: T) {
+>(config: Omit<FormItemConfig, 'component'>, ComposedComponent: T) {
   type OuterProps = JSX.LibraryManagedAttributes<
     T,
     Omit<React.ComponentProps<T>, keyof ControlProps>
@@ -171,7 +178,9 @@ export function wrapControl<
             this.validate = this.validate.bind(this);
             this.flushChange = this.flushChange.bind(this);
             this.renderChild = this.renderChild.bind(this);
-            let name = this.props.$schema.name;
+            let name =
+              this.props.$schema.name ||
+              (ComposedComponent.defaultProps as Record<string, unknown>)?.name;
 
             // 如果 name 是表达式
             // 扩充 each 用法
@@ -183,17 +192,24 @@ export function wrapControl<
               return;
             }
 
+            let valueIsExp = isExpression(value);
             let propValue = this.props.value;
             const model = rootStore.addStore({
               id: guid(),
               path: this.props.$path,
-              storeType: FormItemStore.name,
+              storeType: config.formItemStoreType || FormItemStore.name,
               parentId: store?.id,
               name,
               colIndex: colIndex !== undefined ? colIndex : undefined,
               rowIndex: rowIndex !== undefined ? rowIndex : undefined
             }) as IFormItemStore;
             this.model = model;
+            // 如果组件有默认验证器类型，则合并
+            const rules =
+              validations && model && config.validations
+                ? {...validations, ...str2rules(config.validations)}
+                : validations;
+
             // @issue 打算干掉这个
             formItem?.addSubFormItem(model);
             model.config({
@@ -207,8 +223,9 @@ export function wrapControl<
               required: props.required || required,
               unique,
               value,
-              isValueSchemaExp: isExpression(value),
-              rules: validations,
+              isValueSchemaExp:
+                valueIsExp && value.replace(/\s/g, '') !== `\${${name}}`,
+              rules: rules,
               messages: validationErrors,
               delimiter,
               valueField,
@@ -248,7 +265,13 @@ export function wrapControl<
             if (
               onChange &&
               value !== undefined &&
-              model.tmpValue !== undefined
+              model.tmpValue !== undefined &&
+              // 要么是默认值起作用了
+              // 要么是表达式起作用了
+              // 只有这两种情况才会触发 onChange
+              // 比如以下 case 就不应该触发
+              // 关联到上下文数据了，同时设置了默认值，因为是上下文数据优先，这个时候就不应该触发 onChange，因为没变化
+              (value === model.tmpValue || valueIsExp)
             ) {
               // 组件默认值支持表达式需要: 避免初始化时上下文中丢失组件默认值
               if (model.extraName) {
@@ -276,6 +299,26 @@ export function wrapControl<
                 onChange(model.tmpValue, model.name, false, true);
               }
             }
+
+            this.reaction = reaction(
+              () => model.validatedAt,
+              (validatedAt: number) => {
+                this.props.dispatchEvent?.(
+                  model.valid
+                    ? 'formItemValidateSucc'
+                    : 'formItemValidateError',
+                  injectObjectChain(
+                    this.props.formStore?.data ?? this.props.data,
+                    {
+                      __errors: model.errors,
+                      __formName: model.name,
+                      __formValue: model.tmpValue,
+                      __formControl: this.control
+                    }
+                  )
+                );
+              }
+            );
           }
 
           componentDidMount() {
@@ -352,7 +395,10 @@ export function wrapControl<
                   ...changes,
 
                   // todo 优化后面两个
-                  isValueSchemaExp: isExpression(props.$schema.value),
+                  isValueSchemaExp:
+                    isExpression(props.$schema.value) &&
+                    props.$schema.value.replace(/\s/g, '') !==
+                      `\${${props.$schema.name}}`,
                   inputGroupControl: props?.inputGroupControl
                 } as any);
 
@@ -381,6 +427,8 @@ export function wrapControl<
             } else if (
               typeof props.defaultValue !== 'undefined' &&
               isExpression(props.defaultValue) &&
+              (props.defaultValue as string).replace(/\s/g, '') !==
+                `\${${props.name}}` &&
               (!isEqual(props.defaultValue, prevProps.defaultValue) ||
                 (props.data !== prevProps.data &&
                   isNeedFormula(
@@ -471,8 +519,19 @@ export function wrapControl<
 
           setInitialValue(value: any) {
             const model = this.model!;
-            const {formStore: form, data, canAccessSuperData} = this.props;
-            const isExp = isExpression(value);
+            const {
+              formStore: form,
+              data,
+              canAccessSuperData,
+              name
+            } = this.props;
+            let isExp = isExpression(value);
+
+            if (isExp && value.replace(/\s/g, '') === `\${${name}}`) {
+              console.warn('value 不要使用表达式关联自己');
+              isExp = false;
+              value = undefined;
+            }
 
             let initialValue = model.extraName
               ? [
@@ -535,7 +594,9 @@ export function wrapControl<
                 formItem.removeSubFormItem(this.model);
 
               this.model.clearValueOnHidden &&
-                this.model.form?.deleteValueByName(this.model.name);
+                this.model.form?.deleteValueByName(this.model.name, {
+                  type: 'hide'
+                });
 
               isAlive(rootStore) && rootStore.removeStore(this.model);
             }
@@ -616,7 +677,7 @@ export function wrapControl<
 
           async validate() {
             if (!this.model) return;
-            const {formStore: form, data, formItemDispatchEvent} = this.props;
+            const {formStore: form, data, dispatchEvent} = this.props;
             let result;
 
             if (
@@ -635,10 +696,6 @@ export function wrapControl<
             }
 
             const valid = !result.some(item => item === false);
-            (formItemDispatchEvent ?? this.props.dispatchEvent)?.(
-              valid ? 'formItemValidateSucc' : 'formItemValidateError',
-              form?.data ?? this.props.data // form里的一定是最新的数据
-            );
             return valid;
           }
 
@@ -691,7 +748,10 @@ export function wrapControl<
               );
             }
 
-            this.model.changeTmpValue(value, 'input');
+            this.model.changeTmpValue(
+              value,
+              type === 'formula' ? 'formulaChanged' : 'input'
+            );
 
             if (changeImmediately || conrolChangeImmediately || !formInited) {
               this.emitChange(submitOnChange);
@@ -772,12 +832,44 @@ export function wrapControl<
               return;
             }
 
+            const changeReason: DataChangeReason = {
+              type: 'input'
+            };
+
+            if (model.changeMotivation === 'formulaChanged') {
+              changeReason.type = 'formula';
+            } else if (
+              model.changeMotivation === 'initialValue' ||
+              model.changeMotivation === 'formInited' ||
+              model.changeMotivation === 'defaultValue'
+            ) {
+              changeReason.type = 'init';
+            }
+
             if (model.extraName) {
               const values = model.splitExtraValue(value);
-              onChange?.(values[0], model.name);
-              onChange?.(values[1], model.extraName, submitOnChange === true);
+              onChange?.(
+                values[0],
+                model.name,
+                undefined,
+                undefined,
+                changeReason
+              );
+              onChange?.(
+                values[1],
+                model.extraName,
+                submitOnChange === true,
+                undefined,
+                changeReason
+              );
             } else {
-              onChange?.(value, model.name, submitOnChange === true);
+              onChange?.(
+                value,
+                model.name,
+                submitOnChange === true,
+                undefined,
+                changeReason
+              );
             }
             this.checkValidate();
           }

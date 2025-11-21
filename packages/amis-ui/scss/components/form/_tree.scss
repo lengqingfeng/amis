@@ -30,6 +30,14 @@
     max-height: none;
     overflow: visible;
   }
+
+  &-toolbar {
+    display: flex;
+    align-items: center;
+    margin-top: var(--gap-sm);
+    margin-bottom: var(--gap-md);
+    margin-left: px2rem(12px);
+  }
 }
 
 .#{$ns}Tree {
@@ -49,6 +57,7 @@
 
   &-item {
     line-height: var(--Tree-itemHeight);
+    padding-left: calc(var(--Tree-depth) * var(--Tree-indent));
     position: relative;
 
     > div {
@@ -99,12 +108,7 @@
     &:before {
       position: absolute;
       top: -8px;
-      left: calc(
-        (
-            var(--Tree-icon-gap) + var(--Tree-itemArrowWidth) +
-              var(--Tree-icon-margin-right)
-          ) / 2 - var(--Tree-indent)
-      );
+      left: calc(var(--Tree-depth) * var(--Tree-indent));
       bottom: 0px;
       border-left: 1px solid var(--borderColor);
       content: '';
@@ -113,6 +117,11 @@
 
   &-rootItem {
     line-height: var(--Tree-itemHeight);
+
+    .#{$ns}Tree-rootIcon {
+      color: var(--inputTree-base-default-color);
+      align-items: center;
+    }
   }
 
   &-item > div:hover > .#{$ns}Tree-item-icons,
@@ -126,7 +135,7 @@
     align-items: center;
     position: relative;
     user-select: none;
-    margin-bottom: px2rem(4px);
+    // margin-bottom: px2rem(4px);
     padding-left: var(--Tree-icon-gap);
     & > * {
       position: relative;
@@ -143,6 +152,8 @@
       align-items: center;
       overflow: hidden;
       height: px2rem(32px);
+      position: relative;
+      cursor: pointer;
     }
 
     &:hover {
@@ -159,6 +170,7 @@
 
     .#{$ns}Checkbox {
       margin-right: var(--inputTree-checkboxes-size-marginRight);
+      margin-top: 0;
     }
   }
 
@@ -194,7 +206,8 @@
   &-item-icons {
     visibility: hidden;
     transition: visibility var(--animation-duration) ease;
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
     vertical-align: top;
     height: var(--Tree-itemHeight);
     line-height: var(--Tree-itemHeight);
@@ -213,6 +226,12 @@
         top: 0;
       }
     }
+  }
+
+  &-itemActions {
+    display: flex;
+    align-items: center;
+    margin-left: var(--Tree-icon-gap);
   }
 
   &-itemInput {
@@ -330,8 +349,10 @@
   }
 
   &-itemArrowPlaceholder {
-    display: inline-block;
-    width: calc(var(--Tree-itemArrowWidth) + var(--Tree-icon-gap));
+    display: inline-flex;
+    width: var(--Tree-itemArrowWidth);
+    flex-shrink: 0;
+    margin-right: var(--inputTree-base-size-expandMarginRight);
   }
 
   &-itemDrager {
@@ -351,7 +372,8 @@
   &-rootIcon,
   &-folderIcon,
   &-leafIcon {
-    > svg {
+    > svg,
+    .icon {
       top: 0;
       width: px2rem(14px);
       height: px2rem(14px);

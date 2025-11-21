@@ -1,5 +1,5 @@
 import React from 'react';
-import {findDOMNode} from 'react-dom';
+import {findDomCompat as findDOMNode} from 'amis-core';
 import {reaction} from 'mobx';
 import {isAlive} from 'mobx-state-tree';
 import cloneDeep from 'lodash/cloneDeep';
@@ -32,7 +32,9 @@ import {
   changedEffect,
   evalExpressionWithConditionBuilderAsync,
   normalizeApi,
-  getPropValue
+  getPropValue,
+  CustomStyle,
+  setThemeClassName
 } from 'amis-core';
 import {Icon, Table, BadgeObject, SpinnerExtraProps} from 'amis-ui';
 import type {
@@ -43,7 +45,7 @@ import type {
   RowSelectionProps,
   ExpandableProps,
   AutoFillHeightObject
-} from 'amis-ui/lib/components/table';
+} from 'amis-ui/lib/components/table/index';
 import {
   BaseSchema,
   SchemaObject,
@@ -57,7 +59,7 @@ import './TableCell';
 import './ColumnToggler';
 import {SchemaQuickEdit} from '../QuickEdit';
 
-import type {TestIdBuilder} from 'amis-core';
+import type {AMISButtonSchema, AMISSchemaBase, TestIdBuilder} from 'amis-core';
 
 /**
  * Table 表格2渲染器。
@@ -146,6 +148,16 @@ export interface ColumnSchema {
   align?: string;
 
   /**
+   * 标题内容居左、居中、居右
+   */
+  headerAlign?: 'left' | 'center' | 'right';
+
+  /**
+   * 列垂直对齐方式
+   */
+  vAlign?: 'top' | 'middle' | 'bottom';
+
+  /**
    * 是否固定在左侧/右侧
    */
   fixed?: boolean | string;
@@ -178,7 +190,7 @@ export interface ColumnSchema {
   width?: string | number;
 
   /**
-   * 表格列单元格是否可以获取父级数据域值，默认为true，该配置对当前列内单元格生效
+   * 表格列单元格是否可获取父级数据域值，默认为true，该配置对当前列内单元格生效
    */
   canAccessSuperData?: boolean;
 }
@@ -269,12 +281,7 @@ export interface ExpandableSchema {
   expandedRowKeysExpr: string;
 }
 
-export interface TableSchema2 extends BaseSchema {
-  /**
-   * 指定为表格类型
-   */
-  type: 'table2';
-
+export interface BaseTableSchema2 extends AMISSchemaBase {
   /**
    * 表格标题
    */
@@ -388,7 +395,7 @@ export interface TableSchema2 extends BaseSchema {
   /**
    * 操作列配置
    */
-  actions?: Array<ActionSchema>;
+  actions?: Array<AMISButtonSchema>;
 
   /**
    * 批量操作最大限制数
@@ -423,7 +430,7 @@ export interface TableSchema2 extends BaseSchema {
   autoFillHeight?: boolean | AutoFillHeightObject;
 
   /**
-   * 表格是否可以获取父级数据域值，默认为false
+   * 表格是否可获取父级数据域值，默认为false
    */
   canAccessSuperData?: boolean;
 
@@ -432,6 +439,13 @@ export interface TableSchema2 extends BaseSchema {
    * @default 100
    */
   lazyRenderAfter?: number;
+}
+
+export interface AMISTableSchema2 extends BaseTableSchema2 {
+  /**
+   * 指定为表格类型
+   */
+  type: 'table2';
 }
 
 // 事件调整 对应CRUD2里的事件配置也需要同步修改
@@ -542,14 +556,16 @@ export default class Table2 extends React.Component<Table2Props, object> {
       rowSelection,
       keyField,
       primaryField,
-      canAccessSuperData
+      canAccessSuperData,
+      persistKey
     } = props;
 
     store.update({
       columnsTogglable,
       columns,
       canAccessSuperData,
-      rowSelectionKeyField: primaryField || rowSelection?.keyField || keyField
+      rowSelectionKeyField: primaryField || rowSelection?.keyField || keyField,
+      persistKey
     });
     Table2.syncRows(store, props, undefined) && this.syncSelected();
 
@@ -611,13 +627,14 @@ export default class Table2 extends React.Component<Table2Props, object> {
     let rows: Array<object> = [];
     let updateRows = false;
 
-    if (
-      Array.isArray(value) &&
-      (!prevProps ||
-        getPropValue(prevProps, (props: Table2Props) => props.items) !== value)
-    ) {
-      updateRows = true;
-      rows = value;
+    if (Array.isArray(value)) {
+      if (
+        !prevProps ||
+        getPropValue(prevProps, (props: Table2Props) => props.items) !== value
+      ) {
+        updateRows = true;
+        rows = value;
+      }
     } else if (typeof source === 'string') {
       const resolved = resolveVariableAndFilter(source, props.data, '| raw');
       const prev = prevProps
@@ -698,7 +715,7 @@ export default class Table2 extends React.Component<Table2Props, object> {
     const store = props.store;
 
     changedEffect(
-      ['orderBy', 'columnsTogglable', 'canAccessSuperData'],
+      ['orderBy', 'columnsTogglable', 'canAccessSuperData', 'persistKey'],
       prevProps,
       props,
       changes => {
@@ -806,7 +823,7 @@ export default class Table2 extends React.Component<Table2Props, object> {
   }
 
   renderCellSchema(schema: any, props: any) {
-    const {render} = this.props;
+    const {render, store} = this.props;
 
     // Table Cell SchemaObject转化成ReactNode
     if (schema && isObject(schema)) {
@@ -818,12 +835,14 @@ export default class Table2 extends React.Component<Table2Props, object> {
 
       // title 不应该传递到 cell-field 的 column 中，否则部分组件会将其渲染出来
       // 但是 cell-field 需要这个字段，展示列的名称
-      const {width, children, title, ...rest} = schema;
+      const {width, children, wrapperComponent, title, ...rest} = schema;
 
       return render(
         'cell-field',
         {
           ...rest,
+          // 空字符串/null 被认为是正常的值，导致 defaultProps 不生效
+          wrapperComponent: wrapperComponent || undefined,
           title: title || rest.label,
           type: 'cell-field',
           column: rest,
@@ -892,17 +911,20 @@ export default class Table2 extends React.Component<Table2Props, object> {
         const clone = {...column} as any;
 
         let titleSchema: any = null;
+        const title = clone.title || clone.label;
         const titleProps = {
-          popOverContainer: popOverContainer || this.getPopOverContainer,
-          value: column.title || column.label
+          ...data,
+          popOverContainer: popOverContainer || this.getPopOverContainer
         };
         if (isObject(column.title)) {
           titleSchema = cloneDeep(column.title);
-        } else if (
-          typeof column.title === 'string' ||
-          typeof column.label === 'string'
-        ) {
-          titleSchema = {type: 'plain'};
+        } else if (typeof title === 'string') {
+          titleSchema = {type: 'plain', tpl: title};
+        }
+
+        if (column.headerAlign || column.align) {
+          titleSchema.align = column.headerAlign || column.align;
+          titleSchema.className = 'flex-1';
         }
 
         const titleRender = (children: any) => {
@@ -924,6 +946,15 @@ export default class Table2 extends React.Component<Table2Props, object> {
                 [`${column.className}`]: !!column.className,
                 [`${column.titleClassName}`]: !!column.titleClassName
               })}
+              style={{
+                justifyContent:
+                  (
+                    {
+                      right: 'flex-end',
+                      center: 'center'
+                    } as any
+                  )[column.align] || 'flex-start'
+              }}
             >
               {content}
               {remark}
@@ -960,12 +991,16 @@ export default class Table2 extends React.Component<Table2Props, object> {
               const obj = {
                 children: this.renderCellSchema(column, {
                   data: item.locals,
-                  value: column.name
-                    ? resolveVariable(
-                        column.name,
-                        finalCanAccessSuperData ? item.locals : item.data
-                      )
-                    : column.name,
+                  // 不要下发 value，组件基本上都会自己取
+                  // 如果下发了表单项会认为是 controlled value
+                  // 就不会去跑 extraName 之类的逻辑了
+                  // value: column.name
+                  //   ? resolveVariable(
+                  //       column.name,
+                  //       finalCanAccessSuperData ? item.locals : item.data
+                  //     )
+                  //   : column.name,
+                  btnDisabled: store.dragging,
                   popOverContainer:
                     popOverContainer || this.getPopOverContainer,
                   quickEditFormRef: this.subFormRef,
@@ -987,7 +1022,7 @@ export default class Table2 extends React.Component<Table2Props, object> {
                     );
                   },
                   row: item,
-                  showBadge,
+                  showBadge: showBadge && col === 0,
                   itemBadge,
                   testIdBuilder: itemIDBuilder
                 }),
@@ -1152,11 +1187,14 @@ export default class Table2 extends React.Component<Table2Props, object> {
 
   @autobind
   rowClassName(record: any, rowIndex: number) {
-    const {rowClassNameExpr, store} = this.props;
+    const {rowClassNameExpr, store, themeCss, id, rowClassName} = this.props;
 
     const classnames = [];
+    if (rowClassName) {
+      classnames.push(rowClassName);
+    }
     if (rowClassNameExpr) {
-      classnames.push(filter(rowClassNameExpr, {record, rowIndex}));
+      classnames.push(filter(rowClassNameExpr, {...record, rowIndex}));
     }
     // row可能不存在
     // 比如初始化给了10条数据，异步接口又替换成4条
@@ -1167,6 +1205,14 @@ export default class Table2 extends React.Component<Table2Props, object> {
     if (row?.moved) {
       classnames.push('is-moved');
     }
+    classnames.push(
+      setThemeClassName({
+        ...this.props,
+        name: 'tableRowClassname',
+        id,
+        themeCss
+      })
+    );
     return classnames.join(' ');
   }
 
@@ -1273,7 +1319,7 @@ export default class Table2 extends React.Component<Table2Props, object> {
       {
         data: {
           ...this.props.data,
-          record,
+          ...record,
           rowIndex
         }
       }
@@ -1393,7 +1439,8 @@ export default class Table2 extends React.Component<Table2Props, object> {
       keyField,
       env,
       messages,
-      reload
+      reload,
+      dispatchEvent
     } = this.props;
 
     if (Array.isArray(rows)) {
@@ -1423,6 +1470,7 @@ export default class Table2 extends React.Component<Table2Props, object> {
           errorMessage: messages && messages.saveSuccess
         })
         .then(() => {
+          dispatchEvent('quickSaveSubmitted', data);
           reload && this.reloadTarget(filterTarget(reload, data), data);
         })
         .catch(() => {});
@@ -1442,6 +1490,7 @@ export default class Table2 extends React.Component<Table2Props, object> {
       store
         .saveRemote(quickSaveItemApi, sendData)
         .then(() => {
+          dispatchEvent('quickSaveSubmitted', sendData);
           reload && this.reloadTarget(filterTarget(reload, data), data);
         })
         .catch(() => {
@@ -1532,7 +1581,7 @@ export default class Table2 extends React.Component<Table2Props, object> {
     const {onAction} = this.props;
 
     // todo
-    onAction && onAction(e, action, ctx);
+    return onAction?.(e, action, ctx);
   }
 
   renderActions(region: string) {
@@ -1546,7 +1595,11 @@ export default class Table2 extends React.Component<Table2Props, object> {
       dispatchEvent
     } = this.props;
     actions = Array.isArray(actions) ? actions.concat() : [];
-    const config = isObject(columnsTogglable) ? columnsTogglable : {};
+    const config = isObject(columnsTogglable)
+      ? columnsTogglable
+      : {
+          align: 'left'
+        };
 
     // 现在默认从crud里传进来的columnsTogglable是boolean类型
     // table单独配置的是SchemaNode类型
@@ -1576,9 +1629,11 @@ export default class Table2 extends React.Component<Table2Props, object> {
                 })
               );
             },
-            toggleToggle: (index: number) => {
-              const column = store.columnsData[index];
-              column.toggleToggle();
+            toggleToggle: (id: string) => {
+              const column = store.columnsData.find(
+                (col: any) => col?.id === id
+              );
+              column?.toggleToggle();
 
               dispatchEvent(
                 'columnToggled',
@@ -1621,19 +1676,16 @@ export default class Table2 extends React.Component<Table2Props, object> {
   ): Promise<any> {
     const {dispatchEvent, data, store} = this.props;
 
-    const rendererEvent = await dispatchEvent(
+    store.updateSelected(selectedRowKeys);
+    this.syncSelected();
+
+    await dispatchEvent(
       'selectedChange',
       createObject(data, {
         selectedItems: selectedRows,
         unSelectedItems: unSelectedRows
       })
     );
-
-    if (rendererEvent?.prevented) {
-      return rendererEvent?.prevented;
-    }
-    store.updateSelected(selectedRowKeys);
-    this.syncSelected();
   }
 
   @autobind
@@ -1933,6 +1985,8 @@ export default class Table2 extends React.Component<Table2Props, object> {
       maxKeepItemSelectionLength,
       onRow,
       store,
+      id,
+      themeCss,
       ...rest
     } = this.props;
 
@@ -1974,6 +2028,18 @@ export default class Table2 extends React.Component<Table2Props, object> {
     return (
       <Table
         {...rest}
+        headerClassName={setThemeClassName({
+          ...this.props,
+          name: 'tableHeadClassname',
+          id,
+          themeCss
+        })}
+        bodyClassname={setThemeClassName({
+          ...this.props,
+          name: 'tableBodyClassname',
+          id,
+          themeCss
+        })}
         onRef={this.getRef}
         title={this.renderSchema('title', title, schemaProps)}
         footer={this.renderSchema('footer', footer, schemaProps)}
@@ -2101,7 +2167,15 @@ export default class Table2 extends React.Component<Table2Props, object> {
   }
 
   render() {
-    const {classnames: cx, style, store} = this.props;
+    const {
+      classnames: cx,
+      style,
+      store,
+      themeCss,
+      wrapperCustomStyle,
+      id,
+      env
+    } = this.props;
 
     this.renderedToolbars = []; // 用来记录哪些 toolbar 已经渲染了
 
@@ -2109,14 +2183,82 @@ export default class Table2 extends React.Component<Table2Props, object> {
 
     return (
       <div
-        className={cx('Table-render-wrapper', {
-          'Table--unsaved': !!store.modified || !!store.moved
-        })}
+        className={cx(
+          'Table-render-wrapper',
+          setThemeClassName({
+            ...this.props,
+            name: 'wrapperCustomStyle',
+            id,
+            themeCss: wrapperCustomStyle
+          }),
+          {
+            'Table--unsaved': !!store.modified || !!store.moved
+          }
+        )}
         style={style}
       >
         {this.renderActions('header')}
         {heading}
         {this.renderTable()}
+        <CustomStyle
+          {...this.props}
+          config={{
+            themeCss,
+            classNames: [
+              {
+                key: 'tableHeadClassname',
+                weights: {
+                  default: {
+                    inner: `.${cx('Table-table')} > thead > tr > th`,
+                    important: true
+                  }
+                }
+              },
+              {
+                key: 'tableHeadClassname',
+                weights: {
+                  default: {
+                    inner: `> tr > th`,
+                    important: true
+                  }
+                }
+              },
+              {
+                key: 'tableBodyClassname',
+                weights: {
+                  default: {
+                    inner: `> tbody.${cx('Table-tbody')} > tr  td`
+                  },
+                  hover: {
+                    suf: '> tbody > tr',
+                    inner: `td`,
+                    important: true
+                  }
+                }
+              },
+              {
+                key: 'tableRowClassname',
+                weights: {
+                  default: {
+                    parent: `.${cx('Table-table')} > tbody.${cx(
+                      'Table-tbody'
+                    )}`,
+                    inner: `td.${cx('Table-cell')}`
+                  },
+                  hover: {
+                    parent: `.${cx('Table-table')} > tbody.${cx(
+                      'Table-tbody'
+                    )}`,
+                    inner: `td.${cx('Table-cell')}`
+                  }
+                }
+              }
+            ],
+            wrapperCustomStyle,
+            id
+          }}
+          env={env}
+        />
       </div>
     );
   }

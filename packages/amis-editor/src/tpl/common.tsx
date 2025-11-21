@@ -4,13 +4,14 @@ import {
   defaultValue,
   isObject,
   tipedLabel,
+  getI18nEnabled,
   EditorManager
 } from 'amis-editor-core';
-import type {SchemaObject} from 'amis';
+import {render, type SchemaObject} from 'amis';
 import flatten from 'lodash/flatten';
 import {InputComponentName} from '../component/InputComponentName';
 import {FormulaDateType} from '../renderer/FormulaControl';
-import type {VariableItem} from 'amis-ui/src/components/formula/CodeEditor';
+import type {VariableItem} from 'amis-ui/lib/components/formula/CodeEditor';
 import reduce from 'lodash/reduce';
 import map from 'lodash/map';
 import omit from 'lodash/omit';
@@ -18,6 +19,7 @@ import keys from 'lodash/keys';
 import type {Schema} from 'amis';
 
 import type {DSField} from '../builder';
+import OptionAutoFill from '../component/OptionAutoFill';
 
 /**
  * @deprecated 兼容当前组件的switch
@@ -118,12 +120,14 @@ setSchemaTpl(
         label: '垂直',
         value: 'normal'
       },
-      config?.isForm
-        ? null
-        : {
-            label: '继承',
-            value: ''
-          }
+      !config?.isForm && {
+        label: '继承',
+        value: ''
+      },
+      config?.isForm && {
+        label: '网格',
+        value: 'flex'
+      }
     ].filter(i => i),
     pipeOut: (v: string) => (v ? v : undefined)
   })
@@ -258,6 +262,28 @@ setSchemaTpl('labelHide', () =>
     pipeOut: (value: any) => (value === true ? false : ''),
     visibleOn:
       'this.__props__ && this.__props__.formMode === "horizontal" || this.mode === "horizontal"'
+  })
+);
+
+setSchemaTpl('theme:labelHide', () =>
+  getSchemaTpl('switch', {
+    name: '__label',
+    label: '隐藏标题',
+    value: '${label === false}',
+    onChange: (value: any, origin: any, item: any, form: any) => {
+      if (value) {
+        form.setValueByName(
+          '$$tempLabel',
+          form.getValueByName('label') || item.label
+        );
+        form.setValueByName('label', false);
+      } else {
+        form.setValueByName(
+          'label',
+          form.getValueByName('$$tempLabel') || item['$$tempLabel'] || ''
+        );
+      }
+    }
   })
 );
 
@@ -829,19 +855,17 @@ setSchemaTpl(
 );
 
 setSchemaTpl('autoFill', {
-  type: 'input-kv',
+  component: OptionAutoFill,
+  asFormItem: true,
+  mode: 'normal',
   name: 'autoFill',
   label: tipedLabel(
-    '自动填充',
+    '选项填充',
     '将当前已选中的选项的某个字段的值，自动填充到表单中某个表单项中，支持数据映射'
   )
 });
 
-setSchemaTpl('autoFillApi', {
-  type: 'input-kv',
-  name: 'autoFill',
-  label: tipedLabel('数据录入', '自动填充或参照录入')
-});
+setSchemaTpl('autoFillApi', (config: any) => getSchemaTpl('autoFill', config));
 
 setSchemaTpl('required', {
   type: 'switch',
@@ -1765,6 +1789,7 @@ setSchemaTpl('deferField', {
 setSchemaTpl(
   'signBtn',
   (options: {label: string; name: string; icon: string}) => {
+    const i18nEnabled = getI18nEnabled();
     return {
       type: 'flex',
       justify: 'space-between',
@@ -1790,7 +1815,7 @@ setSchemaTpl(
                 {
                   name: options.name,
                   label: '按钮文案',
-                  type: 'input-text'
+                  type: i18nEnabled ? 'input-text-i18n' : 'input-text'
                 },
                 getSchemaTpl('icon', {
                   name: options.icon,
@@ -1812,3 +1837,54 @@ setSchemaTpl(
     };
   }
 );
+
+setSchemaTpl('closable', {
+  type: 'ae-StatusControl',
+  label: tipedLabel('可关闭选项卡', '选项卡内优先级更高'),
+  mode: 'normal',
+  name: 'closable',
+  expressionName: 'closableOn'
+});
+
+setSchemaTpl('inputForbid', {
+  type: 'switch',
+  label: '禁止输入',
+  name: 'inputForbid',
+  inputClassName: 'is-inline'
+});
+
+setSchemaTpl('button-manager', () => {
+  return getSchemaTpl('combo-container', {
+    type: 'combo',
+    label: '按钮管理',
+    name: 'actions',
+    mode: 'normal',
+    multiple: true,
+    addable: true,
+    draggable: true,
+    editable: false,
+    items: [
+      {
+        component: (props: any) => {
+          return render({
+            ...props.data,
+            onEvent: {},
+            actionType: '',
+            onClick: (e: any, props: any) => {
+              const editorStore = (window as any).editorStore;
+              const subEditorStore = editorStore.getSubEditorRef()?.store;
+              (subEditorStore || editorStore).setActiveIdByComponentId(
+                props.id
+              );
+            }
+          });
+        }
+      }
+    ],
+    addButtonText: '新增按钮',
+    scaffold: {
+      type: 'button',
+      label: '按钮'
+    }
+  });
+});

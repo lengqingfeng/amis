@@ -26,19 +26,26 @@ import {
   isIntegerInRange,
   setThemeClassName
 } from 'amis-core';
-import {Html, Icon, TooltipWrapper} from 'amis-ui';
+import {Html, Icon, OverflowTpl, TooltipWrapper} from 'amis-ui';
 import {FormOptionsSchema, SchemaTpl} from '../../Schema';
 import intersectionWith from 'lodash/intersectionWith';
-import type {TooltipWrapperSchema} from '../TooltipWrapper';
-import type {Option} from 'amis-core';
+import type {AMISTooltipWrapperSchema} from '../TooltipWrapper';
+import type {AMISFormItemWithOptions, Option} from 'amis-core';
 import {supportStatic} from './StaticHoc';
 import {reaction} from 'mobx';
+import {AutoFoldedList} from 'amis-ui';
 
 /**
  * Picker
  * 文档：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/picker
  */
-export interface PickerControlSchema extends FormOptionsSchema {
+/**
+ * Picker 选择器组件，用于表单中弹窗选择数据，可通过弹窗（Dialog/Drawer）或内嵌模式展示配置的选择内容，支持自定义标签显示与选项描述。
+ */
+export interface AMISPickerSchema extends AMISFormItemWithOptions {
+  /**
+   * 指定为 picker 组件
+   */
   type: 'picker';
 
   /**
@@ -47,33 +54,37 @@ export interface PickerControlSchema extends FormOptionsSchema {
   labelTpl?: SchemaTpl;
 
   /**
-   * 建议用 labelTpl
    * 选中一个字段名用来作为值的描述文字
    */
   labelField?: string;
 
   /**
-   * 选一个可以用来作为值的字段。
+   * 选一个可以用来作为值的字段
    */
   valueField?: string;
 
   /**
-   * 弹窗选择框详情。
+   * 弹窗选择框详情
    */
   pickerSchema?: any; // Omit<CRUDSchema, 'type'>;
 
   /**
-   * 弹窗模式，dialog 或者 drawer
+   * 弹窗模式
    */
   modalMode?: 'dialog' | 'drawer';
 
   /**
-   * 弹窗的标题，默认为情选择
+   * 弹窗的尺寸
+   */
+  modalSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
+
+  /**
+   * 弹窗的标题
    */
   modalTitle?: string;
 
   /**
-   * 内嵌模式，也就是说不弹框了。
+   * 内嵌模式
    */
   embed?: boolean;
 
@@ -82,29 +93,35 @@ export interface PickerControlSchema extends FormOptionsSchema {
    */
   overflowConfig: {
     /**
-     * 标签的最大展示数量，超出数量后以收纳浮层的方式展示，仅在多选模式开启后生效
+     * 标签的最大展示数量
      */
     maxTagCount?: number;
 
     /**
-     * 开启最大标签展示数量后，收纳标签生效的位置，未开启内嵌模式默认为选择器, 开启后默认为选择器 + 模态框，可选值为'select'(选择器)、'crud'(增删改查)
+     * 收纳标签生效的位置
      */
     displayPosition?: ('select' | 'crud')[];
 
     /**
      * 开启最大标签展示数量后，选择器内收纳标签的Popover配置
      */
-    overflowTagPopover?: TooltipWrapperSchema;
+    overflowTagPopover?: AMISTooltipWrapperSchema;
 
     /**
      * 开启最大标签展示数量后，CRUD顶部内收纳标签的Popover配置
      */
-    overflowTagPopoverInCRUD?: TooltipWrapperSchema;
+    overflowTagPopoverInCRUD?: AMISTooltipWrapperSchema;
   };
+
+  /**
+   * 选中项可删除，默认为true
+   */
+  itemClearable?: boolean;
 }
 
 export interface PickerProps extends OptionsControlProps {
   modalMode: 'dialog' | 'drawer';
+  modalSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
   pickerSchema: PlainObject;
   labelField: string;
 }
@@ -122,6 +139,7 @@ export default class PickerControl extends React.PureComponent<
   static propsList: Array<string> = [
     'modalTitle',
     'modalMode',
+    'modalSize',
     'pickerSchema',
     'labelField',
     'onChange',
@@ -152,13 +170,13 @@ export default class PickerControl extends React.PureComponent<
         placement: 'top',
         trigger: 'hover',
         showArrow: false,
-        offset: [0, -10]
+        offset: [0, -5]
       },
       overflowTagPopoverInCRUD: {
         placement: 'bottom',
         trigger: 'hover',
         showArrow: false,
-        offset: [0, 10]
+        offset: [0, 0]
       }
     }
   };
@@ -292,12 +310,12 @@ export default class PickerControl extends React.PureComponent<
     this.crud = ref;
   }
 
-  reload() {
+  reload(subpath?: string, query?: any) {
     if (this.crud) {
-      this.crud.search();
+      this.crud.reload(subpath, query);
     } else {
       const reload = this.props.reloadOptions;
-      reload && reload();
+      reload && reload(subpath, query);
     }
   }
 
@@ -451,7 +469,9 @@ export default class PickerControl extends React.PureComponent<
   }
 
   @autobind
-  handleFocus() {
+  handleFocus(e: React.MouseEvent<HTMLElement>) {
+    this.input.current && this.input.current.focus();
+    e.stopPropagation();
     this.setState({
       isFocused: true
     });
@@ -466,12 +486,12 @@ export default class PickerControl extends React.PureComponent<
 
   @autobind
   handleClick() {
-    this.input.current && this.input.current.focus();
     this.open();
   }
 
   @autobind
-  clearValue() {
+  clearValue(e: React.MouseEvent<HTMLElement>) {
+    e.stopPropagation();
     const {onChange, resetValue} = this.props;
 
     onChange(resetValue !== void 0 ? resetValue : '');
@@ -523,6 +543,7 @@ export default class PickerControl extends React.PureComponent<
 
   renderTag(item: Option, index: number) {
     const {
+      itemClearable = true,
       classPrefix: ns,
       classnames: cx,
       labelField,
@@ -551,47 +572,54 @@ export default class PickerControl extends React.PureComponent<
           }
         )}
       >
-        <span
-          className={cx(
-            `${ns}Picker-valueIcon`,
-            setThemeClassName({
-              ...this.props,
-              name: 'pickValueIconClassName',
-              id,
-              themeCss: themeCss || css
-            })
-          )}
-          onClick={e => {
-            e.stopPropagation();
-            this.removeItem(index);
-          }}
+        {itemClearable && (
+          <span
+            className={cx(
+              `${ns}Picker-valueIcon`,
+              setThemeClassName({
+                ...this.props,
+                name: 'pickValueIconClassName',
+                id,
+                themeCss: themeCss || css
+              })
+            )}
+            onClick={e => {
+              e.stopPropagation();
+              this.removeItem(index);
+            }}
+          >
+            ×
+          </span>
+        )}
+        <OverflowTpl
+          inline={false}
+          tooltip={getVariable(item, labelField || 'label')}
         >
-          ×
-        </span>
-        <span
-          className={cx(
-            `${ns}Picker-valueLabel`,
-            setThemeClassName({
-              ...this.props,
-              name: 'pickFontClassName',
-              id,
-              themeCss: themeCss || css
-            })
-          )}
-          onClick={e => {
-            e.stopPropagation();
-            this.handleItemClick(item);
-          }}
-        >
-          {labelTpl ? (
-            <Html html={filter(labelTpl, item)} filterHtml={env.filterHtml} />
-          ) : (
-            `${
-              getVariable(item, labelField || 'label') ||
-              getVariable(item, 'id')
-            }`
-          )}
-        </span>
+          <span
+            className={cx(
+              `${ns}Picker-valueLabel`,
+              setThemeClassName({
+                ...this.props,
+                name: 'pickFontClassName',
+                id,
+                themeCss: themeCss || css
+              })
+            )}
+            onClick={e => {
+              e.stopPropagation();
+              this.handleItemClick(item);
+            }}
+          >
+            {labelTpl ? (
+              <Html html={filter(labelTpl, item)} />
+            ) : (
+              `${
+                getVariable(item, labelField || 'label') ||
+                getVariable(item, 'id')
+              }`
+            )}
+          </span>
+        </OverflowTpl>
       </div>
     );
   }
@@ -609,84 +637,39 @@ export default class PickerControl extends React.PureComponent<
       css
     } = this.props;
     const {maxTagCount, overflowTagPopover} = this.getOverflowConfig();
-    const totalCount = selectedOptions.length;
     let tags = selectedOptions;
     const enableOverflow =
-      multiple !== false &&
-      isIntegerInRange(maxTagCount, {
-        start: 0,
-        end: totalCount,
-        left: 'inclusive',
-        right: 'exclusive'
-      });
+      multiple !== false && typeof maxTagCount === 'number' && maxTagCount > 0;
 
-    /** 多选且开启限制标签数量 */
-    if (enableOverflow) {
-      tags = [
-        ...selectedOptions.slice(0, maxTagCount),
-        {label: `+ ${totalCount - maxTagCount} ...`, value: '__overflow_tag__'}
-      ];
-    }
+    const tooltipProps: any = {
+      tooltipClassName: cx(
+        'Picker-overflow',
+        overflowTagPopover?.tooltipClassName
+      ),
+      title: __('已选项'),
+      ...omit(overflowTagPopover, ['children', 'content', 'tooltipClassName'])
+    };
 
     return (
-      <div className={`${ns}Picker-values`}>
-        {tags.map((item, index) => {
-          if (enableOverflow && index === maxTagCount) {
-            return (
-              <TooltipWrapper
-                key={index}
-                container={popOverContainer}
-                tooltip={{
-                  tooltipClassName: cx(
-                    'Picker-overflow',
-                    overflowTagPopover?.tooltipClassName
-                  ),
-                  title: __('已选项'),
-                  ...omit(overflowTagPopover, [
-                    'children',
-                    'content',
-                    'tooltipClassName'
-                  ]),
-                  children: () => {
-                    return (
-                      <div className={cx(`${ns}Picker-overflow-wrapper`)}>
-                        {selectedOptions
-                          .slice(maxTagCount, totalCount)
-                          .map((overflowItem, rawIndex) => {
-                            const key = rawIndex + maxTagCount;
-
-                            return this.renderTag(overflowItem, key);
-                          })}
-                      </div>
-                    );
-                  }
-                }}
-              >
-                <div
-                  key={index}
-                  className={cx(`${ns}Picker-value`, {
-                    'is-disabled': disabled
-                  })}
-                >
-                  <span
-                    className={`${ns}Picker-valueLabel ${setThemeClassName({
-                      ...this.props,
-                      name: 'pickFontClassName',
-                      id,
-                      themeCss: themeCss || css
-                    })}`}
-                  >
-                    {item.label}
-                  </span>
-                </div>
-              </TooltipWrapper>
-            );
-          }
-
+      <AutoFoldedList
+        enabled={!!enableOverflow}
+        tooltipClassName={cx('Picker-overflow-wrapper')}
+        items={tags}
+        popOverContainer={popOverContainer}
+        tooltipOptions={tooltipProps}
+        maxVisibleCount={maxTagCount}
+        renderItem={(item, index, folded) => {
           return this.renderTag(item, index);
-        })}
-      </div>
+        }}
+      ></AutoFoldedList>
     );
+  }
+
+  @autobind
+  overrideCRUDProps() {
+    // 自定义参数，用于外部透传给 crud 组件外围需要的属性值。
+    // 需要保留这个函数和函数名存在即可，返回值是一个对象
+    return {};
   }
 
   @autobind
@@ -719,7 +702,8 @@ export default class PickerControl extends React.PureComponent<
       ...(embed ||
       (Array.isArray(displayPosition) && displayPosition.includes('crud'))
         ? {maxTagCount, overflowTagPopover: overflowTagPopoverInCRUD}
-        : {})
+        : {}),
+      ...this.overrideCRUDProps()
     }) as JSX.Element;
   }
   @supportStatic()
@@ -733,7 +717,7 @@ export default class PickerControl extends React.PureComponent<
       render,
       modalMode,
       source,
-      size,
+      modalSize,
       clearable,
       multiple,
       placeholder,
@@ -770,15 +754,11 @@ export default class PickerControl extends React.PureComponent<
               onClick={this.handleClick}
               className={cx(
                 'Picker-input',
+                disabled && 'is-disabled',
+                this.state.isFocused && 'is-focused',
                 setThemeClassName({
                   ...this.props,
                   name: 'pickControlClassName',
-                  id,
-                  themeCss: themeCss || css
-                }),
-                setThemeClassName({
-                  ...this.props,
-                  name: 'pickControlDisabledClassName',
                   id,
                   themeCss: themeCss || css
                 })
@@ -788,24 +768,24 @@ export default class PickerControl extends React.PureComponent<
                 <div className={cx('Picker-placeholder')}>
                   {__(placeholder)}
                 </div>
-              ) : null}
+              ) : (
+                <div
+                  className={cx('Picker-valueWrap')}
+                  {...testIdBuilder?.getTestId()}
+                >
+                  {this.renderValues()}
 
-              <div
-                className={cx('Picker-valueWrap')}
-                {...testIdBuilder?.getTestId()}
-              >
-                {this.renderValues()}
-
-                <input
-                  onChange={noop}
-                  value={''}
-                  ref={this.input}
-                  onKeyDown={this.handleKeyDown}
-                  onFocus={this.handleFocus}
-                  onBlur={this.handleBlur}
-                  readOnly={mobileUI}
-                />
-              </div>
+                  <input
+                    onChange={noop}
+                    value={''}
+                    ref={this.input}
+                    onKeyDown={this.handleKeyDown}
+                    onClick={this.handleFocus}
+                    onBlur={this.handleBlur}
+                    readOnly={mobileUI}
+                  />
+                </div>
+              )}
 
               {clearable && !disabled && selectedOptions.length ? (
                 <a onClick={this.clearValue} className={cx('Picker-clear')}>
@@ -841,7 +821,7 @@ export default class PickerControl extends React.PureComponent<
                   modalTitle && typeof modalTitle === 'string'
                     ? filter(modalTitle, data)
                     : __('Select.placeholder'),
-                size: size,
+                size: modalSize,
                 type: modalMode,
                 className: modalClassName,
                 body: {
@@ -873,24 +853,13 @@ export default class PickerControl extends React.PureComponent<
                   hover: {
                     important: true
                   },
-                  active: {
-                    important: true
+                  focused: {
+                    important: true,
+                    parent: `.${ns}Picker.is-focused >`
                   },
                   disabled: {
-                    important: true
-                  }
-                }
-              },
-              {
-                key: 'pickControlDisabledClassName',
-                weights: {
-                  default: {
-                    pre: `${ns}Picker.is-disabled> .${setThemeClassName({
-                      ...this.props,
-                      name: 'pickControlDisabledClassName',
-                      id,
-                      themeCss: themeCss || css
-                    })}, `
+                    important: true,
+                    parent: `.${ns}Picker.is-disabled >`
                   }
                 }
               },

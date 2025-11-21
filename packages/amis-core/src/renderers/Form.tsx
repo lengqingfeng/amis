@@ -1,5 +1,4 @@
 import React from 'react';
-import extend from 'lodash/extend';
 import {Renderer, RendererProps} from '../factory';
 import {FormStore, IFormStore} from '../store/form';
 import {
@@ -11,7 +10,8 @@ import {
   ClassName,
   BaseApiObject,
   SchemaExpression,
-  SchemaClassName
+  SchemaClassName,
+  DataChangeReason
 } from '../types';
 import {filter, evalExpression} from '../utils/tpl';
 import getExprProperties from '../utils/filter-schema';
@@ -44,15 +44,35 @@ import {
 
 import {IComboStore} from '../store/combo';
 import {dataMapping} from '../utils/tpl-builtin';
-import {isApiOutdated, isEffectiveApi} from '../utils/api';
+import {
+  isApiOutdated,
+  isEffectiveApi,
+  shouldBlockedBySendOnApi
+} from '../utils/api';
 import LazyComponent from '../components/LazyComponent';
 import {isAlive} from 'mobx-state-tree';
 
 import type {LabelAlign} from './Item';
-import {injectObjectChain} from '../utils';
+import {
+  CustomStyleClassName,
+  injectObjectChain,
+  setThemeClassName
+} from '../utils';
 import {reaction} from 'mobx';
 import groupBy from 'lodash/groupBy';
 import isEqual from 'lodash/isEqual';
+import CustomStyle from '../components/CustomStyle';
+import debounce from 'lodash/debounce';
+import {
+  AMISApi,
+  AMISButtonWithAction,
+  AMISClassName,
+  AMISDefaultData,
+  AMISExpression,
+  AMISSchemaCollection,
+  AMISSchemaBase,
+  AMISButtonSchema
+} from '../schema';
 
 export interface FormHorizontal {
   left?: number;
@@ -62,9 +82,10 @@ export interface FormHorizontal {
   labelAlign?: 'left' | 'right'; // label对齐方式
   /** label自定义宽度，默认单位为px */
   labelWidth?: number | string;
+  labelOverflow?: 'default' | 'ellipsis';
 }
 
-export interface FormSchemaBase {
+export interface AMISFormBase extends AMISSchemaBase {
   /**
    * 表单标题
    */
@@ -73,12 +94,14 @@ export interface FormSchemaBase {
   /**
    * 按钮集合，会固定在底部显示。
    */
-  actions?: Array<any>;
+  actions?: Array<AMISButtonSchema>;
 
   /**
    * 表单项集合
    */
-  body?: any;
+  body?: AMISSchemaCollection;
+
+  className?: AMISClassName;
 
   /**
    * @deprecated 请用类型 tabs
@@ -90,7 +113,7 @@ export interface FormSchemaBase {
    */
   fieldSet?: any;
 
-  data?: any;
+  data?: AMISDefaultData;
 
   /**
    * 是否开启调试，开启后会在顶部实时显示表单项数据。
@@ -130,17 +153,18 @@ export interface FormSchemaBase {
      * 设置字符串的最大展示长度，超出长度阈值的字符串将被截断，点击value可切换字符串展示方式，默认为120
      */
     ellipsisThreshold?: number | false;
+    labelOverflow?: 'default' | 'ellipsis';
   };
 
   /**
    * 用来初始化表单数据
    */
-  initApi?: string | BaseApiObject;
+  initApi?: AMISApi;
 
   /**
    * Form 用来获取初始数据的 api,与initApi不同的是，会一直轮询请求该接口，直到返回 finished 属性为 true 才 结束。
    */
-  initAsyncApi?: string | BaseApiObject;
+  initAsyncApi?: AMISApi;
 
   /**
    * 设置了initAsyncApi后，默认会从返回数据的data.finished来判断是否完成，也可以设置成其他的xxx，就会从data.xxx中获取
@@ -160,7 +184,7 @@ export interface FormSchemaBase {
   /**
    * 建议改成 api 的 sendOn 属性。
    */
-  initFetchOn?: string;
+  initFetchOn?: AMISExpression;
 
   /**
    * 设置后将轮询调用 initApi
@@ -175,7 +199,7 @@ export interface FormSchemaBase {
   /**
    * 配置停止轮询的条件
    */
-  stopAutoRefreshWhen?: string;
+  stopAutoRefreshWhen?: AMISExpression;
 
   /**
    * 是否开启本地缓存
@@ -197,7 +221,7 @@ export interface FormSchemaBase {
    *
    * 详情：https://aisuda.bce.baidu.com/amis/zh-CN/components/form/index#%E8%A1%A8%E5%8D%95%E6%8F%90%E4%BA%A4
    */
-  api?: string | BaseApiObject;
+  api?: AMISApi;
 
   /**
    * Form 也可以配置 feedback。
@@ -207,7 +231,7 @@ export interface FormSchemaBase {
   /**
    * 设置此属性后，表单提交发送保存接口后，还会继续轮询请求该接口，直到返回 finished 属性为 true 才 结束。
    */
-  asyncApi?: string | BaseApiObject;
+  asyncApi?: AMISApi;
 
   /**
    * 轮询请求的时间间隔，默认为 3秒。设置 asyncApi 才有效
@@ -264,7 +288,7 @@ export interface FormSchemaBase {
   /**
    * 配置容器 panel className
    */
-  panelClassName?: ClassName;
+  panelClassName?: AMISClassName;
 
   /**
    * 设置主键 id, 当设置后，检测表单是否完成时（asyncApi），只会携带此数据。
@@ -346,8 +370,33 @@ export interface FormSchemaBase {
    * 展示态时的className
    */
   static?: boolean;
-  staticOn?: SchemaExpression;
-  staticClassName?: SchemaClassName;
+  staticOn?: AMISExpression;
+  staticClassName?: AMISClassName;
+
+  /**
+   * 是否可以访问上层数据，默认是会允许，这样顶层同名数据会自动赋值到同名表单项
+   * @default true
+   */
+  canAccessSuperData?: boolean;
+}
+
+export type FormSchemaBase = AMISFormBase;
+
+/**
+ * 表单容器组件，用于收集和提交用户输入数据。支持字段验证、数据提交、布局配置等。
+ */
+export interface AMISFormSchema extends AMISFormBase {
+  /**
+   * 指定为表单渲染器
+   */
+  type: 'form';
+}
+
+// 注册到 AMISSchemaRegistry 中
+declare module '../schema' {
+  interface AMISSchemaRegistry {
+    form: AMISFormSchema;
+  }
 }
 
 export type FormGroup = FormSchemaBase & {
@@ -372,7 +421,7 @@ export interface FormProps
   onSubmit?: (values: object, action: any) => any;
   onChange?: (values: object, diff: object, props: any) => any;
   onFailed?: (reason: string, errors: any) => any;
-  onFinished: (values: object, action: any) => any;
+  onFinished: (values: object, action: ActionObject, store: IFormStore) => any;
   onValidate: (values: object, form: any) => any;
   onValidChange?: (valid: boolean, props: any) => void; // 表单数据合法性变更
   messages: {
@@ -474,7 +523,17 @@ export default class Form extends React.Component<FormProps, object> {
     trailing: true,
     leading: false
   });
+  // 当有多次调用时，只需要跳一个
+  lazyJumpToErrorComponent = debouce(
+    this.jumpToErrorComponent.bind(this),
+    250,
+    {
+      trailing: false,
+      leading: true
+    }
+  );
   unBlockRouting?: () => void;
+  formRef = React.createRef<HTMLElement>();
   constructor(props: FormProps) {
     super(props);
 
@@ -500,9 +559,11 @@ export default class Form extends React.Component<FormProps, object> {
     this.dispatchInited = this.dispatchInited.bind(this);
     this.blockRouting = this.blockRouting.bind(this);
     this.beforePageUnload = this.beforePageUnload.bind(this);
-    this.formItemDispatchEvent = this.formItemDispatchEvent.bind(this);
+    this.dispatchEvent = this.dispatchEvent.bind(this);
+    this.flush = this.flush.bind(this);
 
-    const {store, canAccessSuperData, persistData, simpleMode} = props;
+    const {store, canAccessSuperData, persistData, simpleMode, formLazyChange} =
+      props;
 
     store.setCanAccessSuperData(canAccessSuperData !== false);
     store.setPersistData(persistData);
@@ -533,7 +594,10 @@ export default class Form extends React.Component<FormProps, object> {
         () => store.initedAt,
         () => {
           store.inited &&
-            this.lazyEmitChange(!!this.props.submitOnChange, true);
+            (formLazyChange === false ? this.emitChange : this.lazyEmitChange)(
+              !!this.props.submitOnChange,
+              true
+            );
         }
       )
     );
@@ -624,7 +688,9 @@ export default class Form extends React.Component<FormProps, object> {
           successMessage: fetchSuccess,
           errorMessage: fetchFailed,
           onSuccess: (json: Payload, data: any) => {
-            store.setValues(data);
+            store.setValues(data, undefined, undefined, undefined, {
+              type: 'api'
+            });
 
             if (
               !isEffectiveApi(initAsyncApi, store.data) ||
@@ -642,6 +708,14 @@ export default class Form extends React.Component<FormProps, object> {
           }
         })
         .then(this.initInterval)
+        .then(() =>
+          this.props.dispatchEvent(
+            'initApiFinished',
+            injectObjectChain(store.data, {
+              __trigger: 'init'
+            })
+          )
+        )
         .then(this.onInit);
     } else {
       setTimeout(this.onInit.bind(this), 4);
@@ -685,6 +759,7 @@ export default class Form extends React.Component<FormProps, object> {
     clearTimeout(this.timer);
     // this.lazyHandleChange.flush();
     this.lazyEmitChange.cancel();
+    this.lazyJumpToErrorComponent.cancel();
     this.asyncCancel && this.asyncCancel();
     this.toDispose.forEach(fn => fn());
     this.toDispose = [];
@@ -763,6 +838,9 @@ export default class Form extends React.Component<FormProps, object> {
     const initedAt = store.initedAt;
 
     store.setInited(true);
+    // 等待 formInited 属性下发成功
+    // 因为 hooks 里面可以能有读取 props 的操作
+    await new Promise<void>(resolve => this.forceUpdate(resolve));
     const hooks = this.hooks['init'] || [];
     const groupedHooks = groupBy(hooks, item =>
       (item as any).__enforce === 'prev'
@@ -874,6 +952,12 @@ export default class Form extends React.Component<FormProps, object> {
       if (result?.ok) {
         this.initInterval(result);
         store.reset(undefined, false);
+        await this.props.dispatchEvent(
+          'initApiFinished',
+          injectObjectChain(store.data, {
+            __trigger: 'reload'
+          })
+        );
       }
     } else {
       store.reset(undefined, false);
@@ -881,6 +965,7 @@ export default class Form extends React.Component<FormProps, object> {
 
     // 派发初始化接口请求完成事件
     this.dispatchInited(result);
+    return store.data;
   }
 
   receive(values: object, name?: string, replace?: boolean) {
@@ -891,7 +976,7 @@ export default class Form extends React.Component<FormProps, object> {
   }
 
   silentReload(target?: string, query?: any) {
-    this.reload(target, query, undefined, true);
+    return this.reload(target, query, undefined, true);
   }
 
   initInterval(value: any) {
@@ -959,7 +1044,9 @@ export default class Form extends React.Component<FormProps, object> {
   setValues(value: any, replace?: boolean) {
     const {store} = this.props;
     this.flush();
-    store.setValues(value, undefined, replace);
+    store.setValues(value, undefined, replace, undefined, {
+      type: 'action'
+    });
   }
 
   async submit(
@@ -993,7 +1080,10 @@ export default class Form extends React.Component<FormProps, object> {
 
       this.flushing = true;
       const hooks = this.hooks['flush'] || [];
-      await Promise.all(hooks.map(fn => fn()));
+      // 得有顺序，有些可能依赖上一个的结果
+      for (let hook of hooks) {
+        await hook();
+      }
       if (!this.emitting) {
         await this.lazyEmitChange.flush();
       }
@@ -1044,13 +1134,23 @@ export default class Form extends React.Component<FormProps, object> {
     value: any,
     name: string,
     submit: boolean,
-    changePristine = false
+    changePristine = false,
+    changeReason?: DataChangeReason
   ) {
     const {store, formLazyChange, persistDataKeys} = this.props;
     if (typeof name !== 'string') {
       return;
     }
-    store.changeValue(name, value, changePristine);
+    store.changeValue(
+      name,
+      value,
+      changePristine,
+      undefined,
+      undefined,
+      changeReason || {
+        type: 'input'
+      }
+    );
     if (!changePristine || typeof value !== 'undefined') {
       (formLazyChange === false ? this.emitChange : this.lazyEmitChange)(
         submit
@@ -1061,9 +1161,44 @@ export default class Form extends React.Component<FormProps, object> {
       store.setLocalPersistData(persistDataKeys);
     }
   }
-  formItemDispatchEvent(type: string, data: any) {
-    const {dispatchEvent} = this.props;
-    return dispatchEvent(type, data);
+
+  jumpToErrorComponent(renderer: any) {
+    // 当表单校验错误是，优先调用组件的 focus
+    // 如果没有 focus 方法，则滚动到错误信息的位置
+    if (typeof renderer?.focus === 'function') {
+      renderer.focus();
+    } else {
+      this.formRef.current
+        ?.querySelector(`.${this.props.classPrefix}Form-feedback`)
+        ?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center'
+        });
+    }
+  }
+
+  dispatchEvent(
+    e: React.MouseEvent<any> | string,
+    data: any,
+    renderer?: React.Component<RendererProps>, // for didmount
+    scoped?: IScopedContext
+  ) {
+    // 把这两个事件转到 form 组件上，让 form 组件来处理
+    if (
+      (e === 'formItemValidateSucc' || e === 'formItemValidateError') &&
+      renderer?.props.type !== 'form'
+    ) {
+      if (e === 'formItemValidateError') {
+        this.lazyJumpToErrorComponent(renderer);
+      }
+
+      // 如果事件是 formItemValidateSucc 或者 formItemValidateError 转成当前组件触发的，
+      // 所以 onEvent 是配置在 form 层的而不是表单项层
+      renderer = undefined;
+      scoped = undefined;
+    }
+
+    return this.props.dispatchEvent(e, data, renderer, scoped);
   }
 
   emittedData: any = null;
@@ -1072,13 +1207,14 @@ export default class Form extends React.Component<FormProps, object> {
     try {
       this.emitting = true;
 
-      const {onChange, store, submitOnChange, dispatchEvent, data} = this.props;
+      const {onChange, store, submitOnChange, dispatchEvent, data, originData} =
+        this.props;
 
       if (!isAlive(store)) {
         return;
       }
 
-      const diff = difference(store.data, store.pristine);
+      const diff = difference(store.data, originData ?? store.upStreamData);
       if (
         emitedFromWatch &&
         (!Object.keys(diff).length || isEqual(store.data, this.emittedData))
@@ -1098,7 +1234,7 @@ export default class Form extends React.Component<FormProps, object> {
         onChange && onChange.apply(null, changeProps);
       }
 
-      store.clearRestError();
+      isAlive(store) && store.clearRestError();
 
       // 只有主动修改表单项触发的 change 才会触发 submit
       if (!emitedFromWatch && (submit || (submitOnChange && store.inited))) {
@@ -1118,9 +1254,21 @@ export default class Form extends React.Component<FormProps, object> {
     }
   }
 
-  handleBulkChange(values: Object, submit: boolean) {
+  handleBulkChange(
+    values: Object,
+    submit: boolean,
+    changeReason?: DataChangeReason
+  ) {
     const {onChange, store, formLazyChange} = this.props;
-    store.setValues(values);
+    store.setValues(
+      values,
+      undefined,
+      undefined,
+      undefined,
+      changeReason || {
+        type: 'input'
+      }
+    );
     // store.updateData(values);
 
     // store.items.forEach(formItem => {
@@ -1205,6 +1353,10 @@ export default class Form extends React.Component<FormProps, object> {
       await this.flush();
     }
 
+    if (!isAlive(store)) {
+      return;
+    }
+
     if (trimValues) {
       store.trimValues();
     }
@@ -1273,7 +1425,7 @@ export default class Form extends React.Component<FormProps, object> {
           }
 
           // 走到这里代表校验成功了
-          dispatchEvent('validateSucc', this.props.data);
+          dispatchEvent('validateSucc', createObject(this.props.data, values));
 
           if (target) {
             this.submitToTarget(filterTarget(target, values), values);
@@ -1393,6 +1545,9 @@ export default class Form extends React.Component<FormProps, object> {
                   __response: response
                 });
               });
+          } else if (shouldBlockedBySendOnApi(action.api || api, values)) {
+            // api存在，但是不满足sendOn时，走这里，不派发submitSucc事件
+            return;
           } else {
             clearPersistDataAfterSubmit && store.clearLocalPersistData();
             // type为submit，但是没有配api以及target时，只派发事件
@@ -1410,7 +1565,7 @@ export default class Form extends React.Component<FormProps, object> {
             return store.data;
           }
 
-          if (onFinished && onFinished(values, action) === false) {
+          if (onFinished && onFinished(values, action, store) === false) {
             return values;
           }
 
@@ -1669,17 +1824,25 @@ export default class Form extends React.Component<FormProps, object> {
       submitText,
       body,
       translate: __,
-      loadingConfig
+      loadingConfig,
+      wrapWithPanel
     } = this.props;
 
     if (
+      wrapWithPanel === false ||
       typeof actions !== 'undefined' ||
       !submitText ||
       (Array.isArray(body) &&
         body.some(
           item =>
             item &&
-            !!~['submit', 'button', 'button-group', 'reset'].indexOf(
+            !!~[
+              'submit',
+              'button',
+              'button-group',
+              'reset',
+              'button-toolbar'
+            ].indexOf(
               (item as any)?.body?.[0]?.type ||
                 (item as any)?.body?.type ||
                 (item as any).type
@@ -1768,22 +1931,33 @@ export default class Form extends React.Component<FormProps, object> {
 
       return (
         <div className={cx('Form-row')}>
-          {children.map((control, key) =>
-            ~['hidden', 'formula'].indexOf((control as any).type) ||
-            (control as any).mode === 'inline' ? (
+          {children.map((control, key) => {
+            const split = control.colSize?.split('/');
+            const colSize =
+              split?.[0] && split?.[1]
+                ? (split[0] / split[1]) * 100 + '%'
+                : control.colSize;
+            return ~['hidden', 'formula'].indexOf((control as any).type) ||
+              (control as any).mode === 'inline' ? (
               this.renderChild(control, key, otherProps)
             ) : (
               <div
                 key={key}
                 className={cx(`Form-col`, (control as Schema).columnClassName)}
+                style={{
+                  flex:
+                    colSize && !['1', 'auto'].includes(colSize)
+                      ? `0 0 ${colSize}`
+                      : '1'
+                }}
               >
                 {this.renderChild(control, '', {
                   ...otherProps,
                   mode: 'row'
                 })}
               </div>
-            )
-          )}
+            );
+          })}
         </div>
       );
     }
@@ -1883,6 +2057,7 @@ export default class Form extends React.Component<FormProps, object> {
       dispatchEvent,
       labelAlign,
       labelWidth,
+      labelOverflow,
       static: isStatic,
       canAccessSuperData
     } = props;
@@ -1902,6 +2077,7 @@ export default class Form extends React.Component<FormProps, object> {
           ? 'right'
           : labelAlign,
       formLabelWidth: labelWidth,
+      formLabelOverflow: labelOverflow,
       controlWidth,
       /**
        * form.loading有为true时才下发disabled属性，否则不显性设置disbaled为false
@@ -1919,8 +2095,9 @@ export default class Form extends React.Component<FormProps, object> {
       addHook: this.addHook,
       removeHook: this.removeHook,
       renderFormItems: this.renderFormItems,
-      formItemDispatchEvent: this.formItemDispatchEvent,
-      formPristine: form.pristine
+      dispatchEvent: this.dispatchEvent,
+      formPristine: form.pristine,
+      onFlushForm: this.flush
       // value: (control as any)?.name
       //   ? getVariable(form.data, (control as any)?.name, canAccessSuperData)
       //   : (control as any)?.value,
@@ -1957,6 +2134,11 @@ export default class Form extends React.Component<FormProps, object> {
       staticClassName,
       static: isStatic = false,
       loadingConfig,
+      themeCss,
+      id,
+      wrapperCustomStyle,
+      env,
+      wrapWithPanel,
       testid
     } = this.props;
 
@@ -1980,12 +2162,31 @@ export default class Form extends React.Component<FormProps, object> {
 
     return (
       <WrapperComponent
+        ref={this.formRef}
         className={cx(
           `Form`,
           `Form--${mode || 'normal'}`,
           columnCount ? `Form--column Form--column-${columnCount}` : null,
           staticClassName && isStatic ? staticClassName : className,
-          isStatic ? 'Form--isStatic' : null
+          isStatic ? 'Form--isStatic' : null,
+          setThemeClassName({
+            ...this.props,
+            name: [
+              'formControlClassName',
+              'itemClassName',
+              'staticClassName',
+              'itemLabelClassName'
+            ],
+            id,
+            themeCss
+          }),
+          !wrapWithPanel &&
+            setThemeClassName({
+              ...this.props,
+              name: 'wrapperCustomStyle',
+              id,
+              themeCss: wrapperCustomStyle
+            })
         )}
         onSubmit={this.handleFormSubmit}
         noValidate
@@ -2031,8 +2232,7 @@ export default class Form extends React.Component<FormProps, object> {
         {render(
           'modal',
           {
-            ...((store.action as ActionObject) &&
-              ((store.action as ActionObject).dialog as object)),
+            ...store.dialogSchema,
             type: 'dialog'
           },
           {
@@ -2047,8 +2247,7 @@ export default class Form extends React.Component<FormProps, object> {
         {render(
           'modal',
           {
-            ...((store.action as ActionObject) &&
-              ((store.action as ActionObject).drawer as object)),
+            ...store.drawerSchema,
             type: 'drawer'
           },
           {
@@ -2059,6 +2258,74 @@ export default class Form extends React.Component<FormProps, object> {
             show: store.drawerOpen
           }
         )}
+        <CustomStyle
+          {...this.props}
+          config={{
+            themeCss,
+            classNames: [
+              wrapWithPanel && {
+                key: 'panelClassName'
+              },
+              !wrapWithPanel && {
+                key: 'formControlClassName'
+              },
+              {
+                key: 'headerControlClassName',
+                weights: {
+                  default: {
+                    parent: `.${cx('Panel')}`
+                  }
+                }
+              },
+              wrapWithPanel && {
+                key: 'headerTitleControlClassName',
+                weights: {
+                  default: {
+                    important: true
+                  }
+                }
+              },
+              wrapWithPanel && {
+                key: 'bodyControlClassName'
+              },
+              wrapWithPanel && {
+                key: 'actionsControlClassName',
+                weights: {
+                  default: {
+                    parent: `.${cx('Panel--form')}`
+                  }
+                }
+              },
+              {
+                key: 'itemClassName',
+                weights: {
+                  default: {
+                    inner: `.${cx('Form-item')}`
+                  }
+                }
+              },
+              {
+                key: 'staticClassName',
+                weights: {
+                  default: {
+                    inner: `.${cx('Form-static')}`
+                  }
+                }
+              },
+              {
+                key: 'itemLabelClassName',
+                weights: {
+                  default: {
+                    inner: `.${cx('Form-label')}`
+                  }
+                }
+              }
+            ].filter(n => n) as CustomStyleClassName[],
+            wrapperCustomStyle,
+            id
+          }}
+          env={env}
+        />
       </WrapperComponent>
     );
   }
@@ -2082,7 +2349,10 @@ export default class Form extends React.Component<FormProps, object> {
       affixFooter,
       lazyLoad,
       translate: __,
-      footer
+      footer,
+      id,
+      wrapperCustomStyle,
+      themeCss
     } = this.props;
 
     let body: JSX.Element = this.renderBody();
@@ -2095,7 +2365,22 @@ export default class Form extends React.Component<FormProps, object> {
           title: __(title)
         },
         {
-          className: cx(panelClassName, 'Panel--form'),
+          className: cx(
+            panelClassName,
+            'Panel--form',
+            setThemeClassName({
+              ...this.props,
+              name: 'wrapperCustomStyle',
+              id,
+              themeCss: wrapperCustomStyle
+            }),
+            setThemeClassName({
+              ...this.props,
+              name: 'panelClassName',
+              id,
+              themeCss
+            })
+          ),
           style: style,
           formStore: this.props.store,
           children: body,
@@ -2105,11 +2390,35 @@ export default class Form extends React.Component<FormProps, object> {
           disabled: store.loading,
           btnDisabled: store.loading || store.validating,
           headerClassName,
+          headerControlClassName: setThemeClassName({
+            ...this.props,
+            name: 'headerControlClassName',
+            id,
+            themeCss
+          }),
+          headerTitleControlClassName: setThemeClassName({
+            ...this.props,
+            name: 'headerTitleControlClassName',
+            id,
+            themeCss
+          }),
           footer,
           footerClassName,
           footerWrapClassName,
           actionsClassName,
+          actionsControlClassName: setThemeClassName({
+            ...this.props,
+            name: 'actionsControlClassName',
+            id,
+            themeCss
+          }),
           bodyClassName,
+          bodyControlClassName: setThemeClassName({
+            ...this.props,
+            name: 'bodyControlClassName',
+            id,
+            themeCss
+          }),
           affixFooter
         }
       ) as JSX.Element;
@@ -2123,30 +2432,7 @@ export default class Form extends React.Component<FormProps, object> {
   }
 }
 
-@Renderer({
-  type: 'form',
-  storeType: FormStore.name,
-  isolateScope: true,
-  storeExtendsData: (props: any) => props.inheritData,
-  shouldSyncSuperStore: (store, props, prevProps) => {
-    // 如果是 QuickEdit，让 store 同步 __super 数据。
-    if (
-      props.quickEditFormRef &&
-      props.onQuickChange &&
-      (isObjectShallowModified(prevProps.data, props.data) ||
-        isObjectShallowModified(prevProps.data.__super, props.data.__super) ||
-        isObjectShallowModified(
-          prevProps.data.__super?.__super,
-          props.data.__super?.__super
-        ))
-    ) {
-      return true;
-    }
-
-    return undefined;
-  }
-})
-export class FormRenderer extends Form {
+export class FormRendererBase extends Form {
   static contextType = ScopedContext;
 
   constructor(props: FormProps, context: IScopedContext) {
@@ -2160,13 +2446,7 @@ export class FormRenderer extends Form {
     super.componentDidMount();
 
     if (this.props.autoFocus) {
-      const scoped = this.context as IScopedContext;
-      const inputs = scoped.getComponents();
-      let focuableInput = find(
-        inputs,
-        input => input.focus
-      ) as ScopedComponentType;
-      focuableInput && setTimeout(() => focuableInput.focus!(), 200);
+      this.focus();
     }
   }
 
@@ -2175,6 +2455,16 @@ export class FormRenderer extends Form {
     scoped.unRegisterComponent(this);
 
     super.componentWillUnmount();
+  }
+
+  focus() {
+    const scoped = this.context as IScopedContext;
+    const inputs = scoped.getComponents();
+    let focuableInput = find(
+      inputs,
+      input => input.focus
+    ) as ScopedComponentType;
+    focuableInput && setTimeout(() => focuableInput.focus!(), 200);
   }
 
   doAction(
@@ -2217,6 +2507,8 @@ export class FormRenderer extends Form {
           );
         })
       );
+    } else if (action.actionType === 'clearError') {
+      return super.clearErrors();
     } else {
       return super.handleAction(e, action, ctx, throwErrors, delegate);
     }
@@ -2337,3 +2629,29 @@ export class FormRenderer extends Form {
     return this.getValues();
   }
 }
+
+@Renderer({
+  type: 'form',
+  storeType: FormStore.name,
+  isolateScope: true,
+  storeExtendsData: (props: any) => props.inheritData,
+  shouldSyncSuperStore: (store, props, prevProps) => {
+    // 如果是 QuickEdit，让 store 同步 __super 数据。
+    if (
+      props.quickEditFormRef &&
+      props.onQuickChange &&
+      (isObjectShallowModified(prevProps.data, props.data) ||
+        isObjectShallowModified(prevProps.data.__super, props.data.__super) ||
+        isObjectShallowModified(
+          prevProps.data.__super?.__super,
+          props.data.__super?.__super
+        ))
+    ) {
+      return true;
+    }
+
+    return undefined;
+  }
+})
+// 装饰器装饰后的类无法继承父类上的方法，所以多包了一层FormRendererBase用来继承
+export class FormRenderer extends FormRendererBase {}

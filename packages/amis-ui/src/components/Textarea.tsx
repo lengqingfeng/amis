@@ -1,5 +1,5 @@
 import React from 'react';
-import {findDOMNode} from 'react-dom';
+import {findDomCompat as findDOMNode} from 'amis-core';
 import BaseTextArea from 'react-textarea-autosize';
 import {localeable, LocaleProps, TestIdBuilder} from 'amis-core';
 import {themeable, ThemeProps} from 'amis-core';
@@ -185,7 +185,8 @@ export class Textarea extends React.Component<TextAreaProps, TextAreaState> {
       maxLength,
       showCounter,
       clearable,
-      testIdBuilder
+      testIdBuilder,
+      style
     } = this.props;
     const counter = showCounter ? this.valueToString(value).length : 0;
 
@@ -200,6 +201,7 @@ export class Textarea extends React.Component<TextAreaProps, TextAreaState> {
           },
           className
         )}
+        style={style}
       >
         <BaseTextArea
           className={cx(`TextareaControl-input`, {

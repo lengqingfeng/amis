@@ -3,7 +3,7 @@
  */
 import {isAlive} from 'mobx-state-tree';
 import React from 'react';
-import {findDOMNode} from 'react-dom';
+import {findDomCompat as findDOMNode} from 'amis-core';
 import {RendererInfo} from '../plugin';
 import {EditorNodeContext, EditorNodeType} from '../store/node';
 
@@ -60,7 +60,9 @@ export class VRenderer extends React.Component<VRendererProps> {
     }
 
     const info = this.editorNode.info!;
-    let dom = info.wrapperResolve ? info.wrapperResolve(root) : root;
+    let dom = info.wrapperResolve
+      ? info.wrapperResolve(root, this.props as any)
+      : root;
     (Array.isArray(dom) ? dom : dom ? [dom] : []).forEach(dom =>
       dom.setAttribute('data-editor-id', id)
     );

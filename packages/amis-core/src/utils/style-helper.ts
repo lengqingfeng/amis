@@ -6,6 +6,8 @@ import map from 'lodash/map';
 import isEmpty from 'lodash/isEmpty';
 import kebabCase from 'lodash/kebabCase';
 import {resolveVariableAndFilter} from './resolveVariableAndFilter';
+import some from 'lodash/some';
+import {isExpression} from './formula';
 
 export const valueMap: PlainObject = {
   'marginTop': 'margin-top',
@@ -40,6 +42,7 @@ export const inheritValueMap: PlainObject = {
 
 interface extra {
   important?: boolean;
+  parent?: string;
   inner?: string;
   pre?: string;
   suf?: string;
@@ -179,7 +182,8 @@ export function formatStyle(
     default: '',
     hover: ':hover',
     active: ':hover:active',
-    disabled: '.is-disabled'
+    focused: '',
+    disabled: ''
   };
 
   for (let item of classNames) {
@@ -191,8 +195,8 @@ export function formatStyle(
 
     let className = item.key + '-' + id?.replace('u:', '');
     const weightsList: PlainObject = item.weights || {};
-
-    if (typeof data?.index === 'number') {
+    const cssHasExpression = hasExpression(body);
+    if (typeof data?.index === 'number' && cssHasExpression !== false) {
       className += `-${data.index}`;
     }
 
@@ -200,6 +204,7 @@ export function formatStyle(
       default: {},
       hover: {},
       active: {},
+      focused: {},
       disabled: {}
     };
     Object.keys(body).forEach(key => {
@@ -210,6 +215,8 @@ export function formatStyle(
           statusMap.hover[key.replace(':hover', '')] = body[key];
         } else if (!!~key.indexOf(':active')) {
           statusMap.active[key.replace(':active', '')] = body[key];
+        } else if (!!~key.indexOf(':focused')) {
+          statusMap.focused[key.replace(':focused', '')] = body[key];
         } else if (!!~key.indexOf(':disabled')) {
           statusMap.disabled[key.replace(':disabled', '')] = body[key];
         } else {
@@ -269,11 +276,13 @@ export function formatStyle(
       if (styles.length > 0) {
         const cx = (weights?.pre || '') + className + (weights?.suf || '');
         const inner = weights?.inner || '';
+        const parent = weights?.parent || '';
+
         res.push({
-          className: cx + status2string[status] + inner,
-          content: `.${cx + status2string[status]} ${inner}{\n  ${styles.join(
-            '\n  '
-          )}\n}`
+          className: parent + cx + status2string[status] + inner,
+          content: `${parent} .${
+            cx + status2string[status]
+          } ${inner}{\n  ${styles.join('\n  ')}\n}`
         });
         // TODO:切换状态暂时先不改变组件的样式
         // if (['hover', 'active', 'disabled'].includes(status)) {
@@ -297,17 +306,19 @@ export interface CustomStyleClassName {
     default?: extra;
     hover?: extra;
     active?: extra;
+    focused?: extra;
     disabled?: extra;
   };
 }
 
-export function insertCustomStyle(prams: {
+export function insertCustomStyle(params: {
   themeCss: any;
   classNames: CustomStyleClassName[];
   id: string;
   defaultData?: any;
   customStyleClassPrefix?: string;
   doc?: Document;
+  cssHasExpression?: boolean;
   [propName: string]: any;
 }) {
   const {
@@ -317,8 +328,9 @@ export function insertCustomStyle(prams: {
     defaultData,
     customStyleClassPrefix,
     doc,
-    data
-  } = prams;
+    data,
+    cssHasExpression
+  } = params;
   if (!themeCss) {
     return;
   }
@@ -326,7 +338,7 @@ export function insertCustomStyle(prams: {
   let {value} = formatStyle(themeCss, classNames, id, defaultData, data);
   value = customStyleClassPrefix ? `${customStyleClassPrefix} ${value}` : value;
   let classId = id?.replace?.('u:', '') || id + '';
-  if (typeof data?.index === 'number') {
+  if (typeof data?.index === 'number' && cssHasExpression !== false) {
     classId += `-${data.index}`;
   }
   // 这里需要插入到wrapperCustomStyle的前面
@@ -363,7 +375,15 @@ function traverseStyle(style: any, path: string, result: any) {
   Object.keys(style).forEach(key => {
     if (key !== '$$id') {
       if (isObject(style[key])) {
-        const nowPath = path ? `${path} ${key}` : key;
+        const keys = key.split(',');
+        const nowPath = path
+          ? keys
+              .map(key => {
+                const paths = path.split(',');
+                return paths.map(path => `${path} ${key}`).join(',');
+              })
+              .join(',')
+          : key;
         traverseStyle(style[key], nowPath, result);
       } else if (path === '') {
         !result[key] && (result[key] = {});
@@ -376,6 +396,86 @@ function traverseStyle(style: any, path: string, result: any) {
   });
 }
 
+export function hasExpression(customStyle: any) {
+  let styles: any = {};
+  traverseStyle(customStyle || {}, '', styles);
+  if (!isEmpty(styles)) {
+    return some(Object.keys(styles), (key: string) => {
+      return some(styles[key], (value: any, k) => {
+        return isExpression(value) || isExpression(k);
+      });
+    });
+  }
+  return false;
+}
+
+export function formatCustomStyle(params: {
+  customStyle: any;
+  id?: string;
+  doc?: Document;
+  cssHasExpression?: boolean;
+  customStyleClassPrefix?: string;
+  [propName: string]: any;
+}): {
+  content: string;
+  index?: string;
+  id: string;
+} {
+  const {customStyle, doc, data, cssHasExpression, customStyleClassPrefix} =
+    params;
+  const id = params.id?.replace?.('u:', '') || params.id + '';
+  let styles: any = {};
+  traverseStyle(customStyle, '', styles);
+
+  let content = '';
+  let index = '';
+  if (typeof data?.index === 'number' && cssHasExpression !== false) {
+    index = `-${data.index}`;
+  }
+  if (!isEmpty(styles)) {
+    let className = `.wrapperCustomStyle-${id}${index}`;
+    if (customStyleClassPrefix) {
+      className = `${customStyleClassPrefix} ${className}`;
+    }
+    Object.keys(styles).forEach((key: string) => {
+      if (!isObject(styles[key])) {
+        // 这里如果有表达式 应该先运行表达式 在执行替换 否则表达式始终运行不过去
+        content += `\n${className} {\n  ${key}: ${(
+          resolveVariableAndFilter(styles[key], data, '| raw') || styles[key]
+        ).replace(/['|"]/g, '')}\n}`;
+      } else if (key.startsWith('root')) {
+        const res = map(
+          styles[key],
+          (value: any, key) =>
+            `${key}: ${(
+              resolveVariableAndFilter(value, data, '| raw') || value
+            ).replace(/['|"]/g, '')};`
+        );
+        content += `\n${key.replace(/root/g, className)} {\n  ${res.join(
+          '\n  '
+        )}\n}`;
+      } else {
+        const res = map(
+          styles[key],
+          (value: any, key) =>
+            `${key}: ${(
+              resolveVariableAndFilter(value, data, '| raw') || value
+            ).replace(/['|"]/g, '')};`
+        );
+        const keys = key.split(',');
+        content += `\n${keys.map(key => `${className} ${key}`)} {\n  ${res.join(
+          '\n  '
+        )}\n}`;
+      }
+    });
+  }
+  return {
+    content: content,
+    index: index,
+    id: id
+  };
+}
+
 /**
  * 设置源码编辑自定义样式
  */
@@ -383,79 +483,19 @@ export function insertEditCustomStyle(params: {
   customStyle: any;
   id?: string;
   doc?: Document;
+  cssHasExpression?: boolean;
+  customStyleClassPrefix?: string;
   [propName: string]: any;
 }) {
-  const {customStyle, doc, data} = params;
-  const id = params.id?.replace?.('u:', '') || params.id + '';
-  let styles: any = {};
-  traverseStyle(customStyle, '', styles);
-
-  let content = '';
-  let index = '';
-  if (typeof data?.index === 'number') {
-    index = `-${data.index}`;
-  }
-  if (!isEmpty(styles)) {
-    const className = `wrapperCustomStyle-${id}${index}`;
-    Object.keys(styles).forEach((key: string) => {
-      if (!isObject(styles[key])) {
-        content += `\n.${className} {\n  ${key}: ${
-          resolveVariableAndFilter(
-            styles[key].replace(/['|"]/g, ''),
-            data,
-            '| raw'
-          ) || styles[key]
-        }\n}`;
-      } else if (key === 'root') {
-        const res = map(
-          styles[key],
-          (value, key) =>
-            `${key}: ${
-              resolveVariableAndFilter(
-                value.replace(/['|"]/g, ''),
-                data,
-                '| raw'
-              ) || value
-            };`
-        );
-        content += `\n.${className} {\n  ${res.join('\n  ')}\n}`;
-      } else if (/^root:/.test(key)) {
-        const res = map(
-          styles[key],
-          (value, key) =>
-            `${key}: ${
-              resolveVariableAndFilter(
-                value.replace(/['|"]/g, ''),
-                data,
-                '| raw'
-              ) || value
-            };`
-        );
-        const nowKey = key.replace('root', '');
-        content += `\n.${className} ${nowKey} {\n  ${res.join('\n  ')}\n}`;
-      } else {
-        const res = map(
-          styles[key],
-          (value, key) =>
-            `${key}: ${
-              resolveVariableAndFilter(
-                value.replace(/['|"]/g, ''),
-                data,
-                '| raw'
-              ) || value
-            };`
-        );
-        content += `\n.${className} ${key} {\n  ${res.join('\n  ')}\n}`;
-      }
-    });
-  }
-
+  const {doc} = params;
+  const {content, index, id} = formatCustomStyle(params);
   insertStyle({
     style: content,
     classId: 'wrapperCustomStyle-' + (id || uuid()) + index,
     doc,
     id: id.replace(/(-.*)/, '')
   });
+  return content;
 }
 
 export interface InsertCustomStyle {
@@ -474,11 +514,12 @@ export function removeCustomStyle(
   type: string,
   id: string,
   doc?: Document,
-  data?: any
+  data?: any,
+  cssHasExpression?: boolean
 ) {
   let styleId =
     'amis-' + (type ? type + '-' : '') + (id.replace?.('u:', '') || id + '');
-  if (typeof data?.index === 'number') {
+  if (typeof data?.index === 'number' && cssHasExpression !== false) {
     styleId += `-${data.index}`;
   }
   const style = (doc || document).getElementById(styleId);
@@ -503,7 +544,7 @@ export function formatInputThemeCss(themeCss: any) {
 }
 
 export function setThemeClassName(params: {
-  name: string;
+  name: string | string[];
   id?: string;
   themeCss: any;
   extra?: string;
@@ -513,18 +554,26 @@ export function setThemeClassName(params: {
   if (!id || !themeCss) {
     return '';
   }
-
-  if (name !== 'wrapperCustomStyle' && !themeCss[name]) {
-    return '';
-  }
+  const cssHasExpression = hasExpression(themeCss || {});
   let index = '';
-  if (typeof data?.index === 'number') {
+  if (typeof data?.index === 'number' && cssHasExpression !== false) {
     index = `-${data.index}`;
   }
 
-  return (
-    `${name}-${id.replace?.('u:', '') || id}` +
-    (extra ? `-${extra}` : '') +
-    index
-  );
+  function setClassName(name: string, id: string) {
+    if (name !== 'wrapperCustomStyle' && !themeCss[name]) {
+      return '';
+    }
+    return (
+      `${name}-${id.replace?.('u:', '') || id}` +
+      (extra ? `-${extra}` : '') +
+      index
+    );
+  }
+
+  if (typeof name === 'string') {
+    return setClassName(name, id);
+  } else {
+    return name.map(n => setClassName(n, id)).join(' ');
+  }
 }
